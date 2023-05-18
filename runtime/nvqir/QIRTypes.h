@@ -118,8 +118,7 @@ class QubitIdTracker {
 public:
   /// The Constructor
   QubitIdTracker() {
-    // FIXME calculate the memory available
-    totalQubits = 30;
+    totalQubits = std::numeric_limits<std::size_t>::max();
     for (std::size_t i = 0; i < totalQubits; i++) {
       availableIndices.push_back(i);
     }

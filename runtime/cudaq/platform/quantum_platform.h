@@ -52,11 +52,11 @@ public:
   std::optional<QubitConnectivity> connectivity();
 
   /// Get the number of qubits for the current QPU
-  std::size_t get_num_qubits();
+  std::size_t get_num_qubits() {return get_num_qubits(0); }
 
   /// Get the number of qubits for the QPU with ID qpu_id
   std::size_t get_num_qubits(std::size_t qpu_id);
-
+  
   /// Getter for the shots
   std::optional<int> get_shots() { return platformNumShots; }
 

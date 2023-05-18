@@ -32,9 +32,10 @@ else()
     set_target_properties(nvqir-clifford PROPERTIES LINK_FLAGS "-shared")
 endif()
 
-target_link_directories(nvqir-clifford PRIVATE /root/.stim/lib)
-target_link_libraries(nvqir-clifford PRIVATE 
-                fmt::fmt-header-only stim
+target_compile_options(nvqir-clifford PRIVATE -march=native)
+target_link_directories(nvqir-clifford PUBLIC /root/.stim/lib)
+target_link_libraries(nvqir-clifford PUBLIC stim
+                fmt::fmt-header-only 
                 cudaq-common)
   
 

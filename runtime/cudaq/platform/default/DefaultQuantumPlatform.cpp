@@ -32,6 +32,9 @@ public:
     execution_queue->enqueue(task);
   }
 
+  std::size_t getNumQubits() override {
+    
+  }
   void launchKernel(const std::string &name, void (*kernelFunc)(void *),
                     void *args, std::uint64_t, std::uint64_t) override {
     cudaq::ScopedTrace trace("QPU::launchKernel");

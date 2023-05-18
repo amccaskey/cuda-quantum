@@ -46,6 +46,10 @@ quantum_platform *getQuantumPlatformInternal() {
   return platform;
 }
 
+std::size_t quantum_platform::get_num_qubits(std::size_t qpu_id) {
+  return platformQPUs[qpu_id]->getNumQubits();
+}
+
 void quantum_platform::set_noise(noise_model *model) {
   auto &platformQPU = platformQPUs[platformCurrentQPU];
   platformQPU->setNoiseModel(model);

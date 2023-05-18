@@ -64,7 +64,7 @@ protected:
 
 public:
   ExecutionManager() {
-    totalQudits = 30; // platform.get_num_qubits();
+    totalQudits = 100; // platform.get_num_qubits();
     for (std::size_t i = 0; i < totalQudits; i++) {
       availableIndices.push_back(i);
     }

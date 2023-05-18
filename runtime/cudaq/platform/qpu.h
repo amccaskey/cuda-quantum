@@ -58,7 +58,7 @@ public:
   virtual void setNoiseModel(noise_model *model) { noiseModel = model; }
 
   /// Return the number of qubits
-  std::size_t getNumQubits() { return numQubits; }
+  virtual std::size_t getNumQubits() { return numQubits; }
   /// Return the qubit connectivity
   auto getConnectivity() { return connectivity; }
   /// Is this QPU a simulator ?
