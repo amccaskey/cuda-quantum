@@ -37,6 +37,7 @@ install(TARGETS ${LIBRARY_NAME}
         INCLUDES DESTINATION include/nvqir)
 
 add_subdirectory(qpp)
+add_subdirectory(clifford)
 
 # FIXME Check that we have GPUs. Could be in a 
 # Docker environment built with CUDA, but no --gpus flag
