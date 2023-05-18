@@ -27,17 +27,17 @@ protected:
 
   /// @brief Grow the state vector by one qubit.
   void addQubitToState() override {
-    // do nothing
+    // do nothing, we don't really need to track qubits
   }
 
   /// @brief Override the default sized allocation of qubits
   /// here to be a bit more efficient than the default implementation
   void addQubitsToState(std::size_t count) override {
-    // do nothing
+    // do nothing, we don't really need to track qubits
   }
 
   /// @brief Reset the qubit state.
-  void deallocateStateImpl() override {}
+  void deallocateStateImpl() override { circuit.clear(); }
 
   void applyGate(const GateApplicationTask &task) override {
     if (task.controls.size() > 1)
@@ -47,8 +47,17 @@ protected:
     std::transform(task.targets.begin(), task.targets.end(),
                    std::back_inserter(targets),
                    [](auto &&el) { return static_cast<uint32_t>(el); });
-    if (task.operationName == "h") {
+
+    // valid cliffords in our mlir instruction set are
+    // x, y, z, cx, cy, cz, h, s, swap
+
+    if (task.operationName == "h" && task.controls.empty()) {
       circuit.safe_append_u("H", targets);
+      return;
+    }
+
+    if (task.operationName == "s" && task.controls.empty()) {
+      circuit.safe_append_u("S", targets);
       return;
     }
 
@@ -57,6 +66,27 @@ protected:
         targets.insert(targets.begin(), task.controls[0]);
 
       circuit.safe_append_u("CX", targets);
+      return;
+    }
+
+    if (task.operationName == "y") {
+      if (!task.controls.empty())
+        targets.insert(targets.begin(), task.controls[0]);
+
+      circuit.safe_append_u("CY", targets);
+      return;
+    }
+
+    if (task.operationName == "z") {
+      if (!task.controls.empty())
+        targets.insert(targets.begin(), task.controls[0]);
+
+      circuit.safe_append_u("CZ", targets);
+      return;
+    }
+
+    if (task.operationName == "swap" && task.controls.empty()) {
+      circuit.safe_append_u("SWAP", targets);
       return;
     }
   }
@@ -78,7 +108,10 @@ public:
 
   /// @brief Reset the qubit
   /// @param qubitIdx
-  void resetQubit(const std::size_t qubitIdx) override { flushGateQueue(); }
+  void resetQubit(const std::size_t qubitIdx) override {
+    flushGateQueue();
+    circuit.safe_append_u("MRZ", {static_cast<uint32_t>(qubitIdx)});
+  }
 
   /// @brief Sample the multi-qubit state.
   cudaq::ExecutionResult sample(const std::vector<std::size_t> &measuredBits,
@@ -105,7 +138,9 @@ public:
     return counts;
   }
 
-  cudaq::State getStateData() override { flushGateQueue(); }
+  cudaq::State getStateData() override {
+    throw std::runtime_error("Cannot get state data from clifford simulator.");
+  }
 
   std::string name() const override { return "clifford"; }
   NVQIR_SIMULATOR_CLONE_IMPL(StimCircuitSimulator)
