@@ -104,9 +104,9 @@ public:
 
   // This method is the hook for the kernel rewrites to invoke
   // quantum kernels.
-  void launchKernel(std::string kernelName, void (*kernelFunc)(void *),
+  virtual void launchKernel(std::string kernelName, void (*kernelFunc)(void *),
                     void *args, std::uint64_t voidStarSize,
-                    std::uint64_t resultOffset);
+                    std::uint64_t resultOffset) {}
 
   /// List all available platforms, which correspond to .qplt files in the
   /// platform directory.

@@ -156,6 +156,20 @@ public:
     // Forward to the QPU.
     platformQPUs.front()->setTargetBackend(backend);
   }
+
+  void launchKernel(std::string kernelName, void (*kernelFunc)(void *),
+                    void *args, std::uint64_t voidStarSize,
+                    std::uint64_t resultOffset) override {
+    std::size_t qpu_id = 0;
+
+    auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    auto iter = threadToQpuId.find(tid);
+    if (iter != threadToQpuId.end())
+      qpu_id = iter->second;
+
+    auto &qpu = platformQPUs[qpu_id];
+    qpu->launchKernel(kernelName, kernelFunc, args, voidStarSize, resultOffset);
+  }
 };
 } // namespace
 

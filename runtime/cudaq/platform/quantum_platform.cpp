@@ -118,21 +118,6 @@ bool quantum_platform::supports_conditional_feedback(
   return platformQPUs[qpu_id]->supportsConditionalFeedback();
 }
 
-void quantum_platform::launchKernel(std::string kernelName,
-                                    void (*kernelFunc)(void *), void *args,
-                                    std::uint64_t voidStarSize,
-                                    std::uint64_t resultOffset) {
-  std::size_t qpu_id = 0;
-
-  auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
-  auto iter = threadToQpuId.find(tid);
-  if (iter != threadToQpuId.end())
-    qpu_id = iter->second;
-
-  auto &qpu = platformQPUs[qpu_id];
-  qpu->launchKernel(kernelName, kernelFunc, args, voidStarSize, resultOffset);
-}
-
 } // namespace cudaq
 
 void cudaq::altLaunchKernel(const char *kernelName, void (*kernelFunc)(void *),
