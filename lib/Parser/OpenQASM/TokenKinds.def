@@ -1,0 +1,82 @@
+/*******************************************************************************
+ * Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the MIT License which accompanies this distribution.
+ ******************************************************************************/
+#if !defined(TOK_MARKER) && !defined(TOK_IDENTIFIER) &&                        \
+    !defined(TOK_LITERAL) && !defined(TOK_PUNCTUATION) &&                      \
+    !defined(TOK_KEYWORD)
+#error Must define one of the TOK_ macros.
+#endif
+
+#ifndef TOK_MARKER
+#define TOK_MARKER(X)
+#endif
+#ifndef TOK_IDENTIFIER
+#define TOK_IDENTIFIER(NAME)
+#endif
+#ifndef TOK_LITERAL
+#define TOK_LITERAL(NAME)
+#endif
+#ifndef TOK_PUNCTUATION
+#define TOK_PUNCTUATION(NAME, SPELLING)
+#endif
+#ifndef TOK_KEYWORD
+#define TOK_KEYWORD(SPELLING)
+#endif
+
+// Markers
+TOK_MARKER(eof)
+TOK_MARKER(error)
+
+// Identifiers
+TOK_IDENTIFIER(identifier)
+
+// Literals
+TOK_LITERAL(real)
+TOK_LITERAL(integer)
+TOK_LITERAL(string)
+
+// Punctuation
+TOK_PUNCTUATION(arrow, "->")
+TOK_PUNCTUATION(caret, "^")
+TOK_PUNCTUATION(colon, ":")
+TOK_PUNCTUATION(comma, ",")
+TOK_PUNCTUATION(equal, "=")
+TOK_PUNCTUATION(equalequal, "==")
+TOK_PUNCTUATION(greater, ">")
+TOK_PUNCTUATION(l_brace, "{")
+TOK_PUNCTUATION(l_paren, "(")
+TOK_PUNCTUATION(l_square, "[")
+TOK_PUNCTUATION(less, "<")
+TOK_PUNCTUATION(minus, "-")
+TOK_PUNCTUATION(plus, "+")
+TOK_PUNCTUATION(r_brace, "}")
+TOK_PUNCTUATION(r_paren, ")")
+TOK_PUNCTUATION(r_square, "]")
+TOK_PUNCTUATION(semicolon, ";")
+TOK_PUNCTUATION(slash, "/")
+TOK_PUNCTUATION(star, "*")
+TOK_PUNCTUATION(vertical_bar, "|")
+
+// Keywords.  These turn "foo" into Token::kw_foo enums.
+TOK_KEYWORD(barrier)
+TOK_KEYWORD(creg)
+TOK_KEYWORD(CX)
+TOK_KEYWORD(gate)
+TOK_KEYWORD(if)
+TOK_KEYWORD(include)
+TOK_KEYWORD(measure)
+TOK_KEYWORD(pi)
+TOK_KEYWORD(opaque)
+TOK_KEYWORD(OPENQASM)
+TOK_KEYWORD(qreg)
+TOK_KEYWORD(reset)
+TOK_KEYWORD(U)
+
+#undef TOK_MARKER
+#undef TOK_IDENTIFIER
+#undef TOK_LITERAL
+#undef TOK_PUNCTUATION
+#undef TOK_KEYWORD

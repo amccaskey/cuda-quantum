@@ -8,6 +8,7 @@
 
 # This file is responsible for testing the accuracy of gates within
 # the kernel builder.
+import os 
 
 import numpy as np
 
@@ -245,4 +246,48 @@ def test_can_progressively_build():
     print(counts)
     assert '11' in counts 
     assert '00' in counts 
+
+def test_from_string():
+    """Tests that kernel_builders can be created from string."""
+    code = '''OPENQASM 2.0;
+qreg q[2];
+h q[0];
+cx q[0], q[1];'''
+
+    # Create from code string
+    kernel = cudaq.make_kernel(code)
+    counts = cudaq.sample(kernel)
+    assert len(counts) == 2 
+
+    # Create from file with code in it 
+    f = open('test_oq.qasm', 'w')
+    f.write(code)
+    f.close()
+    kernel = cudaq.make_kernel('test_oq.qasm')
+    counts = cudaq.sample(kernel)
+    assert len(counts) == 2 
+    os.remove('test_oq.qasm')
+
+    # Create from quake
+    quake = str(kernel)
+    kernel = cudaq.make_kernel(quake)
+    counts = cudaq.sample(kernel)
+    assert len(counts) == 2 
+
+    # Create from qiskit 
+    import qiskit 
+    qc = qiskit.QuantumCircuit(2)
+    qc.h(0)
+    qc.cnot(0,1)
+    print(qc.qasm())
+
+    kernel = cudaq.make_kernel(qc.qasm())
+    counts = cudaq.sample(kernel)
+    assert len(counts) == 2 
+
+    # Create without .qasm()
+    kernel = cudaq.make_kernel(qc)
+    counts = cudaq.sample(kernel)
+    assert len(counts) == 2 
+
     

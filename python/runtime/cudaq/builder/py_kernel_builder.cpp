@@ -56,6 +56,32 @@ void bindMakeKernel(py::module &mod) {
 
   mod.def(
       "make_kernel",
+      [](const std::string &codeOrFile) {
+        return std::make_unique<kernel_builder<>>(codeOrFile);
+      },
+      "Create and return a :class:`Kernel` from the input string "
+      "representation. The string can be a file name or a code "
+      "representation.\n"
+      "\nArgs:\n"
+      "  codeOrFile : A string representing a file name or code "
+      "representation.\n"
+      "\nReturns:\n"
+      "  :class:`Kernel` : An empty kernel function to be used for quantum "
+      "program construction."
+      "\n.. code-block:: python\n\n"
+      "  # Example:\n"
+      "  kernel = cudaq.make_kernel('test.qasm')\n");
+
+  mod.def("make_kernel", [](const py::object &pyObject) {
+    if (!py::hasattr(pyObject, "qasm"))
+      throw std::runtime_error("Cannot create Kernel from the input Python "
+                               "object, must have .qasm() method.");
+    auto code = pyObject.attr("qasm")().cast<std::string>();
+    return std::make_unique<kernel_builder<>>(code);
+  });
+
+  mod.def(
+      "make_kernel",
       [](py::args arguments) {
         // Transform the py::args (which must be py::types) into
         // our KernelBuilderType

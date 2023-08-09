@@ -16,6 +16,8 @@
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeOps.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
+#include "cudaq/Parser/OpenQASM.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -27,6 +29,7 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "mlir/Transforms/Passes.h"
@@ -111,6 +114,68 @@ MLIRContext *initializeContext() {
 }
 void deleteContext(MLIRContext *context) { delete context; }
 void deleteJitEngine(ExecutionEngine *jit) { delete jit; }
+
+ImplicitLocOpBuilder *
+initializeBuilderFromStringOrFile(MLIRContext *context,
+                                  const std::string &externalSource,
+                                  std::string &kernelName) {
+  cudaq::info("Creating the MLIR ModuleOp from file or string.");
+
+  ModuleOp moduleOp;
+  std::error_code ec;
+  std::filesystem::is_regular_file(externalSource, ec);
+  if (!ec) {
+    std::string errorMessage;
+    auto file = mlir::openInputFile(externalSource, &errorMessage);
+    llvm::SourceMgr sourceMgr;
+    sourceMgr.AddNewSourceBuffer(std::move(file), llvm::SMLoc());
+
+    mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, context);
+
+    // FIXME What kind of file is this? To start assume OpenQASM.
+    moduleOp = cudaq::qasm::parseFile(context, sourceMgr).release();
+    if (!moduleOp)
+      throw std::runtime_error("[kernel_builder] error parsing code in " +
+                               externalSource + ".");
+
+  } else
+    // Only thing left is this is some code String
+    if (externalSource.find("OPENQASM 2.0") != std::string::npos) {
+      moduleOp = cudaq::qasm::parseCode(context, externalSource).release();
+      if (!moduleOp)
+        throw std::runtime_error("[kernel_builder] error parsing code:\n" +
+                                 externalSource);
+
+    } else {
+      moduleOp =
+          parseSourceString<ModuleOp>(
+              externalSource, ParserConfig{context, /*verifyAfterParse=*/false})
+              .release();
+      if (!moduleOp)
+        throw std::runtime_error("[kernel_builder] error parsing quake code.");
+    }
+
+  moduleOp.dump();
+  // Make the kernel_name unique,
+  std::ostringstream os;
+  for (int i = 0; i < 12; ++i) {
+    int digit = rand() % 10;
+    os << digit;
+  }
+
+  kernelName += fmt::format("_{}", os.str());
+  cudaq::info("kernel_builder name set to {}", kernelName);
+
+  auto location = FileLineColLoc::get(context, "<builder>", 1, 1);
+  auto *opBuilder = new ImplicitLocOpBuilder(location, context);
+  moduleOp.walk([&](func::FuncOp function) {
+    opBuilder->setInsertionPointToEnd(&function.getBlocks().front());
+    function.setName(kernelName);
+    return WalkResult::interrupt();
+  });
+
+  return opBuilder;
+}
 
 ImplicitLocOpBuilder *
 initializeBuilder(MLIRContext *context,

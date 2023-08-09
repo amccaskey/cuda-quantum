@@ -11,6 +11,7 @@
 #include <cudaq/algorithms/gradients/central_difference.h>
 #include <cudaq/builder.h>
 #include <cudaq/optimizers.h>
+#include <fstream>
 #include <regex>
 
 CUDAQ_TEST(BuilderTester, checkSimple) {
@@ -684,3 +685,44 @@ CUDAQ_TEST(BuilderTester, checkCanProgressivelyBuild) {
 }
 
 #endif
+
+CUDAQ_TEST(BuilderTester, checkFromCodeString) {
+
+  const std::string code = R"#(OPENQASM 2.0;
+qreg q[2];
+h q[0];
+cx q[0], q[1];)#";
+
+  // Test kernel from code string
+  {
+    auto kernel = cudaq::make_kernel(code);
+    auto counts = cudaq::sample(kernel);
+    counts.dump();
+    EXPECT_EQ(counts.size(), 2);
+  }
+
+  // Output to a file
+  {
+    std::ofstream out("test_oq_builder.qasm");
+    out << code;
+  }
+
+  // Test kernel from file, save its quake rep
+  std::string quake = "";
+  {
+    auto kernelFromFile = cudaq::make_kernel("test_oq_builder.qasm");
+    auto counts = cudaq::sample(kernelFromFile);
+    counts.dump();
+    EXPECT_EQ(counts.size(), 2);
+    std::remove("test_oq_builder.qasm");
+    quake = kernelFromFile.to_quake();
+  }
+
+  // Test kernel from quake
+  {
+    auto kernelFromQuake = cudaq::make_kernel(quake);
+    auto counts = cudaq::sample(kernelFromQuake);
+    counts.dump();
+    EXPECT_EQ(counts.size(), 2);
+  }
+}

@@ -13,6 +13,7 @@
 #include "cudaq/qis/qvector.h"
 #include "cudaq/utils/cudaq_utils.h"
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -135,6 +136,10 @@ MLIRContext *initializeContext();
 /// @brief Delete function for the context pointer,
 /// also given to the `unique_ptr`
 void deleteContext(MLIRContext *);
+
+ImplicitLocOpBuilder *
+initializeBuilderFromStringOrFile(MLIRContext *, const std::string &,
+                                  std::string &kernelName);
 
 /// @brief Initialize the `OpBuilder`, return the raw
 /// pointer which we'll wrap in an `unique_ptr`.
@@ -372,6 +377,17 @@ public:
         jitEngine(nullptr, [](ExecutionEngine *) {}) {
     auto *ptr =
         details::initializeBuilder(context.get(), types, arguments, kernelName);
+    opBuilder =
+        std::unique_ptr<ImplicitLocOpBuilder, void (*)(ImplicitLocOpBuilder *)>(
+            ptr, details::deleteBuilder);
+  }
+
+  kernel_builder(const std::string &externalSource)
+      : context(details::initializeContext(), details::deleteContext),
+        opBuilder(nullptr, [](ImplicitLocOpBuilder *) {}),
+        jitEngine(nullptr, [](ExecutionEngine *) {}) {
+    auto *ptr = details::initializeBuilderFromStringOrFile(
+        context.get(), externalSource, kernelName);
     opBuilder =
         std::unique_ptr<ImplicitLocOpBuilder, void (*)(ImplicitLocOpBuilder *)>(
             ptr, details::deleteBuilder);
@@ -708,6 +724,10 @@ struct tuple_element<N, cudaq::kernel_builder<Args...>> {
 } // namespace std
 
 namespace cudaq {
+
+inline auto make_kernel(const std::string &codeOrFile) {
+  return kernel_builder<>(codeOrFile);
+}
 
 /// @brief Return a new kernel_builder that takes no arguments
 inline auto make_kernel() {

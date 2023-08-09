@@ -6,13 +6,16 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(cudaq-opt)
-add_subdirectory(cudaq-translate)
-add_subdirectory(qasm-quake)
+add_llvm_executable(qasm-quake qasm-quake.cpp)
+llvm_update_compile_flags(qasm-quake)
 
-if (NOT CUDAQ_DISABLE_CPP_FRONTEND)
-  add_subdirectory(cudaq-lsp-server)
-  add_subdirectory(cudaq-quake)
-  add_subdirectory(fixup-linkage)
-  add_subdirectory(nvqpp)
-endif()
+target_link_libraries(qasm-quake
+  PRIVATE
+  OpenQASMParser
+  QuakeDialect
+  MLIRMemRefDialect
+)
+
+mlir_check_all_link_libraries(qasm-quake)
+
+install(TARGETS qasm-quake DESTINATION bin)
