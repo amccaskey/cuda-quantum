@@ -6,7 +6,7 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  *******************************************************************************/
 
-#include "cudaq/Parser/OpenQASM.h"
+#include "cudaq/Parser/QASM.h"
 
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "llvm/Support/CommandLine.h"
@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
 
   mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
 
-  if (auto module = cudaq::qasm::parseFile(&context, sourceMgr)) {
+  if (auto module = cudaq::parseQASMFile(&context, sourceMgr)) {
     module->print(llvm::outs());
     return 0;
   }

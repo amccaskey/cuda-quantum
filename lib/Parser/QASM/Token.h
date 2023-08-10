@@ -12,7 +12,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
 
-namespace cudaq::qasm {
+namespace cudaq {
 
 class Token {
 public:
@@ -71,4 +71,4 @@ private:
   llvm::StringRef spelling;
 };
 
-} // namespace cudaq::qasm
+} // namespace cudaq

@@ -12,12 +12,12 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OwningOpRef.h"
 
-namespace cudaq::qasm {
+namespace cudaq {
 
-mlir::OwningOpRef<mlir::ModuleOp> parseCode(mlir::MLIRContext *context,
+mlir::OwningOpRef<mlir::ModuleOp> parseQASMCode(mlir::MLIRContext *context,
                                             const llvm::StringRef &code);
 
-mlir::OwningOpRef<mlir::ModuleOp> parseFile(mlir::MLIRContext *context,
+mlir::OwningOpRef<mlir::ModuleOp> parseQASMFile(mlir::MLIRContext *context,
                                             const llvm::SourceMgr &SourceMgr);
 
 } // namespace cudaq::qasm

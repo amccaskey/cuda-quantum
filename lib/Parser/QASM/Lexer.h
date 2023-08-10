@@ -18,7 +18,6 @@ class MLIRContext;
 } // namespace mlir
 
 namespace cudaq {
-namespace qasm {
 
 class Lexer {
 public:
@@ -56,5 +55,4 @@ private:
   void operator=(const Lexer &) = delete;
 };
 
-} // namespace qasm
 } // namespace cudaq

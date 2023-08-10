@@ -16,7 +16,7 @@
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeOps.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
-#include "cudaq/Parser/OpenQASM.h"
+#include "cudaq/Parser/QASM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Passes.h"
@@ -133,7 +133,7 @@ initializeBuilderFromStringOrFile(MLIRContext *context,
     mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, context);
 
     // FIXME What kind of file is this? To start assume OpenQASM.
-    moduleOp = cudaq::qasm::parseFile(context, sourceMgr).release();
+    moduleOp = cudaq::parseQASMFile(context, sourceMgr).release();
     if (!moduleOp)
       throw std::runtime_error("[kernel_builder] error parsing code in " +
                                externalSource + ".");
@@ -141,7 +141,7 @@ initializeBuilderFromStringOrFile(MLIRContext *context,
   } else
     // Only thing left is this is some code String
     if (externalSource.find("OPENQASM 2.0") != std::string::npos) {
-      moduleOp = cudaq::qasm::parseCode(context, externalSource).release();
+      moduleOp = cudaq::parseQASMCode(context, externalSource).release();
       if (!moduleOp)
         throw std::runtime_error("[kernel_builder] error parsing code:\n" +
                                  externalSource);

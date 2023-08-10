@@ -11,7 +11,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Diagnostics.h"
 
-using namespace cudaq::qasm;
+using namespace cudaq;
 
 static mlir::StringAttr
 getMainBufferNameIdentifier(const llvm::SourceMgr &sourceMgr,

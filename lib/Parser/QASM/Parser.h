@@ -9,26 +9,12 @@
 #pragma once
 
 #include "Lexer.h"
+#include "llvm/ADT/StringMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "llvm/ADT/StringMap.h"
 
-namespace cudaq::qasm {
+namespace cudaq {
 
-// TODO: This parser is enough to unblock us to experiment with implementing
-// optimizations algorithms in Quake and QTX.  Therefore, it does not implements
-// all OpenQASM 2.0, and we still need to have discussion on how to handle some
-// constructs.  Couple of examples:
-//   * In Quake, circuits are represented using functions, `mlir::func::FuncOp`,
-//     and must return.  OpenQASM, however, does not have such concept, we can
-//     only do measurements to bits specified.  Should the Queke function return
-//     all classical bits, which were allocated?
-//
-//   * OpenQASM 2.0 only has `CX` and `U` as primitives.  Therefore,
-//     identifiying `h` as a `quake.h` (Hadamard) is pretty much a hack.  An
-//     user could have defined `h` to be something completely different.  The
-//     same is true for all other operators.  Although unlikely, this is an
-//     allowed thing to do.
 class Parser {
 public:
   Parser(mlir::MLIRContext *context, const llvm::SourceMgr &sourceMgr,
@@ -69,7 +55,7 @@ private:
   mlir::ParseResult expect(Token::Kind expected);
 
   //===--------------------------------------------------------------------===//
-  // OpenQASM Parsing
+  // QASM Parsing
   //===--------------------------------------------------------------------===//
   mlir::ParseResult parseArgument(mlir::Value &arg, int64_t *index = nullptr);
   mlir::ParseResult parseCRegDecl();
@@ -114,4 +100,4 @@ private:
   void operator=(const Parser &) = delete;
 };
 
-} // namespace cudaq::qasm
+} // namespace cudaq

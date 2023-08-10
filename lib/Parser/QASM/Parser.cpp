@@ -9,36 +9,35 @@
 #include "Parser.h"
 #include "Lexer.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeOps.h"
-#include "cudaq/Parser/OpenQASM.h"
+#include "cudaq/Parser/QASM.h"
 #include "llvm/Support/Path.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
-using namespace cudaq;
-
+namespace cudaq {
 mlir::OwningOpRef<mlir::ModuleOp>
-qasm::parseFile(mlir::MLIRContext *context, const llvm::SourceMgr &sourceMgr) {
+parseQASMFile(mlir::MLIRContext *context, const llvm::SourceMgr &sourceMgr) {
   const auto *sourceBuf = sourceMgr.getMemoryBuffer(sourceMgr.getMainFileID());
   mlir::Location loc = mlir::FileLineColLoc::get(
       context, sourceBuf->getBufferIdentifier(), /*line=*/0, /*column=*/0);
   mlir::OwningOpRef<mlir::ModuleOp> module(mlir::ModuleOp::create(loc));
-  if (qasm::Parser(context, sourceMgr, *module).parse())
+  if (Parser(context, sourceMgr, *module).parse())
     return {};
   return module;
 }
 
 mlir::OwningOpRef<mlir::ModuleOp>
-qasm::parseCode(mlir::MLIRContext *context, const llvm::StringRef &sourceStr) {
+parseQASMCode(mlir::MLIRContext *context, const llvm::StringRef &sourceStr) {
   auto sourceBuf = llvm::MemoryBuffer::getMemBuffer(sourceStr, "sourceName");
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(sourceBuf), llvm::SMLoc());
-  return parseFile(context, sourceMgr);
+  return parseQASMFile(context, sourceMgr);
 }
 
 //===----------------------------------------------------------------------===//
 
-mlir::ParseResult qasm::Parser::parse() {
+mlir::ParseResult Parser::parse() {
   if (parseHeader())
     return mlir::failure();
 
@@ -97,7 +96,7 @@ mlir::ParseResult qasm::Parser::parse() {
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseCRegDecl() {
+mlir::ParseResult Parser::parseCRegDecl() {
   mlir::Location loc = translateLocation(curToken.getLoc());
   mlir::StringRef identifier;
   int64_t size;
@@ -114,7 +113,7 @@ mlir::ParseResult qasm::Parser::parseCRegDecl() {
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseHeader() {
+mlir::ParseResult Parser::parseHeader() {
   if (expect(Token::Kind::kw_OPENQASM))
     return mlir::failure();
   // Gambiarra: checking for version as a real number
@@ -135,7 +134,7 @@ mlir::ParseResult qasm::Parser::parseHeader() {
   return expect(Token::Kind::semicolon);
 }
 
-mlir::ParseResult qasm::Parser::parseIdentifier(mlir::StringRef &result) {
+mlir::ParseResult Parser::parseIdentifier(mlir::StringRef &result) {
   if (!check(Token::Kind::identifier))
     return mlir::failure();
   result = curToken.getSpelling();
@@ -144,14 +143,14 @@ mlir::ParseResult qasm::Parser::parseIdentifier(mlir::StringRef &result) {
 }
 
 // Doesn't really matter if it's sucessful or not, for now we gracefully ignore
-mlir::ParseResult qasm::Parser::parseInclude() {
+mlir::ParseResult Parser::parseInclude() {
   if (expect(Token::Kind::kw_include) || expect(Token::Kind::string) ||
       expect(Token::Kind::semicolon))
     return mlir::failure();
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseInteger(int64_t &result) {
+mlir::ParseResult Parser::parseInteger(int64_t &result) {
   if (!check(Token::Kind::integer))
     return mlir::failure();
   result = curToken.getIntegerValue().value();
@@ -159,7 +158,7 @@ mlir::ParseResult qasm::Parser::parseInteger(int64_t &result) {
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseQRegDecl() {
+mlir::ParseResult Parser::parseQRegDecl() {
   mlir::Location loc = translateLocation(curToken.getLoc());
   mlir::StringRef identifier;
   int64_t size;
@@ -175,7 +174,7 @@ mlir::ParseResult qasm::Parser::parseQRegDecl() {
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseGateStmt() {
+mlir::ParseResult Parser::parseGateStmt() {
   mlir::Location loc = translateLocation(curToken.getLoc());
   mlir::SmallVector<mlir::Value> params;
   mlir::SmallVector<mlir::Value> args;
@@ -227,7 +226,7 @@ mlir::ParseResult qasm::Parser::parseGateStmt() {
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseParameter(mlir::Value &param) {
+mlir::ParseResult Parser::parseParameter(mlir::Value &param) {
   mlir::Location loc = translateLocation(curToken.getLoc());
   double value;
   bool is_minus = consumeIf(Token::Kind::minus);
@@ -241,7 +240,7 @@ mlir::ParseResult qasm::Parser::parseParameter(mlir::Value &param) {
 }
 
 // Statement: `measure` qubit | qreg `->` bit | creg
-mlir::ParseResult qasm::Parser::parseMeasure() {
+mlir::ParseResult Parser::parseMeasure() {
   mlir::Location loc = translateLocation(curToken.getLoc());
   mlir::Value qArg;
   mlir::Value cArg;
@@ -262,8 +261,7 @@ mlir::ParseResult qasm::Parser::parseMeasure() {
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseArgument(mlir::Value &arg,
-                                              int64_t *index) {
+mlir::ParseResult Parser::parseArgument(mlir::Value &arg, int64_t *index) {
   mlir::Location loc = translateLocation(curToken.getLoc());
   mlir::StringRef identifier;
   int64_t idx;
@@ -285,7 +283,7 @@ mlir::ParseResult qasm::Parser::parseArgument(mlir::Value &arg,
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseReal(double &result) {
+mlir::ParseResult Parser::parseReal(double &result) {
   if (!check(Token::Kind::real))
     return mlir::failure();
   result = curToken.getFloatingPointValue().value();
@@ -293,7 +291,7 @@ mlir::ParseResult qasm::Parser::parseReal(double &result) {
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::parseCommaSeparatedList(
+mlir::ParseResult Parser::parseCommaSeparatedList(
     llvm::function_ref<mlir::ParseResult()> parseElementFn) {
   if (parseElementFn())
     return mlir::failure();
@@ -305,13 +303,13 @@ mlir::ParseResult qasm::Parser::parseCommaSeparatedList(
   return mlir::success();
 }
 
-mlir::ParseResult qasm::Parser::expect(Token::Kind expected) {
+mlir::ParseResult Parser::expect(Token::Kind expected) {
   if (consumeIf(expected))
     return mlir::success();
   return mlir::failure();
 }
 
-std::string qasm::Parser::getTopLevelName() const {
+std::string Parser::getTopLevelName() const {
   auto &sourceMgr = getSourceMgr();
   auto mainBuffer = sourceMgr.getMemoryBuffer(sourceMgr.getMainFileID());
   mlir::StringRef bufferName = mainBuffer->getBufferIdentifier();
@@ -323,3 +321,4 @@ std::string qasm::Parser::getTopLevelName() const {
   }
   return bufferName.str();
 }
+} // namespace cudaq

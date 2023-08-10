@@ -8,7 +8,7 @@
 
 #include "Token.h"
 
-using namespace cudaq::qasm;
+using namespace cudaq;
 
 bool Token::isKeyword() const {
   switch (kind) {
