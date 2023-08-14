@@ -204,6 +204,10 @@ mlir::ParseResult Parser::parseGateStmt() {
   }
   if (identifier == "h")
     builder.create<quake::HOp>(loc, controls, targets);
+  else if (identifier == "rx")
+    builder.create<quake::RxOp>(loc, params, controls, targets);
+  else if (identifier == "ry")
+    builder.create<quake::RyOp>(loc, params, controls, targets);
   else if (identifier == "rz")
     builder.create<quake::RzOp>(loc, params, controls, targets);
   else if (identifier == "s")
