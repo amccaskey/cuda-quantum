@@ -15,9 +15,9 @@
 namespace cudaq {
 
 mlir::OwningOpRef<mlir::ModuleOp> parseQASMCode(mlir::MLIRContext *context,
-                                            const llvm::StringRef &code);
+                                                const llvm::StringRef &code);
 
-mlir::OwningOpRef<mlir::ModuleOp> parseQASMFile(mlir::MLIRContext *context,
-                                            const llvm::SourceMgr &SourceMgr);
+mlir::OwningOpRef<mlir::ModuleOp>
+parseQASMFile(mlir::MLIRContext *context, const llvm::SourceMgr &SourceMgr);
 
-} // namespace cudaq::qasm
+} // namespace cudaq
