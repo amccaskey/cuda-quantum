@@ -259,6 +259,15 @@ cx q[0], q[1];'''
     counts = cudaq.sample(kernel)
     assert len(counts) == 2 
 
+    # Create from code string
+    kernel = cudaq.make_kernel(code)
+    q = kernel.get_allocations()[0]
+    kernel.x(q[0])
+    kernel.x(q[1])
+    print(kernel)
+    counts = cudaq.sample(kernel)
+    assert len(counts) == 2 
+
     # Create from file with code in it 
     f = open('test_oq.qasm', 'w')
     f.write(code)

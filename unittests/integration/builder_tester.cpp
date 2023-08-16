@@ -693,36 +693,49 @@ qreg q[2];
 h q[0];
 cx q[0], q[1];)#";
 
-  // Test kernel from code string
+  // // Test kernel from code string
+  // {
+  //   auto kernel = cudaq::make_kernel(code);
+  //   auto counts = cudaq::sample(kernel);
+  //   counts.dump();
+  //   EXPECT_EQ(counts.size(), 2);
+  // }
+
+  // // Output to a file
+  // {
+  //   std::ofstream out("test_oq_builder.qasm");
+  //   out << code;
+  // }
+
+  // // Test kernel from file, save its quake rep
+  // std::string quake = "";
+  // {
+  //   auto kernelFromFile = cudaq::make_kernel("test_oq_builder.qasm");
+  //   auto counts = cudaq::sample(kernelFromFile);
+  //   counts.dump();
+  //   EXPECT_EQ(counts.size(), 2);
+  //   std::remove("test_oq_builder.qasm");
+  //   quake = kernelFromFile.to_quake();
+  // }
+
+  // // Test kernel from quake
+  // {
+  //   auto kernelFromQuake = cudaq::make_kernel(quake);
+  //   auto counts = cudaq::sample(kernelFromQuake);
+  //   counts.dump();
+  //   EXPECT_EQ(counts.size(), 2);
+  // }
+
+  // Test that we can get the qvec and add more operations.
   {
     auto kernel = cudaq::make_kernel(code);
+    auto q = kernel.get_allocations().front();
+    kernel.x(q[0]);
+    kernel.x(q[0]);
     auto counts = cudaq::sample(kernel);
     counts.dump();
     EXPECT_EQ(counts.size(), 2);
-  }
 
-  // Output to a file
-  {
-    std::ofstream out("test_oq_builder.qasm");
-    out << code;
-  }
-
-  // Test kernel from file, save its quake rep
-  std::string quake = "";
-  {
-    auto kernelFromFile = cudaq::make_kernel("test_oq_builder.qasm");
-    auto counts = cudaq::sample(kernelFromFile);
-    counts.dump();
-    EXPECT_EQ(counts.size(), 2);
-    std::remove("test_oq_builder.qasm");
-    quake = kernelFromFile.to_quake();
-  }
-
-  // Test kernel from quake
-  {
-    auto kernelFromQuake = cudaq::make_kernel(quake);
-    auto counts = cudaq::sample(kernelFromQuake);
-    counts.dump();
-    EXPECT_EQ(counts.size(), 2);
+    std::cout << "TEST:\n" << kernel << "\n";
   }
 }

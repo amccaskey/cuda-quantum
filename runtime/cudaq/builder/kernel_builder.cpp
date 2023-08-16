@@ -115,10 +115,9 @@ MLIRContext *initializeContext() {
 void deleteContext(MLIRContext *context) { delete context; }
 void deleteJitEngine(ExecutionEngine *jit) { delete jit; }
 
-ImplicitLocOpBuilder *
-initializeBuilderFromStringOrFile(MLIRContext *context,
-                                  const std::string &externalSource,
-                                  std::string &kernelName) {
+ImplicitLocOpBuilder *initializeBuilderFromStringOrFile(
+    MLIRContext *context, const std::string &externalSource,
+    std::string &kernelName, std::vector<QuakeValue> &allocations) {
   cudaq::info("Creating the MLIR ModuleOp from file or string.");
 
   ModuleOp moduleOp;
@@ -168,10 +167,19 @@ initializeBuilderFromStringOrFile(MLIRContext *context,
 
   auto location = FileLineColLoc::get(context, "<builder>", 1, 1);
   auto *opBuilder = new ImplicitLocOpBuilder(location, context);
+  func::FuncOp mainFunction;
   moduleOp.walk([&](func::FuncOp function) {
-    opBuilder->setInsertionPointToEnd(&function.getBlocks().front());
+    auto *terminator = function.getBlocks().front().getTerminator();
+    opBuilder->setInsertionPoint(terminator);
     function.setName(kernelName);
+    mainFunction = function;
     return WalkResult::interrupt();
+  });
+
+  // Get quantum allocations
+  mainFunction.walk([&](quake::AllocaOp allocation) {
+    allocations.emplace_back(QuakeValue(*opBuilder, allocation.getResult()));
+    return WalkResult::advance();
   });
 
   return opBuilder;

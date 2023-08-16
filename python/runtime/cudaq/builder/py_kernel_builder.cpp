@@ -271,6 +271,8 @@ void bindKernel(py::module &mod) {
                              &cudaq::kernel_builder<>::getArguments)
       .def_property_readonly("argument_count",
                              &cudaq::kernel_builder<>::getNumParams)
+      .def("get_allocations",
+           [](kernel_builder<> &self) { return self.get_allocations(); })
       /// @brief Bind overloads for `qalloc()`.
       .def(
           "qalloc", [](kernel_builder<> &self) { return self.qalloc(); },

@@ -139,7 +139,8 @@ void deleteContext(MLIRContext *);
 
 ImplicitLocOpBuilder *
 initializeBuilderFromStringOrFile(MLIRContext *, const std::string &,
-                                  std::string &kernelName);
+                                  std::string &kernelName,
+                                  std::vector<QuakeValue> &);
 
 /// @brief Initialize the `OpBuilder`, return the raw
 /// pointer which we'll wrap in an `unique_ptr`.
@@ -367,6 +368,8 @@ private:
   /// as `QuakeValue`s.
   std::vector<QuakeValue> arguments;
 
+  std::vector<QuakeValue> allocatedQuantumRegisters;
+
 public:
   /// @brief The constructor, takes the input
   /// `KernelBuilderType`s which is used to create the MLIR
@@ -387,7 +390,7 @@ public:
         opBuilder(nullptr, [](ImplicitLocOpBuilder *) {}),
         jitEngine(nullptr, [](ExecutionEngine *) {}) {
     auto *ptr = details::initializeBuilderFromStringOrFile(
-        context.get(), externalSource, kernelName);
+        context.get(), externalSource, kernelName, allocatedQuantumRegisters);
     opBuilder =
         std::unique_ptr<ImplicitLocOpBuilder, void (*)(ImplicitLocOpBuilder *)>(
             ptr, details::deleteBuilder);
@@ -411,17 +414,29 @@ public:
   std::size_t getNumParams() { return arguments.size(); }
 
   /// @brief Return a `QuakeValue` representing the allocated qubit.
-  QuakeValue qalloc() { return details::qalloc(*opBuilder.get()); }
+  QuakeValue qalloc() {
+    allocatedQuantumRegisters.emplace_back(details::qalloc(*opBuilder.get()));
+    return allocatedQuantumRegisters.back();
+  }
 
   /// @brief Return a `QuakeValue` representing the allocated `QVec`.
   QuakeValue qalloc(const std::size_t nQubits) {
-    return details::qalloc(*opBuilder.get(), nQubits);
+    allocatedQuantumRegisters.emplace_back(
+        details::qalloc(*opBuilder.get(), nQubits));
+    return allocatedQuantumRegisters.back();
   }
 
   /// @brief Return a `QuakeValue` representing the allocated `Veq`,
   /// size is from a pre-allocated size `QuakeValue` or `BlockArgument`.
   QuakeValue qalloc(QuakeValue size) {
-    return details::qalloc(*opBuilder.get(), size);
+    allocatedQuantumRegisters.emplace_back(
+        details::qalloc(*opBuilder.get(), size));
+    return allocatedQuantumRegisters.back();
+  }
+
+  /// @brief Return the QuakeValues that represent quantum allocation values.
+  std::vector<QuakeValue> get_allocations() {
+    return allocatedQuantumRegisters;
   }
 
   // In the following macros + instantiations, we define the kernel_builder
