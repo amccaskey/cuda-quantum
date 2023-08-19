@@ -6,6 +6,10 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(OpenQASM)
-add_subdirectory(IQM)
-add_subdirectory(Python)
+add_cudaq_translation_library(CUDAQTargetPython
+  TranslateToCUDAQPython.cpp
+
+  LINK_LIBS PUBLIC
+  MLIRIR
+  MLIRTranslateLib
+)

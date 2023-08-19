@@ -13,6 +13,7 @@
 #include "cudaq/Support/Version.h"
 #include "cudaq/Target/IQM/IQMJsonEmitter.h"
 #include "cudaq/Target/OpenQASM/OpenQASMEmitter.h"
+#include "cudaq/Target/Python/CUDAQPythonEmitter.h"
 #include "cudaq/Todo.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
@@ -179,6 +180,8 @@ int main(int argc, char **argv) {
       .Case("openqasm",
             [&]() { directTranslation = cudaq::translateToOpenQASM; })
       .Case("iqm", [&]() { directTranslation = cudaq::translateToIQMJson; })
+      .Case("pycudaq",
+            [&]() { directTranslation = cudaq::translateToCUDAQPython; })
       .Default([]() {})();
 
   std::error_code ec;
