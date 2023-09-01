@@ -1840,12 +1840,12 @@ bool QuakeBridgeVisitor::VisitInitListExpr(clang::InitListExpr *x) {
 
   // Let's allocate some memory and store the init list elements there.
 
-  // Clear the types for the init expr
-  for (std::size_t i = 0; i < size; i++)
-    popType();
+  // Pop the type of the init expr assignment (ConstantArray)
+  Type arrayValueType = popType();
 
   // This is a initlist on ints or floats, get which one
   Type dataType = last.front().getType();
+  assert(arrayValueType == dataType);
 
   // Add the array size value
   Value arrSize =
