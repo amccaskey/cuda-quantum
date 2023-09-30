@@ -6,8 +6,10 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(Builder)
-add_subdirectory(CodeGen)
-add_subdirectory(Dialect)
-add_subdirectory(Transforms)
-add_subdirectory(CAPI)
+add_mlir_public_c_api_library(CUDAQuantumMLIRCAPI 
+  Dialects.cpp
+
+  LINK_LIBS PRIVATE 
+  QuakeDialect 
+  CCDialect
+)
