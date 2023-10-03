@@ -14,6 +14,7 @@ namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
 PYBIND11_MODULE(_quakeDialects, m) {
+
   auto quakeMod = m.def_submodule("quake");
 
   quakeMod.def(

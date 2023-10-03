@@ -77,3 +77,5 @@ add_mlir_python_modules(CUDAQuantumPythonModules
   COMMON_CAPI_LINK_LIBS
     CUDAQuantumPythonCAPI
   )
+
+file (COPY cudaq DESTINATION ${MLIR_BINARY_DIR}/python_packages/cudaq)
