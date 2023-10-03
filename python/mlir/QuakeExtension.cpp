@@ -14,12 +14,13 @@ namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
 PYBIND11_MODULE(_quakeDialects, m) {
-  auto quantum_m = m.def_submodule("quake");
+  auto quakeMod = m.def_submodule("quake");
 
-  quantum_m.def(
+  quakeMod.def(
       "register_dialect",
       [](MlirContext context, bool load) {
         MlirDialectHandle handle = mlirGetDialectHandle__quake__();
+
         mlirDialectHandleRegisterDialect(handle, context);
         if (load) {
           mlirDialectHandleLoadDialect(handle, context);
@@ -27,14 +28,32 @@ PYBIND11_MODULE(_quakeDialects, m) {
       },
       py::arg("context") = py::none(), py::arg("load") = true);
 
-  mlir_type_subclass(quantum_m, "RefType", [](MlirType) {
-    return false;
+  mlir_type_subclass(quakeMod, "RefType", [](MlirType type) {
+    return unwrap(type).isa<quake::RefType>();
   }).def_classmethod("get", [](py::object cls, MlirContext ctx) {
     return wrap(quake::RefType::get(unwrap(ctx)));
   });
-   mlir_type_subclass(quantum_m, "VeqType", [](MlirType) {
-    return false;
-  }).def_classmethod("get", [](py::object cls, MlirContext ctx, std::size_t size) {
-    return wrap(quake::VeqType::get(unwrap(ctx), size));
-  }, py::arg("cls"), py::arg("context"), py::arg("size") = 0);
+
+  mlir_type_subclass(
+      quakeMod, "VeqType",
+      [](MlirType type) { return unwrap(type).isa<quake::VeqType>(); })
+      .def_classmethod(
+          "get",
+          [](py::object cls, MlirContext ctx, std::size_t size) {
+            return wrap(quake::VeqType::get(unwrap(ctx), size));
+          },
+          py::arg("cls"), py::arg("context"), py::arg("size") = 0);
+
+  auto ccMod = m.def_submodule("cc");
+
+  ccMod.def(
+      "register_dialect",
+      [](MlirContext context, bool load) {
+        MlirDialectHandle ccHandle = mlirGetDialectHandle__cc__();
+        mlirDialectHandleRegisterDialect(ccHandle, context);
+        if (load) {
+          mlirDialectHandleLoadDialect(ccHandle, context);
+        }
+      },
+      py::arg("context") = py::none(), py::arg("load") = true);
 }

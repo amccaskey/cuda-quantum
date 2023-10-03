@@ -27,11 +27,19 @@ declare_mlir_dialect_python_bindings(
     dialects/quake.py
   DIALECT_NAME quake)
 
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT CUDAQuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/mlir_cudaq"
+  TD_FILE dialects/CCOps.td
+  SOURCES
+    dialects/cc.py
+  DIALECT_NAME cc)
+
 declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
   MODULE_NAME _quakeDialects
   ADD_TO_PARENT CUDAQuantumPythonSources
   SOURCES
-    QuakeExtension.cpp
+   QuakeExtension.cpp
   EMBED_CAPI_LINK_LIBS
   CUDAQuantumMLIRCAPI
 )
