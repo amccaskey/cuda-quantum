@@ -19,7 +19,9 @@ class PyKernelDecorator(object):
     def __init__(self, function, verbose=False, library_mode=False):
         self.kernelFunction = function
         self.mlirModule = None
-
+        self.executionEngine = None
+        self.verbose = verbose
+       
         # Library Mode
         self.library_mode = library_mode
 
@@ -32,7 +34,15 @@ class PyKernelDecorator(object):
             import astpretty
             astpretty.pprint(self.module.body[0])
         if not self.library_mode:
-            self.mlirModule = compile_to_quake(self.module, verbose=verbose)
+            # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop, 
+            # range-based for loop to for loop, etc.)
+            #
+            # FIXME Update to return required FuncOps (other kernels) not present 
+            # in this module
+            self.mlirModule = compile_to_quake(self.module, verbose=self.verbose)
+            # Add the other FuncOps to this module (FIXME need global dict of PyKernelDecorators)
+           
+            
             return
 
     def __str__(self):
@@ -46,19 +56,23 @@ class PyKernelDecorator(object):
         if self.library_mode:
             self.kernelFunction(*args)
             return
-
+        
+        # If the Target is remote, then pass the Quake code as 
+        # is to platform.launchKernel()
+        #
+        # If the Target is a simulator, lower to QIR and 
+        # just create the ExecutionEngine
         # Lower the code to QIR and Execute
-        pm = PassManager.parse(
-            "builtin.module(canonicalize,cse,unrolling-pipeline,canonicalize,func.func(quake-add-deallocs),quake-to-qir)",
-            context=self.mlirModule.context)
-        pm.run(self.mlirModule)
-        print(self.mlirModule)
-
-        engine = ExecutionEngine(self.mlirModule, 2, [
-            '/workspaces/cuda-quantum/builds/gcc-12-debug/lib/libnvqir.so',
-            '/workspaces/cuda-quantum/builds/gcc-12-debug/lib/libnvqir-qpp.so'
-        ])
-        engine.invoke("bell")
+        if self.executionEngine == None:
+            pm = PassManager.parse(
+                "builtin.module(canonicalize,cse,func.func(quake-add-deallocs),quake-to-qir)",
+                context=self.mlirModule.context)
+            pm.run(self.mlirModule)
+            self.executionEngine = ExecutionEngine(self.mlirModule, 2, [
+                '/workspaces/cuda-quantum/builds/gcc-12-debug/lib/libnvqir.so',
+                '/workspaces/cuda-quantum/builds/gcc-12-debug/lib/libnvqir-qpp.so'
+            ])
+            self.executionEngine.invoke(self.kernelFunction.__name__)
 
 
 def kernel(function=None, **kwargs):
