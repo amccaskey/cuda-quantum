@@ -7,13 +7,15 @@
 # ============================================================================ #
 import ast
 import importlib
-import inspect 
+import inspect
 from .language.ast_bridge import compile_to_quake
+from mlir_cudaq.ir import *
+from mlir_cudaq.passmanager import *
+from mlir_cudaq.execution_engine import *
 
-def test():
-    print("TESTING")
 
 class PyKernelDecorator(object):
+
     def __init__(self, function, verbose=False, library_mode=False):
         self.kernelFunction = function
         self.mlirModule = None
@@ -32,22 +34,31 @@ class PyKernelDecorator(object):
         if not self.library_mode:
             self.mlirModule = compile_to_quake(self.module, verbose=verbose)
             return
-        
+
     def __str__(self):
         if not self.mlirModule == None:
             return str(self.mlirModule)
         return "{cannot print this kernel}"
-        
+
     def __call__(self, *args):
-        
+
         # Library Mode, don't need Quake, just call the function
         if self.library_mode:
             self.kernelFunction(*args)
-            return 
-        
+            return
+
         # Lower the code to QIR and Execute
-        # pm = PassManager.parse("builtin.module(canonicalize,cse)", context=bridge.ctx)
-        # pm.run(bridge.module)
+        pm = PassManager.parse(
+            "builtin.module(canonicalize,cse,unrolling-pipeline,canonicalize,func.func(quake-add-deallocs),quake-to-qir)",
+            context=self.mlirModule.context)
+        pm.run(self.mlirModule)
+        print(self.mlirModule)
+
+        engine = ExecutionEngine(self.mlirModule, 2, [
+            '/workspaces/cuda-quantum/builds/gcc-12-debug/lib/libnvqir.so',
+            '/workspaces/cuda-quantum/builds/gcc-12-debug/lib/libnvqir-qpp.so'
+        ])
+        engine.invoke("bell")
 
 
 def kernel(function=None, **kwargs):
@@ -58,7 +69,8 @@ def kernel(function=None, **kwargs):
     if function:
         return PyKernelDecorator(function)
     else:
+
         def wrapper(function):
             return PyKernelDecorator(function, **kwargs)
-        return wrapper
 
+        return wrapper

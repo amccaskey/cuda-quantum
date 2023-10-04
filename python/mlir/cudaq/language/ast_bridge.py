@@ -13,11 +13,11 @@ from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith
 
 
-class TypedValue(object):
+# class TypedValue(object):
 
-    def __init__(self, type, value):
-        self.type = type
-        self.value = value
+#     def __init__(self, type, value):
+#         self.type = type
+#         self.value = value
 
 
 class PyASTBridge(ast.NodeVisitor):
@@ -49,7 +49,7 @@ class PyASTBridge(ast.NodeVisitor):
 
     def pushValue(self, value):
         if self.verbose:
-            print('{}push {}'.format(self.increment * ' ', value.value))
+            print('{}push {}'.format(self.increment * ' ', value))
         self.increment += 2
         self.valueStack.append(value)
 
@@ -57,11 +57,14 @@ class PyASTBridge(ast.NodeVisitor):
         val = self.valueStack.pop()
         self.increment -= 2
         if self.verbose:
-            print('{}pop {}'.format(self.increment * ' ', val.value))
+            print('{}pop {}'.format(self.increment * ' ', val))
         return val
 
     def typeFromStr(self, typeStr):
-        return self.getIntegerType(64)
+        if typeStr == 'int':
+            return self.getIntegerType(64)
+        else:
+            raise Exception('{} is not a supported type yet.'.format(typeStr))
 
     def generic_visit(self, node):
         for field, value in reversed(list(ast.iter_fields(node))):
@@ -85,12 +88,13 @@ class PyASTBridge(ast.NodeVisitor):
             # Create the function and the entry block
             f = func.FuncOp('{}'.format(node.name), (argTypes, []),
                             loc=self.loc)
+            f.attributes.__setitem__('llvm.emit_c_interface', UnitAttr.get())
             e = f.add_entry_block()
 
             # Add the block args to the symbol table
             blockArgs = e.arguments
             for i, b in enumerate(blockArgs):
-                self.symbolTable[argNames[i]] = TypedValue(argTypes[i], b)
+                self.symbolTable[argNames[i]] = b
 
             # Set the insertion point to the start of the entry block
             with InsertionPoint(e):
@@ -113,35 +117,35 @@ class PyASTBridge(ast.NodeVisitor):
 
         self.generic_visit(node)
         if isinstance(node.func, ast.Name):
-            if node.func.id in ["h"]:
+            if node.func.id in ["h", "x", "y", "z", "s", "t"]:
                 # should have 1 value on the stack if
                 # this is a vanilla hadamard
                 qubit = self.popValue()
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
-                opCtor([], [], [], [qubit.value])
+                opCtor([], [], [], [qubit])
 
         elif isinstance(node.func, ast.Attribute):
             if node.func.value.id == 'cudaq' and node.func.attr == 'qvector':
                 size = self.popValue()
-                if hasattr(size.value, "literal_value"):
-                    ty = self.getVeqType(size.value.literal_value)
+                if hasattr(size, "literal_value"):
+                    ty = self.getVeqType(size.literal_value)
                     qubits = quake.AllocaOp(ty)
                 else:
                     ty = self.getVeqType()
-                    qubits = quake.AllocaOp(ty, size=size.value)
-                self.pushValue(TypedValue(ty, qubits.results[0]))
+                    qubits = quake.AllocaOp(ty, size=size)
+                self.pushValue(qubits.results[0])
                 return
 
             # We have a func name . ctrl
-            if node.func.value.id in ['x'] and node.func.attr == 'ctrl':
+            if node.func.value.id in ['h', 'x', 'y', 'z', 's', 't'] and node.func.attr == 'ctrl':
                 target = self.popValue()
                 controls = [
                     self.popValue() for i in range(len(self.valueStack))
                 ]
-                controls = [c.value for c in controls]
+                # controls = [c for c in controls]
                 opCtor = getattr(quake,
                                  '{}Op'.format(node.func.value.id.title()))
-                opCtor([], [], controls, [target.value])
+                opCtor([], [], controls, [target])
 
     def visit_Constant(self, node):
         if self.verbose:
@@ -149,12 +153,12 @@ class PyASTBridge(ast.NodeVisitor):
         if isinstance(node.value, int):
             i64Ty = self.getIntegerType(64)
             self.pushValue(
-                TypedValue(
-                    i64Ty,
                     arith.ConstantOp(i64Ty,
                                      self.getIntegerAttr(i64Ty,
-                                                         node.value)).result))
+                                                         node.value)).result)
             return
+        else:
+            raise Exception("unhandled constant: {}".format(ast.unparse(node)))
 
     def visit_Subscript(self, node):
         if self.verbose:
@@ -168,17 +172,17 @@ class PyASTBridge(ast.NodeVisitor):
         if quake.VeqType.isinstance(var.type):
             qrefTy = self.getRefType()
             self.pushValue(
-                TypedValue(
-                    qrefTy,
-                    quake.ExtractRefOp(qrefTy, var.value, -1, index=idx.value)))
+                    quake.ExtractRefOp(qrefTy, var, -1, index=idx))
+        else:
+            raise Exception("unhandled subscript: {}".format(ast.unparse(node)))
 
     def visit_For(self, node):
         if node.iter.func.id != 'range' and len(node.iter.args) == 1:
-            print("CUDA Quantum only supports `for VAR in range(UPPER):`")
-            exit(1)
+            raise Exception("CUDA Quantum only supports `for VAR in range(UPPER):`")
 
         if self.verbose:
             print('[Visit For]')
+        
         # Get the rangeOperand, this is the upper bound on the loop
         self.generic_visit(node.iter)
         rangeOperand = self.popValue()
@@ -197,7 +201,7 @@ class PyASTBridge(ast.NodeVisitor):
             alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, iTy),
                                  TypeAttr.get(iTy)).result
             cc.StoreOp(zero, alloca)
-            self.symbolTable[varName] = TypedValue(alloca.type, alloca)
+            self.symbolTable[varName] = alloca
 
             loop = cc.LoopOp([], [], BoolAttr.get(False))
             bodyBlock = Block.create_at_start(loop.bodyRegion, [])
@@ -207,11 +211,8 @@ class PyASTBridge(ast.NodeVisitor):
 
             whileBlock = Block.create_at_start(loop.whileRegion, [])
             with InsertionPoint(whileBlock):
-                total = rangeOperand.value
-                if rangeOperand.type.width < iTy.width:
-                    total = arith.ExtUIOp(iTy, total).result
                 loaded = cc.LoadOp(alloca)
-                c = arith.CmpIOp(IntegerAttr.get(iTy, 2), loaded, total).result
+                c = arith.CmpIOp(IntegerAttr.get(iTy, 2), loaded, rangeOperand).result
                 cc.ConditionOp(c, [])
 
             stepBlock = Block.create_at_start(loop.stepRegion, [])
@@ -226,29 +227,45 @@ class PyASTBridge(ast.NodeVisitor):
         if self.verbose:
             print("[Visit BinaryOp = {}]".format(ast.unparse(node)))
         self.generic_visit(node)
+
+        # Get the left and right parts of this expression
         left = self.popValue()
         right = self.popValue()
+
+        # Basedon the op type and the leaf types, create the MLIR operator
         if isinstance(node.op, ast.Add):
             if IntegerType.isinstance(left.type):
                 self.pushValue(
-                    TypedValue(left.type,
-                               arith.AddIOp(left.value, right.value).result))
+                               arith.AddIOp(left, right).result)
+                return
+            else:
+                raise Exception("unhandled BinOp.Add types: {}".format(ast.unparse(node)))
+        
         if isinstance(node.op, ast.Sub):
             if IntegerType.isinstance(left.type):
                 self.pushValue(
-                    TypedValue(left.type,
-                               arith.SubIOp(left.value, right.value).result))
+                               arith.SubIOp(left, right).result)
+                return
+            else:
+                raise Exception("unhandled BinOp.Add types: {}".format(ast.unparse(node)))
+        else:
+            raise Exception("unhandled binary operator: {}".format(ast.unparse(node)))
 
     def visit_Name(self, node):
         if self.verbose:
             print("[Visit Name {}]".format(node.id))
         if node.id in self.symbolTable:
             value = self.symbolTable[node.id]
-            if cc.PointerType.isinstance(value.value.type):
-                loaded = cc.LoadOp(value.value).result
-                self.pushValue(TypedValue(loaded.type, loaded))
+            if cc.PointerType.isinstance(value.type):
+                loaded = cc.LoadOp(value).result
+                self.pushValue(loaded)
             else:
                 self.pushValue(self.symbolTable[node.id])
+            return
+        # elif node.id == 'cudaq':
+        #     return 
+        # else:
+        #     raise Exception("unhandled name node: {}".format(ast.unparse(node)))
 
 
 def compile_to_quake(astModule, **kwargs):

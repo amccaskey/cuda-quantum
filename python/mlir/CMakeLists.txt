@@ -41,7 +41,11 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
   SOURCES
    QuakeExtension.cpp
   EMBED_CAPI_LINK_LIBS
-  CUDAQuantumMLIRCAPI
+   CUDAQuantumMLIRCAPI
+   MLIRCAPIExecutionEngine
+  PRIVATE_LINK_LIBS
+   OptCodeGen
+   OptTransforms
 )
 
 ################################################################################

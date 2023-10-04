@@ -7,12 +7,17 @@
  ******************************************************************************/
 
 #include "cudaq/Optimizer/CAPI/Dialects.h"
-#include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
+#include "cudaq/Optimizer/CodeGen/Passes.h"
 #include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
+#include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
+#include "cudaq/Optimizer/Transforms/Passes.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
+#include "mlir/InitAllPasses.h"
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
+
+static bool registered = false;
 
 PYBIND11_MODULE(_quakeDialects, m) {
 
@@ -22,10 +27,19 @@ PYBIND11_MODULE(_quakeDialects, m) {
       "register_dialect",
       [](MlirContext context, bool load) {
         MlirDialectHandle handle = mlirGetDialectHandle__quake__();
-
         mlirDialectHandleRegisterDialect(handle, context);
         if (load) {
           mlirDialectHandleLoadDialect(handle, context);
+        }
+
+        if (!registered) {
+          cudaq::opt::registerOptCodeGenPasses();
+          cudaq::opt::registerOptTransformsPasses();
+          cudaq::opt::registerAggressiveEarlyInlining();
+          cudaq::opt::registerUnrollingPipeline();
+          cudaq::opt::registerBaseProfilePipeline();
+          cudaq::opt::registerTargetPipelines();
+          registered = true;
         }
       },
       py::arg("context") = py::none(), py::arg("load") = true);
@@ -59,9 +73,12 @@ PYBIND11_MODULE(_quakeDialects, m) {
       },
       py::arg("context") = py::none(), py::arg("load") = true);
 
-  mlir_type_subclass(ccMod, "PointerType", [](MlirType type) {
-    return unwrap(type).isa<cudaq::cc::PointerType>();
-  }).def_classmethod("get", [](py::object cls, MlirContext ctx, MlirType elementType) {
-    return wrap(cudaq::cc::PointerType::get(unwrap(ctx), unwrap(elementType)));
-  });
+  mlir_type_subclass(
+      ccMod, "PointerType",
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::PointerType>(); })
+      .def_classmethod(
+          "get", [](py::object cls, MlirContext ctx, MlirType elementType) {
+            return wrap(
+                cudaq::cc::PointerType::get(unwrap(ctx), unwrap(elementType)));
+          });
 }
