@@ -8,6 +8,7 @@
 
 #include "cudaq/Optimizer/CAPI/Dialects.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
+#include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 
 namespace py = pybind11;
@@ -57,4 +58,10 @@ PYBIND11_MODULE(_quakeDialects, m) {
         }
       },
       py::arg("context") = py::none(), py::arg("load") = true);
+
+  mlir_type_subclass(ccMod, "PointerType", [](MlirType type) {
+    return unwrap(type).isa<cudaq::cc::PointerType>();
+  }).def_classmethod("get", [](py::object cls, MlirContext ctx, MlirType elementType) {
+    return wrap(cudaq::cc::PointerType::get(unwrap(ctx), unwrap(elementType)));
+  });
 }
