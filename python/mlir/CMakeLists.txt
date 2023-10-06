@@ -47,6 +47,7 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
    ../runtime/common/py_ObserveResult.cpp
    ../runtime/cudaq/spin/py_matrix.cpp
    ../runtime/cudaq/spin/py_spin_op.cpp 
+   ../runtime/cudaq/algorithms/py_optimizer.cpp 
 
   EMBED_CAPI_LINK_LIBS
    CUDAQuantumMLIRCAPI

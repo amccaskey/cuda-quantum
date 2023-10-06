@@ -15,7 +15,7 @@ from ..language.ast_bridge import compile_to_quake
 
 class PyKernelDecorator(object):
 
-    def __init__(self, function, verbose=False, library_mode=False):
+    def __init__(self, function, verbose=False, library_mode=True):
         self.kernelFunction = function
         self.mlirModule = None
         self.executionEngine = None

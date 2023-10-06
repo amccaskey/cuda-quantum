@@ -17,6 +17,7 @@
 #include "mlir/InitAllPasses.h"
 
 #include <pybind11/stl.h>
+#include <pybind11/complex.h>
 
 #include "runtime/common/py_ObserveResult.h"
 #include "runtime/common/py_SampleResult.h"
@@ -24,6 +25,7 @@
 #include "runtime/cudaq/spin/py_matrix.h"
 #include "runtime/cudaq/spin/py_spin_op.h"
 #include "runtime/cudaq/target/py_runtime_target.h"
+#include "runtime/cudaq/algorithms/py_optimizer.h"
 #include "utils/LinkedLibraryHolder.h"
 
 namespace py = pybind11;
@@ -131,11 +133,13 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindComplexMatrix(cudaqRuntime);
   cudaq::bindSpinWrapper(cudaqRuntime);
   cudaq::bindQIS(cudaqRuntime);
+  cudaq::bindOptimizerWrapper(cudaqRuntime);
 
   py::class_<cudaq::ExecutionContext>(cudaqRuntime, "ExecutionContext")
       .def(py::init<std::string>())
       .def(py::init<std::string, std::size_t>())
       .def_readonly("result", &cudaq::ExecutionContext::result)
+      .def_readonly("simulationData", &cudaq::ExecutionContext::simulationData)
       .def("setSpinOperator", [](cudaq::ExecutionContext &ctx,
                                  cudaq::spin_op &spin) { ctx.spin = &spin; })
       .def("getExpectationValue", [](cudaq::ExecutionContext &ctx) {
@@ -171,4 +175,21 @@ PYBIND11_MODULE(_quakeDialects, m) {
       py::arg("name"), py::arg("params"), py::arg("controls"),
       py::arg("targets"), py::arg("isAdjoint") = false,
       py::arg("op") = cudaq::spin_op());
+
+  cudaqRuntime.def("startAdjointRegion", []() {
+    cudaq::getExecutionManager()->startAdjointRegion();
+  });
+  cudaqRuntime.def("endAdjointRegion",
+                   []() { cudaq::getExecutionManager()->endAdjointRegion(); });
+
+  cudaqRuntime.def("startCtrlRegion", [](std::vector<std::size_t> &controls) {
+    cudaq::getExecutionManager()->startCtrlRegion(controls);
+  });
+  cudaqRuntime.def("endCtrlRegion", [](std::size_t nControls) {
+    cudaq::getExecutionManager()->endCtrlRegion(nControls);
+  });
+
+  cudaqRuntime.def("measure", [](std::size_t id) {
+    cudaq::getExecutionManager()->measure(cudaq::QuditInfo(2, id));
+  });
 }
