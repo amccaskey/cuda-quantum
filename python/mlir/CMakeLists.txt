@@ -39,7 +39,14 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
   MODULE_NAME _quakeDialects
   ADD_TO_PARENT CUDAQuantumPythonSources
   SOURCES
-   QuakeExtension.cpp
+   CUDAQuantumExtension.cpp
+   runtime/utils/MLIRLinkedLibraryHolder.cpp
+   ../runtime/cudaq/target/py_runtime_target.cpp 
+   ../runtime/common/py_SampleResult.cpp
+   ../runtime/common/py_ObserveResult.cpp
+   ../runtime/cudaq/spin/py_matrix.cpp
+   ../runtime/cudaq/spin/py_spin_op.cpp 
+
   EMBED_CAPI_LINK_LIBS
    CUDAQuantumMLIRCAPI
    MLIRCAPIExecutionEngine
@@ -47,6 +54,15 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
    OptCodeGen
    OptTransforms
 )
+
+target_include_directories(CUDAQuantumPythonSources.Extension INTERFACE 
+    ${CMAKE_CURRENT_SOURCE_DIR} 
+    ${CMAKE_SOURCE_DIR}/python 
+    ${CMAKE_SOURCE_DIR}/python/utils)
+target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE 
+    cudaq 
+    cudaq-common 
+    fmt::fmt-header-only)
 
 ################################################################################
 # Common CAPI

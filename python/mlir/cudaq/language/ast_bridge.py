@@ -13,13 +13,6 @@ from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith
 
 
-# class TypedValue(object):
-
-#     def __init__(self, type, value):
-#         self.type = type
-#         self.value = value
-
-
 class PyASTBridge(ast.NodeVisitor):
 
     def __init__(self, **kwargs):

@@ -5,11 +5,12 @@
 # This source code and the accompanying materials are made available under     #
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
-
-from .kernel.kernel_decorator import kernel
-from .kernel.builder import make_kernel
-from .runtime.sample import sample 
-from .runtime.observe import observe
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
-spin = cudaq_runtime.spin
+def sample(kernel, *args, shots=1000):
+    ctx = cudaq_runtime.ExecutionContext("sample", shots)
+    cudaq_runtime.setExecutionContext(ctx)
+    kernel(*args)
+    res = ctx.result
+    cudaq_runtime.resetExecutionContext()
+    return res

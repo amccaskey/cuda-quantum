@@ -11,16 +11,31 @@
 #include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
+#include "cudaq/platform.h"
+#include "cudaq/platform/qpu.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/InitAllPasses.h"
+
+#include <pybind11/stl.h>
+
+#include "runtime/common/py_ObserveResult.h"
+#include "runtime/common/py_SampleResult.h"
+#include "runtime/cudaq/spin/py_matrix.h"
+#include "runtime/cudaq/spin/py_spin_op.h"
+#include "runtime/cudaq/target/py_runtime_target.h"
+#include "utils/LinkedLibraryHolder.h"
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
 static bool registered = false;
 
-PYBIND11_MODULE(_quakeDialects, m) {
+// This is a custom LinkedLibraryHolder that does not 
+// automatically load the Remote REST QPU, we will 
+// need a different Remote REST QPU to avoid the LLVM startup issues
+static cudaq::LinkedLibraryHolder holder;
 
+void registerQuakeDialectAndTypes(py::module &m) {
   auto quakeMod = m.def_submodule("quake");
 
   quakeMod.def(
@@ -37,7 +52,6 @@ PYBIND11_MODULE(_quakeDialects, m) {
           cudaq::opt::registerOptTransformsPasses();
           cudaq::opt::registerAggressiveEarlyInlining();
           cudaq::opt::registerUnrollingPipeline();
-          cudaq::opt::registerBaseProfilePipeline();
           cudaq::opt::registerTargetPipelines();
           registered = true;
         }
@@ -59,6 +73,9 @@ PYBIND11_MODULE(_quakeDialects, m) {
             return wrap(quake::VeqType::get(unwrap(ctx), size));
           },
           py::arg("cls"), py::arg("context"), py::arg("size") = 0);
+}
+
+void registerCCDialectAndTypes(py::module &m) {
 
   auto ccMod = m.def_submodule("cc");
 
@@ -81,4 +98,59 @@ PYBIND11_MODULE(_quakeDialects, m) {
             return wrap(
                 cudaq::cc::PointerType::get(unwrap(ctx), unwrap(elementType)));
           });
+
+  mlir_type_subclass(
+      ccMod, "ArrayType",
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::ArrayType>(); })
+      .def_classmethod(
+          "get", [](py::object cls, MlirContext ctx, MlirType elementType) {
+            return wrap(
+                cudaq::cc::StdvecType::get(unwrap(ctx), unwrap(elementType)));
+          });
+
+  mlir_type_subclass(
+      ccMod, "StdvecType",
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::StdvecType>(); })
+      .def_classmethod(
+          "get", [](py::object cls, MlirContext ctx, MlirType elementType) {
+            return wrap(
+                cudaq::cc::StdvecType::get(unwrap(ctx), unwrap(elementType)));
+          });
+}
+
+PYBIND11_MODULE(_quakeDialects, m) {
+  registerQuakeDialectAndTypes(m);
+  registerCCDialectAndTypes(m);
+
+  auto cudaqRuntime = m.def_submodule("cudaq_runtime");
+
+  cudaq::bindRuntimeTarget(cudaqRuntime, holder);
+  cudaq::bindMeasureCounts(cudaqRuntime);
+  cudaq::bindObserveResult(cudaqRuntime);
+  cudaq::bindComplexMatrix(cudaqRuntime);
+  cudaq::bindSpinWrapper(cudaqRuntime);
+
+  py::class_<cudaq::ExecutionContext>(cudaqRuntime, "ExecutionContext")
+      .def(py::init<std::string>())
+      .def(py::init<std::string, std::size_t>())
+      .def_readonly("result", &cudaq::ExecutionContext::result)
+      .def("setSpinOperator", [](cudaq::ExecutionContext &ctx,
+                                 cudaq::spin_op &spin) { ctx.spin = &spin; })
+      .def("getExpectationValue", [](cudaq::ExecutionContext &ctx) {
+        return ctx.expectationValue.value();
+      });
+  cudaqRuntime.def(
+      "setExecutionContext",
+      [](cudaq::ExecutionContext &ctx) {
+        auto &self = cudaq::get_platform();
+        self.set_exec_ctx(&ctx);
+      },
+      "");
+  cudaqRuntime.def(
+      "resetExecutionContext",
+      []() {
+        auto &self = cudaq::get_platform();
+        self.reset_exec_ctx();
+      },
+      "");
 }

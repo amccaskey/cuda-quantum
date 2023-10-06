@@ -6,10 +6,15 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-from .kernel.kernel_decorator import kernel
-from .kernel.builder import make_kernel
-from .runtime.sample import sample 
-from .runtime.observe import observe
-from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
+# Library Mode QIS
 
-spin = cudaq_runtime.spin
+class qubit(object):
+    def __init__(self):
+        # allocate via the execution manager
+        pass 
+
+class qvector(object):
+    def __init__(self, size):
+        self.size = size 
+        # allocate via execution manager
+    
