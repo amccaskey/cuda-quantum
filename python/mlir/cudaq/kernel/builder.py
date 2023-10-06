@@ -16,7 +16,9 @@ from mlir_cudaq.execution_engine import *
 from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith
 
-from .qubit_qis import qvector
+from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
+
+qvector = cudaq_runtime.qvector 
 
 # Goal here is to reproduce the current kernel_builder in Python
 

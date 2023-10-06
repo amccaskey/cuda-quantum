@@ -20,6 +20,7 @@
 
 #include "runtime/common/py_ObserveResult.h"
 #include "runtime/common/py_SampleResult.h"
+#include "runtime/cudaq/qis/py_qubit_qis.h"
 #include "runtime/cudaq/spin/py_matrix.h"
 #include "runtime/cudaq/spin/py_spin_op.h"
 #include "runtime/cudaq/target/py_runtime_target.h"
@@ -30,8 +31,8 @@ using namespace mlir::python::adaptors;
 
 static bool registered = false;
 
-// This is a custom LinkedLibraryHolder that does not 
-// automatically load the Remote REST QPU, we will 
+// This is a custom LinkedLibraryHolder that does not
+// automatically load the Remote REST QPU, we will
 // need a different Remote REST QPU to avoid the LLVM startup issues
 static cudaq::LinkedLibraryHolder holder;
 
@@ -129,6 +130,7 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindObserveResult(cudaqRuntime);
   cudaq::bindComplexMatrix(cudaqRuntime);
   cudaq::bindSpinWrapper(cudaqRuntime);
+  cudaq::bindQIS(cudaqRuntime);
 
   py::class_<cudaq::ExecutionContext>(cudaqRuntime, "ExecutionContext")
       .def(py::init<std::string>())
@@ -153,4 +155,20 @@ PYBIND11_MODULE(_quakeDialects, m) {
         self.reset_exec_ctx();
       },
       "");
+
+  cudaqRuntime.def(
+      "applyQuantumOperation",
+      [](const std::string &name, std::vector<double> &params,
+         std::vector<std::size_t> &controls, std::vector<std::size_t> &targets,
+         bool isAdjoint, cudaq::spin_op &op) {
+        std::vector<cudaq::QuditInfo> c, t;
+        std::transform(controls.begin(), controls.end(), std::back_inserter(c),
+                       [](auto &&el) { return cudaq::QuditInfo(2, el); });
+        std::transform(targets.begin(), targets.end(), std::back_inserter(t),
+                       [](auto &&el) { return cudaq::QuditInfo(2, el); });
+        cudaq::getExecutionManager()->apply(name, params, c, t, isAdjoint, op);
+      },
+      py::arg("name"), py::arg("params"), py::arg("controls"),
+      py::arg("targets"), py::arg("isAdjoint") = false,
+      py::arg("op") = cudaq::spin_op());
 }

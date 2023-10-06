@@ -41,6 +41,7 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
   SOURCES
    CUDAQuantumExtension.cpp
    runtime/utils/MLIRLinkedLibraryHolder.cpp
+   runtime/cudaq/qis/py_qubit_qis.cpp
    ../runtime/cudaq/target/py_runtime_target.cpp 
    ../runtime/common/py_SampleResult.cpp
    ../runtime/common/py_ObserveResult.cpp
@@ -62,6 +63,7 @@ target_include_directories(CUDAQuantumPythonSources.Extension INTERFACE
 target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE 
     cudaq 
     cudaq-common 
+    cudaq-em-default
     fmt::fmt-header-only)
 
 ################################################################################
