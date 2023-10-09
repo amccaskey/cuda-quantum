@@ -103,4 +103,4 @@ void bindQIS(py::module &mod) {
            py::return_value_policy::reference,
            "Return the qubit at the given index.");
 }
-}
+} // namespace cudaq

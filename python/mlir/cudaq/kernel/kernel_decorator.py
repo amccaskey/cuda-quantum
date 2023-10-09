@@ -24,6 +24,8 @@ class PyKernelDecorator(object):
         # Library Mode
         self.library_mode = library_mode
 
+        # FIXME if target == remote, must have library_mode = False
+        
         src = inspect.getsource(function)
         leadingSpaces = len(src) - len(src.lstrip())
         self.funcSrc = '\n'.join(

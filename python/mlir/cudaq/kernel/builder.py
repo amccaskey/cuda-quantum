@@ -7,8 +7,10 @@
 # ============================================================================ #
 import inspect
 import sys
+import random
+import string
 import numpy as np
-import ctypes 
+import ctypes
 
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
@@ -18,9 +20,20 @@ from mlir_cudaq.dialects import builtin, func, arith
 
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
-qvector = cudaq_runtime.qvector 
+qvector = cudaq_runtime.qvector
 
 # Goal here is to reproduce the current kernel_builder in Python
+
+# We need static initializers to run in the CAPI ExecutionEngine,
+# so here we run a simple JIT compile at global scope
+with Context():
+    module = Module.parse(
+        r"""
+llvm.func @none() {
+  llvm.return
+}""")
+    ExecutionEngine(module)
+
 
 def mlirTypeFromPyType(argType, ctx):
     if argType == int:
@@ -31,16 +44,6 @@ def mlirTypeFromPyType(argType, ctx):
         return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))
     if argType == qvector:
         return quake.VeqType.get()
-
-def runtimeArgToCtypePointer(arg):
-    if isinstance(arg, float):
-        c_float_p = ctypes.c_double * 1
-        return c_float_p(arg)
-    if isinstance(arg, int):
-        c_int_p = ctypes.c_int * 1
-        return c_int_p(arg)
-    
-    raise Exception("{} runtime arg type is not implemented yet.".format(type(arg)))
 
 class QuakeValue(object):
 
@@ -102,21 +105,31 @@ class PyKernel(object):
         self.executionEngine = None
         self.loc = Location.unknown(context=self.ctx)
         self.module = Module.create(loc=self.loc)
+        self.funcName = '__nvqpp__mlirgen____nvqppBuilderKernel{}'.format(''.join(
+            random.choice(string.ascii_uppercase + string.digits) for _ in range(10)))
+        self.funcNameEntryPoint = self.funcName + '_entryPointRewrite'
+        attr = DictAttr.get({self.funcName: StringAttr.get(
+            self.funcNameEntryPoint, context=self.ctx)}, context=self.ctx)
+        self.module.operation.attributes.__setitem__(
+            'quake.mangled_name_map', attr)
+
         with self.ctx, InsertionPoint(self.module.body), self.loc:
-            mlirArgTypes = [
+            self.mlirArgTypes = [
                 mlirTypeFromPyType(argType, self.ctx) for argType in argTypeList
             ]
-            f = func.FuncOp('{}'.format('kernelBuilder'), (mlirArgTypes, []),
-                            loc=self.loc)
-            f.attributes.__setitem__('llvm.emit_c_interface', UnitAttr.get())
-            e = f.add_entry_block()
+
+            self.funcOp = func.FuncOp(self.funcName, (self.mlirArgTypes, []),
+                                      loc=self.loc)
+            self.funcOp.attributes.__setitem__(
+                'cudaq-entrypoint', UnitAttr.get())
+            e = self.funcOp.add_entry_block()
             self.argsAsQuakeValues = [
                 self.__createQuakeValue(b) for b in e.arguments
             ]
 
             with InsertionPoint(e):
                 func.ReturnOp([])
-                
+
             self.insertPoint = InsertionPoint.at_block_begin(e)
 
     def __createQuakeValue(self, value):
@@ -223,7 +236,7 @@ class PyKernel(object):
     def tdg(self, controls, target):
         with self.insertPoint, self.loc:
             quake.TOp([], [], [], [target.mlirValue], is_adj=UnitAttr.get())
-    
+
     def rx(self, parameter, target):
         with self.insertPoint, self.loc:
             if isinstance(parameter, QuakeValue):
@@ -231,10 +244,11 @@ class PyKernel(object):
                                       [target.mlirValue])
             elif isinstance(parameter, float):
                 fty = mlirTypeFromPyType(float, self.ctx)
-                paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter)).result
+                paramVal = arith.ConstantOp(
+                    fty, FloatAttr.get(fty, parameter)).result
                 self.__applyQuantumOp(inspect.stack()[0][3], [paramVal], [],
                                       [target.mlirValue])
-    
+
     def ry(self, parameter, target):
         with self.insertPoint, self.loc:
             if isinstance(parameter, QuakeValue):
@@ -256,6 +270,7 @@ class PyKernel(object):
                 paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
                 self.__applyQuantumOp(inspect.stack()[0][3], [parameter.result], [],
                                       [target.mlirValue])
+
     def r1(self, parameter, target):
         with self.insertPoint, self.loc:
             if isinstance(parameter, QuakeValue):
@@ -268,8 +283,18 @@ class PyKernel(object):
                                       [target.mlirValue])
 
     def exp_pauli(self, theta, qubits, pauliWord):
+        # FIXME implement for qubits...
         with self.insertPoint, self.loc:
-            raise Exception("exp_pauli not yet implemented.")
+            thetaVal = theta
+            if isinstance(theta, float):
+                fty = mlirTypeFromPyType(float, self.ctx)
+                thetaVal = arith.ConstantOp(
+                    fty, FloatAttr.get(fty, theta)).result
+
+            retTy = cc.PointerType.get(self.ctx, cc.ArrayType.get(self.ctx,
+                                                                  IntegerType.get_signless(8), int(len(pauliWord)+1)))
+            slVal = cc.CreateStringLiteralOp(retTy, pauliWord)
+            quake.ExpPauliOp(thetaVal, qubits.mlirValue, slVal)
 
     def swap(self, qubitA, qubitB):
         with self.insertPoint, self.loc:
@@ -289,19 +314,14 @@ class PyKernel(object):
         raise Exception("for_loop not yet implemented.")
 
     def __call__(self, *args):
-        if self.executionEngine == None:
-            # FIXME This should be retrieved from the target
-            pm = PassManager.parse(
-                "builtin.module(canonicalize,cse,func.func(quake-add-deallocs),quake-to-qir)",
-                context=self.ctx)
-            pm.run(self.module)
-            self.executionEngine = ExecutionEngine(self.module)
-        
-        if len([*args]) > 0:
-            cTypeArgs = [runtimeArgToCtypePointer(a) for a in args]
-            self.executionEngine.invoke('kernelBuilder', *cTypeArgs)
-        else:
-            self.executionEngine.invoke('kernelBuilder')
+        if len(args) != len(self.mlirArgTypes):
+            raise Exception("invalid number of arguments passed to kernel {} (passed {} but requires {})".format(
+                self.funcName, len(args), len(self.mlirArgTypes)))
+        cudaq_runtime.pyAltLaunchKernel(
+            self.funcName.removeprefix(
+                '__nvqpp__mlirgen__'), self.module, *args)
+        return
+
 
 def make_kernel(*args):
     kernel = PyKernel([*args])

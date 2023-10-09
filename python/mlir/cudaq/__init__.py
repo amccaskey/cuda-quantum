@@ -20,6 +20,7 @@ qvector = cudaq_runtime.qvector
 optimizers = cudaq_runtime.optimizers
 set_target = cudaq_runtime.set_target
 reset_target = cudaq_runtime.reset_target 
+SpinOperator = cudaq_runtime.SpinOperator
 
 h = h()
 x = x()

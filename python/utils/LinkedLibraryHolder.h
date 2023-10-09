@@ -33,6 +33,8 @@ struct RuntimeTarget {
 
   /// @brief Return the number of QPUs this target exposes.
   std::size_t num_qpus();
+  bool is_remote();
+  bool is_emulated();
 };
 
 /// @brief The LinkedLibraryHolder provides a mechanism for
@@ -73,8 +75,11 @@ protected:
   /// @brief Store the name of the current target
   std::string currentTarget;
 
+  bool overrideRestQPU = false;
+
 public:
   LinkedLibraryHolder();
+  LinkedLibraryHolder(bool overrideRestQPU);
   ~LinkedLibraryHolder();
 
   /// @brief Return the registered simulator with the given name.

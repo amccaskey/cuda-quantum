@@ -40,14 +40,16 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
   ADD_TO_PARENT CUDAQuantumPythonSources
   SOURCES
    CUDAQuantumExtension.cpp
-   runtime/utils/MLIRLinkedLibraryHolder.cpp
+   runtime/utils/PyRemoteRESTQPU.cpp
    runtime/cudaq/qis/py_qubit_qis.cpp
+   ../utils/LinkedLibraryHolder.cpp
    ../runtime/cudaq/target/py_runtime_target.cpp 
    ../runtime/common/py_SampleResult.cpp
    ../runtime/common/py_ObserveResult.cpp
    ../runtime/cudaq/spin/py_matrix.cpp
    ../runtime/cudaq/spin/py_spin_op.cpp 
    ../runtime/cudaq/algorithms/py_optimizer.cpp 
+   ../../runtime/cudaq/platform/common/QuantumExecutionQueue.cpp
 
   EMBED_CAPI_LINK_LIBS
    CUDAQuantumMLIRCAPI
@@ -65,7 +67,8 @@ target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE
     cudaq 
     cudaq-common 
     cudaq-em-default
-    fmt::fmt-header-only)
+    fmt::fmt-header-only
+    )
 
 ################################################################################
 # Common CAPI
