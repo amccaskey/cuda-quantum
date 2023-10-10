@@ -8,9 +8,11 @@
 
 #include "cudaq/Optimizer/CAPI/Dialects.h"
 #include "cudaq/Optimizer/CodeGen/Passes.h"
+#include "cudaq/Optimizer/CodeGen/Pipelines.h"
 #include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
+#include "cudaq.h"
 #include "cudaq/platform.h"
 #include "cudaq/platform/qpu.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
@@ -22,9 +24,11 @@
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 
+#include "runtime/common/py_NoiseModel.h"
 #include "runtime/common/py_ObserveResult.h"
 #include "runtime/common/py_SampleResult.h"
 #include "runtime/cudaq/algorithms/py_optimizer.h"
+#include "runtime/cudaq/kernels/py_common_kernels.h"
 #include "runtime/cudaq/qis/py_qubit_qis.h"
 #include "runtime/cudaq/spin/py_matrix.h"
 #include "runtime/cudaq/spin/py_spin_op.h"
@@ -80,7 +84,18 @@ void registerQuakeDialectAndTypes(py::module &m) {
           [](py::object cls, MlirContext ctx, std::size_t size) {
             return wrap(quake::VeqType::get(unwrap(ctx), size));
           },
-          py::arg("cls"), py::arg("context"), py::arg("size") = 0);
+          py::arg("cls"), py::arg("context"), py::arg("size") = 0)
+      .def_staticmethod(
+          "getSize",
+          [](MlirType type) {
+            auto veqTy = unwrap(type).dyn_cast<quake::VeqType>();
+            if (!veqTy)
+              throw std::runtime_error(
+                  "Invalid type passed to VeqType.getSize()");
+
+            return veqTy.getSize();
+          },
+          py::arg("veqTypeInstance"));
 }
 
 void registerCCDialectAndTypes(py::module &m) {
@@ -145,10 +160,15 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindSpinWrapper(cudaqRuntime);
   cudaq::bindQIS(cudaqRuntime);
   cudaq::bindOptimizerWrapper(cudaqRuntime);
+  cudaq::bindCommonKernels(cudaqRuntime);
+  cudaq::bindNoise(cudaqRuntime);
+
+  cudaqRuntime.def("set_random_seed", &cudaq::set_random_seed,
+                   "Provide the seed for backend quantum kernel simulation.");
 
   py::class_<cudaq::ExecutionContext>(cudaqRuntime, "ExecutionContext")
       .def(py::init<std::string>())
-      .def(py::init<std::string, std::size_t>())
+      .def(py::init<std::string, int>())
       .def_readonly("result", &cudaq::ExecutionContext::result)
       .def_readonly("simulationData", &cudaq::ExecutionContext::simulationData)
       .def("setSpinOperator", [](cudaq::ExecutionContext &ctx,
@@ -204,6 +224,9 @@ PYBIND11_MODULE(_quakeDialects, m) {
     cudaq::getExecutionManager()->measure(cudaq::QuditInfo(2, id));
   });
 
+  cudaqRuntime.def("set_noise", &cudaq::set_noise, "");
+  cudaqRuntime.def("unset_noise", &cudaq::unset_noise, "");
+
   cudaqRuntime.def("pyAltLaunchKernel", [](const std::string &name,
                                            MlirModule module,
                                            py::args runtimeArgs) {
@@ -212,24 +235,10 @@ PYBIND11_MODULE(_quakeDialects, m) {
     auto context = cloned.getContext();
     registerLLVMDialectTranslation(*context);
 
-    // FIXME, this should be dependent on the target
     PassManager pm(context);
-    OpPassManager &optPM = pm.nest<func::FuncOp>();
-    cudaq::opt::addAggressiveEarlyInlining(pm);
-    pm.addPass(createCanonicalizerPass());
-    pm.addPass(cudaq::opt::createApplyOpSpecializationPass());
-    pm.addPass(createCanonicalizerPass());
-    optPM.addPass(cudaq::opt::createQuakeAddDeallocs());
-    optPM.addPass(cudaq::opt::createQuakeAddMetadata());
-    pm.addPass(createCanonicalizerPass());
-    pm.addPass(createCSEPass());
     pm.addPass(cudaq::opt::createGenerateDeviceCodeLoader(/*genAsQuake=*/true));
     pm.addPass(cudaq::opt::createGenerateKernelExecution());
-    optPM.addPass(cudaq::opt::createLowerToCFGPass());
-    pm.addPass(createCanonicalizerPass());
-    pm.addPass(createCSEPass());
-    pm.addPass(cudaq::opt::createConvertToQIRPass());
-
+    cudaq::opt::addPipelineToQIR<>(pm);
     if (failed(pm.run(cloned)))
       throw std::runtime_error(
           "cudaq::builder failed to JIT compile the Quake representation.");
@@ -270,22 +279,24 @@ PYBIND11_MODULE(_quakeDialects, m) {
 
     auto thunkName = name + ".thunk";
     auto thunkPtr = jit->lookup(thunkName);
-    if (!thunkPtr) {
+    if (!thunkPtr)
       throw std::runtime_error("cudaq::builder failed to get thunk function");
-    }
 
-    // Invoke and free the args memory.
     auto thunk = reinterpret_cast<void (*)(void *)>(*thunkPtr);
 
-    struct ArgWrapper {
-      ModuleOp mod;
-      void *rawArgs = nullptr;
-    };
+    auto &platform = cudaq::get_platform();
+    if (platform.is_remote() || platform.is_emulated()) {
+      struct ArgWrapper {
+        ModuleOp mod;
+        void *rawArgs = nullptr;
+      };
+      auto *wrapper = new ArgWrapper{mod, rawArgs};
+      cudaq::altLaunchKernel(name.c_str(), thunk,
+                             reinterpret_cast<void *>(wrapper), size, 0);
+      delete wrapper;
+    } else
+      cudaq::altLaunchKernel(name.c_str(), thunk, rawArgs, size, 0);
 
-    auto *wrapper = new ArgWrapper{mod, rawArgs};
-    cudaq::altLaunchKernel(name.c_str(), thunk,
-                           reinterpret_cast<void *>(wrapper), size, 0);
-    delete wrapper;
     std::free(rawArgs);
     delete jit;
   });

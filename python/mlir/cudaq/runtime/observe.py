@@ -7,11 +7,11 @@
 # ============================================================================ #
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
-def observe(kernel, op, *args):
-    ctx = cudaq_runtime.ExecutionContext("observe")
-    ctx.setSpinOperator(op)
+def observe(kernel, spin_operator, *args, shots_count=0):
+    ctx = cudaq_runtime.ExecutionContext('observe', shots_count)
+    ctx.setSpinOperator(spin_operator)
     cudaq_runtime.setExecutionContext(ctx)
     kernel(*args)
     res = ctx.result
     cudaq_runtime.resetExecutionContext()
-    return cudaq_runtime.ObserveResult(ctx.getExpectationValue(), op, res)
+    return cudaq_runtime.ObserveResult(ctx.getExpectationValue(), spin_operator, res)

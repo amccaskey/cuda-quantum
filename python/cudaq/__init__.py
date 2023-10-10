@@ -25,7 +25,6 @@ if not "CUDAQ_DYNLIBS" in os.environ:
             print("Could not find a suitable cuQuantum Python package.")
         pass
 
-
 from ._pycudaq import *
 from .domains import chemistry
 

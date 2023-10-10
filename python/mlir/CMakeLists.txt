@@ -42,10 +42,12 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
    CUDAQuantumExtension.cpp
    runtime/utils/PyRemoteRESTQPU.cpp
    runtime/cudaq/qis/py_qubit_qis.cpp
+   runtime/cudaq/kernels/py_common_kernels.cpp
    ../utils/LinkedLibraryHolder.cpp
    ../runtime/cudaq/target/py_runtime_target.cpp 
    ../runtime/common/py_SampleResult.cpp
    ../runtime/common/py_ObserveResult.cpp
+   ../runtime/common/py_NoiseModel.cpp
    ../runtime/cudaq/spin/py_matrix.cpp
    ../runtime/cudaq/spin/py_spin_op.cpp 
    ../runtime/cudaq/algorithms/py_optimizer.cpp 

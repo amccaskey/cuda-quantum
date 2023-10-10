@@ -5,6 +5,7 @@
 # This source code and the accompanying materials are made available under     #
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
+from functools import partialmethod
 import inspect
 import sys
 import random
@@ -12,6 +13,7 @@ import string
 import numpy as np
 import ctypes
 
+from .quake_value import QuakeValue, mlirTypeFromPyType
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.execution_engine import *
@@ -35,65 +37,77 @@ llvm.func @none() {
     ExecutionEngine(module)
 
 
-def mlirTypeFromPyType(argType, ctx):
-    if argType == int:
-        return IntegerType.get_signless(64)
-    if argType == float:
-        return F64Type.get()
-    if argType == list:
-        return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))
-    if argType == qvector:
-        return quake.VeqType.get()
+def __generalOperation(opName, parameters, controls, target, isAdj=False, context=None):
+    opCtor = getattr(quake, '{}Op'.format(opName.title()))
 
-class QuakeValue(object):
+    if not quake.VeqType.isinstance(target.mlirValue.type):
+        opCtor([], parameters, controls,
+               [target.mlirValue], is_adj=isAdj)
+        return
 
-    def __init__(self, mlirValue, pyKernel):
-        self.mlirValue = mlirValue
-        self.pyKernel = pyKernel
-        self.ctx = self.pyKernel.ctx
+    # target is a VeqType
+    size = quake.VeqType.getSize(target.mlirValue.type)
+    if size:
+        for i in range(size):
+            extracted = quake.ExtractRefOp(
+                quake.RefType.get(context), target.mlirValue, i)
+            opCtor([], parameters, controls,
+                   [extracted], is_adj=isAdj)
+        return
+    else:
+        raise RuntimeError(
+            'operation broadcasting on veq<?> not supported yet.')
 
-    def __str__(self):
-        return str(self.mlirValue)
 
-    def __getitem__(self, idx):
-        with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
-            if cc.StdvecType.isinstance(self.mlirValue.type):
-                eleTy = mlirTypeFromPyType(float, self.ctx)
-                arrPtrTy = cc.PointerType.get(self.ctx,
-                                              cc.ArrayType.get(self.ctx, eleTy))
-                vecPtr = cc.StdvecDataOp(arrPtrTy, self.mlirValue).result
-                elePtrTy = cc.PointerType.get(self.ctx, eleTy)
-                eleAddr = None
-                i64Ty = IntegerType.get_signless(64)
-                if isinstance(idx, QuakeValue):
-                    eleAddr = cc.ComputePtrOp(
-                        elePtrTy, vecPtr, [idx.mlirValue],
-                        DenseI32ArrayAttr.get([-2147483648], context=self.ctx))
-                elif isinstance(idx, int):
-                    eleAddr = cc.ComputePtrOp(
-                        elePtrTy, vecPtr, [],
-                        DenseI32ArrayAttr.get([idx], context=self.ctx))
-                loaded = cc.LoadOp(eleAddr.result)
-                return QuakeValue(loaded.result, self.pyKernel)
+def __singleTargetOperation(self, opName, target, isAdj=False):
+    with self.insertPoint, self.loc:
+        __generalOperation(opName, [], [], target,
+                           isAdj=isAdj, context=self.ctx)
 
-            if quake.VeqType.isinstance(self.mlirValue.type):
-                processedIdx = None
-                if isinstance(idx, QuakeValue):
-                    processedIdx = idx.mlirValue
-                elif isinstance(idx, int):
-                    i64Ty = IntegerType.get_signless(64)
-                    processedIdx = arith.ConstantOp(i64Ty,
-                                                    IntegerAttr.get(i64Ty,
-                                                                    idx)).result
-                else:
-                    raise Exception("invalid idx passed to QuakeValue.")
-                op = quake.ExtractRefOp(quake.RefType.get(self.ctx),
-                                        self.mlirValue,
-                                        -1,
-                                        index=processedIdx)
-                return QuakeValue(op.result, self.pyKernel)
 
-        raise Exception("invalid getitem")
+def __singleTargetControlOperation(self, opName, controls, target, isAdj=False):
+    with self.insertPoint, self.loc:
+        fwdControls = None
+        if isinstance(controls, list):
+            fwdControls = [c.mlirValue for c in controls]
+        elif quake.RefType.isinstance(controls.mlirValue.type) or quake.VeqType.isinstance(controls.mlirValue.type):
+            fwdControls = [controls.mlirValue]
+        else:
+            raise RuntimeError("invalid controls type for {}.", opName)
+
+        __generalOperation(opName, [], fwdControls, target,
+                           isAdj=isAdj, context=self.ctx)
+
+
+def __singleTargetSingleParameterOperation(self, opName, parameter, target, isAdj=False):
+    with self.insertPoint, self.loc:
+        paramVal = None
+        if isinstance(parameter, float):
+            fty = mlirTypeFromPyType(float, self.ctx)
+            paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
+        else:
+            paramVal = parameter.mlirValue
+        __generalOperation(opName, [paramVal], [], target,
+                           isAdj=isAdj, context=self.ctx)
+
+
+def __singleTargetSingleParameterControlOperation(self, opName, parameter, controls, target, isAdj=False):
+    with self.insertPoint, self.loc:
+        fwdControls = None
+        if isinstance(controls, list):
+            fwdControls = [c.mlirValue for c in controls]
+        elif quake.RefType.isinstance(controls.mlirValue.type) or quake.VeqType.isinstance(controls.mlirValue.type):
+            fwdControls = [controls.mlirValue]
+        else:
+            raise RuntimeError("invalid controls type for {}.", opName)
+
+        paramVal = parameter
+        if isinstance(parameter, float):
+            fty = mlirTypeFromPyType(float, self.ctx)
+            paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
+
+        __generalOperation(opName, [paramVal], fwdControls, target,
+                           isAdj=isAdj, context=self.ctx)
 
 
 class PyKernel(object):
@@ -135,8 +149,19 @@ class PyKernel(object):
     def __createQuakeValue(self, value):
         return QuakeValue(value, self)
 
-    def __str__(self):
+    def dump(self):
+        print(str(self.module))
+    
+    def raw_quake(self):
         return str(self.module)
+    
+    def __str__(self, canonicalize=False):
+        pm = PassManager.parse(
+            "builtin.module(canonicalize,cse)",
+            context=self.ctx)
+        cloned = cudaq_runtime.cloneModuleOp(self.module)
+        pm.run(cloned)
+        return str(cloned)
 
     def qalloc(self, size=None):
         with self.insertPoint, self.loc:
@@ -148,148 +173,21 @@ class PyKernel(object):
                     veqTy = quake.VeqType.get(self.ctx)
                     sizeVal = size.mlirValue
                     return self.__createQuakeValue(
-                        quake.AllocaOp(veqTy, size=sizeVal))
+                        quake.AllocaOp(veqTy, size=sizeVal).result)
                 else:
                     veqTy = quake.VeqType.get(self.ctx, size)
                     return self.__createQuakeValue(quake.AllocaOp(veqTy).result)
 
-    def __applyQuantumOp(self, opName, parameters, controls, targets):
-        opCtor = getattr(quake, '{}Op'.format(opName.title()))
-        opCtor([], parameters, controls, targets)
-
-    def h(self, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3], [], [],
-                                  [target.mlirValue])
-
-    def ch(self, controls, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3][-1], [],
-                                  [c.mlirValue for c in controls] if isinstance(
-                                      controls, list) else [controls.mlirValue],
-                                  [target.mlirValue])
-
-    def x(self, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3], [], [],
-                                  [target.mlirValue])
-
-    def cx(self, controls, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3][-1], [],
-                                  [c.mlirValue for c in controls] if isinstance(
-                                      controls, list) else [controls.mlirValue],
-                                  [target.mlirValue])
-
-    def y(self, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3], [], [],
-                                  [target.mlirValue])
-
-    def cy(self, controls, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3][-1], [],
-                                  [c.mlirValue for c in controls] if isinstance(
-                                      controls, list) else [controls.mlirValue],
-                                  [target.mlirValue])
-
-    def z(self, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3], [], [],
-                                  [target.mlirValue])
-
-    def cz(self, controls, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3][-1], [],
-                                  [c.mlirValue for c in controls] if isinstance(
-                                      controls, list) else [controls.mlirValue],
-                                  [target.mlirValue])
-
-    def s(self, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3], [], [],
-                                  [target.mlirValue])
-
-    def cs(self, controls, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3][-1], [],
-                                  [c.mlirValue for c in controls] if isinstance(
-                                      controls, list) else [controls.mlirValue],
-                                  [target.mlirValue])
-
-    def t(self, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3], [], [],
-                                  [target.mlirValue])
-
-    def ct(self, controls, target):
-        with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3][-1], [],
-                                  [c.mlirValue for c in controls] if isinstance(
-                                      controls, list) else [controls.mlirValue],
-                                  [target.mlirValue])
-
-    def sdg(self, target):
-        with self.insertPoint, self.loc:
-            quake.SOp([], [], [], [target.mlirValue], is_adj=UnitAttr.get())
-
-    def tdg(self, controls, target):
-        with self.insertPoint, self.loc:
-            quake.TOp([], [], [], [target.mlirValue], is_adj=UnitAttr.get())
-
-    def rx(self, parameter, target):
-        with self.insertPoint, self.loc:
-            if isinstance(parameter, QuakeValue):
-                self.__applyQuantumOp(inspect.stack()[0][3], [parameter.mlirValue], [],
-                                      [target.mlirValue])
-            elif isinstance(parameter, float):
-                fty = mlirTypeFromPyType(float, self.ctx)
-                paramVal = arith.ConstantOp(
-                    fty, FloatAttr.get(fty, parameter)).result
-                self.__applyQuantumOp(inspect.stack()[0][3], [paramVal], [],
-                                      [target.mlirValue])
-
-    def ry(self, parameter, target):
-        with self.insertPoint, self.loc:
-            if isinstance(parameter, QuakeValue):
-                self.__applyQuantumOp(inspect.stack()[0][3], [parameter.mlirValue], [],
-                                      [target.mlirValue])
-            elif isinstance(parameter, float):
-                fty = mlirTypeFromPyType(float, self.ctx)
-                paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
-                self.__applyQuantumOp(inspect.stack()[0][3], [parameter.result], [],
-                                      [target.mlirValue])
-
-    def rz(self, parameter, target):
-        with self.insertPoint, self.loc:
-            if isinstance(parameter, QuakeValue):
-                self.__applyQuantumOp(inspect.stack()[0][3], [parameter.mlirValue], [],
-                                      [target.mlirValue])
-            elif isinstance(parameter, float):
-                fty = mlirTypeFromPyType(float, self.ctx)
-                paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
-                self.__applyQuantumOp(inspect.stack()[0][3], [parameter.result], [],
-                                      [target.mlirValue])
-
-    def r1(self, parameter, target):
-        with self.insertPoint, self.loc:
-            if isinstance(parameter, QuakeValue):
-                self.__applyQuantumOp(inspect.stack()[0][3], [parameter.mlirValue], [],
-                                      [target.mlirValue])
-            elif isinstance(parameter, float):
-                fty = mlirTypeFromPyType(float, self.ctx)
-                paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
-                self.__applyQuantumOp(inspect.stack()[0][3], [parameter.result], [],
-                                      [target.mlirValue])
-
     def exp_pauli(self, theta, qubits, pauliWord):
         # FIXME implement for qubits...
         with self.insertPoint, self.loc:
-            thetaVal = theta
+            thetaVal = None
             if isinstance(theta, float):
                 fty = mlirTypeFromPyType(float, self.ctx)
                 thetaVal = arith.ConstantOp(
                     fty, FloatAttr.get(fty, theta)).result
+            else:
+                thetaVal = theta.mlirValue
 
             retTy = cc.PointerType.get(self.ctx, cc.ArrayType.get(self.ctx,
                                                                   IntegerType.get_signless(8), int(len(pauliWord)+1)))
@@ -298,29 +196,110 @@ class PyKernel(object):
 
     def swap(self, qubitA, qubitB):
         with self.insertPoint, self.loc:
-            self.__applyQuantumOp(inspect.stack()[0][3], [], [],
-                                  [qubitA.mlirValue, qubitB.mlirValue])
+            quake.SwapOp([], [], [], [qubitA.mlirValue, qubitB.mlirValue])
+
+    def reset(self, target):
+        with self.insertPoint, self.loc:
+            if not quake.VeqType.isinstance(target.mlirValue.type):
+                quake.ResetOp([], target.mlirValue)
+                return
+
+            # target is a VeqType
+            size = quake.VeqType.getSize(target.mlirValue.type)
+            if size:
+                for i in range(size):
+                    extracted = quake.ExtractRefOp(
+                        quake.RefType.get(self.ctx), target.mlirValue, i).result
+                    quake.ResetOp([], extracted)
+                return
+            else:
+                raise RuntimeError(
+                    'reset operation broadcasting on veq<?> not supported yet.')
+
+    def mz(self, target, regName=None):
+        with self.insertPoint, self.loc:
+            i1Ty = IntegerType.get_signless(1, context=self.ctx)
+            qubitTy = target.mlirValue.type
+            retTy = i1Ty
+            stdvecTy = cc.StdvecType.get(self.ctx, i1Ty)
+            if quake.VeqType.isinstance(target.mlirValue.type):
+                retTy = stdvecTy
+            res = quake.MzOp(retTy, [], [target.mlirValue]) if regName == None else quake.MzOp(
+                retTy, [], target, StrAttr.get(regName, context=self.ctx))
+            return self.__createQuakeValue(res.result)
+
+    def mx(self, qubits, regName=None):
+        self.h(qubits)
+        return self.mz(qubits, regName)
+
+    def my(self, qubits, regName=None):
+        self.sdg(qubits)
+        self.h(qubits)
+        return self.mz(qubits, regName)
 
     def adjoint(self, otherKernel, *args):
-        raise Exception("adjoint not yet implemented")
+        raise RuntimeError("adjoint not yet implemented")
 
     def control(self, otherKernel, control, *args):
-        raise Exception("control not yet implemented")
+        raise RuntimeError("control not yet implemented")
 
     def c_if(self, measurement, thenBlockCallable):
-        raise Exception("c_if not implemented yet.")
+        raise RuntimeError("c_if not implemented yet.")
 
     def for_loop(self, start, stop, bodyCallable):
-        raise Exception("for_loop not yet implemented.")
+        raise RuntimeError("for_loop not yet implemented.")
 
     def __call__(self, *args):
         if len(args) != len(self.mlirArgTypes):
-            raise Exception("invalid number of arguments passed to kernel {} (passed {} but requires {})".format(
+            raise RuntimeError("invalid number of arguments passed to kernel {} (passed {} but requires {})".format(
                 self.funcName, len(args), len(self.mlirArgTypes)))
+        # validate the arg types
+        for i, arg in enumerate(args):
+            mlirType = mlirTypeFromPyType(type(arg), self.ctx)
+            if mlirType != self.mlirArgTypes[i]:
+                raise RuntimeError("invalid runtime arg type")
+
         cudaq_runtime.pyAltLaunchKernel(
             self.funcName.removeprefix(
                 '__nvqpp__mlirgen__'), self.module, *args)
         return
+
+
+setattr(PyKernel, 'h', partialmethod(__singleTargetOperation, 'h'))
+setattr(PyKernel, 'x', partialmethod(__singleTargetOperation, 'x'))
+setattr(PyKernel, 'y', partialmethod(__singleTargetOperation, 'y'))
+setattr(PyKernel, 'z', partialmethod(__singleTargetOperation, 'z'))
+setattr(PyKernel, 's', partialmethod(__singleTargetOperation, 's'))
+setattr(PyKernel, 't', partialmethod(__singleTargetOperation, 't'))
+setattr(PyKernel, 'sdg', partialmethod(
+    __singleTargetOperation, 's', isAdj=True))
+setattr(PyKernel, 'tdg', partialmethod(
+    __singleTargetOperation, 't', isAdj=True))
+
+setattr(PyKernel, 'ch', partialmethod(__singleTargetControlOperation, 'h'))
+setattr(PyKernel, 'cx', partialmethod(__singleTargetControlOperation, 'x'))
+setattr(PyKernel, 'cy', partialmethod(__singleTargetControlOperation, 'y'))
+setattr(PyKernel, 'cz', partialmethod(__singleTargetControlOperation, 'z'))
+setattr(PyKernel, 'cs', partialmethod(__singleTargetControlOperation, 's'))
+setattr(PyKernel, 'ct', partialmethod(__singleTargetControlOperation, 't'))
+
+setattr(PyKernel, 'rx', partialmethod(
+    __singleTargetSingleParameterOperation, 'rx'))
+setattr(PyKernel, 'ry', partialmethod(
+    __singleTargetSingleParameterOperation, 'ry'))
+setattr(PyKernel, 'rz', partialmethod(
+    __singleTargetSingleParameterOperation, 'rz'))
+setattr(PyKernel, 'r1', partialmethod(
+    __singleTargetSingleParameterOperation, 'r1'))
+
+setattr(PyKernel, 'crx', partialmethod(
+    __singleTargetSingleParameterControlOperation, 'rx'))
+setattr(PyKernel, 'cry', partialmethod(
+    __singleTargetSingleParameterControlOperation, 'ry'))
+setattr(PyKernel, 'crz', partialmethod(
+    __singleTargetSingleParameterControlOperation, 'rz'))
+setattr(PyKernel, 'cr1', partialmethod(
+    __singleTargetSingleParameterControlOperation, 'r1'))
 
 
 def make_kernel(*args):
