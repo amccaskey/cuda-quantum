@@ -17,7 +17,9 @@ from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith
+from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
+qvector = cudaq_runtime.qvector
 
 # By default and to keep things easier,
 # we only deal with int==i64 and float=f64
@@ -26,7 +28,7 @@ def mlirTypeFromPyType(argType, ctx):
         return IntegerType.get_signless(64)
     if argType == float:
         return F64Type.get(ctx)
-    if argType == list:
+    if argType == list or argType == np.ndarray:
         return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))
     if argType == qvector:
         return quake.VeqType.get(ctx)

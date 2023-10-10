@@ -254,14 +254,22 @@ class PyKernel(object):
             raise RuntimeError("invalid number of arguments passed to kernel {} (passed {} but requires {})".format(
                 self.funcName, len(args), len(self.mlirArgTypes)))
         # validate the arg types
+        processedArgs = []
         for i, arg in enumerate(args):
             mlirType = mlirTypeFromPyType(type(arg), self.ctx)
             if mlirType != self.mlirArgTypes[i]:
-                raise RuntimeError("invalid runtime arg type")
+                raise RuntimeError("invalid runtime arg type ({} vs {})".format(mlirType, self.mlirArgTypes[i]))
+
+            # Convert np arrays to lists
+            if cc.StdvecType.isinstance(mlirType) and hasattr(arg, "tolist"):
+                processedArgs.append(arg.tolist())
+            else:
+                processedArgs.append(arg)
+
 
         cudaq_runtime.pyAltLaunchKernel(
             self.funcName.removeprefix(
-                '__nvqpp__mlirgen__'), self.module, *args)
+                '__nvqpp__mlirgen__'), self.module, *processedArgs)
         return
 
 

@@ -171,6 +171,8 @@ PYBIND11_MODULE(_quakeDialects, m) {
       .def(py::init<std::string, int>())
       .def_readonly("result", &cudaq::ExecutionContext::result)
       .def_readonly("simulationData", &cudaq::ExecutionContext::simulationData)
+      .def_readwrite("totalIterations", &cudaq::ExecutionContext::totalIterations)
+      .def_readwrite("batchIteration", &cudaq::ExecutionContext::batchIteration)
       .def("setSpinOperator", [](cudaq::ExecutionContext &ctx,
                                  cudaq::spin_op &spin) { ctx.spin = &spin; })
       .def("getExpectationValue", [](cudaq::ExecutionContext &ctx) {
