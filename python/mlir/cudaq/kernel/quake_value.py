@@ -25,7 +25,7 @@ qvector = cudaq_runtime.qvector
 # we only deal with int==i64 and float=f64
 def mlirTypeFromPyType(argType, ctx):
     if argType == int:
-        return IntegerType.get_signless(64)
+        return IntegerType.get_signless(64, ctx)
     if argType == float:
         return F64Type.get(ctx)
     if argType == list or argType == np.ndarray:

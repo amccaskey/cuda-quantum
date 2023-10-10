@@ -119,7 +119,7 @@ class PyKernel(object):
         self.executionEngine = None
         self.loc = Location.unknown(context=self.ctx)
         self.module = Module.create(loc=self.loc)
-        self.funcName = '__nvqpp__mlirgen____nvqppBuilderKernel{}'.format(''.join(
+        self.funcName = '__nvqpp__mlirgen____nvqppBuilderKernel_{}'.format(''.join(
             random.choice(string.ascii_uppercase + string.digits) for _ in range(10)))
         self.funcNameEntryPoint = self.funcName + '_entryPointRewrite'
         attr = DictAttr.get({self.funcName: StringAttr.get(
@@ -137,9 +137,10 @@ class PyKernel(object):
             self.funcOp.attributes.__setitem__(
                 'cudaq-entrypoint', UnitAttr.get())
             e = self.funcOp.add_entry_block()
-            self.argsAsQuakeValues = [
+            self.arguments = [
                 self.__createQuakeValue(b) for b in e.arguments
             ]
+            self.argument_count = len(self.arguments)
 
             with InsertionPoint(e):
                 func.ReturnOp([])
@@ -151,10 +152,10 @@ class PyKernel(object):
 
     def dump(self):
         print(str(self.module))
-    
+
     def raw_quake(self):
         return str(self.module)
-    
+
     def __str__(self, canonicalize=False):
         pm = PassManager.parse(
             "builtin.module(canonicalize,cse)",
@@ -228,14 +229,29 @@ class PyKernel(object):
                 retTy, [], target, StrAttr.get(regName, context=self.ctx))
             return self.__createQuakeValue(res.result)
 
-    def mx(self, qubits, regName=None):
-        self.h(qubits)
-        return self.mz(qubits, regName)
+    def mx(self, target, regName=None):
+        with self.insertPoint, self.loc:
+            i1Ty = IntegerType.get_signless(1, context=self.ctx)
+            qubitTy = target.mlirValue.type
+            retTy = i1Ty
+            stdvecTy = cc.StdvecType.get(self.ctx, i1Ty)
+            if quake.VeqType.isinstance(target.mlirValue.type):
+                retTy = stdvecTy
+            res = quake.MxOp(retTy, [], [target.mlirValue]) if regName == None else quake.MzOp(
+                retTy, [], target, StrAttr.get(regName, context=self.ctx))
+            return self.__createQuakeValue(res.result)
 
-    def my(self, qubits, regName=None):
-        self.sdg(qubits)
-        self.h(qubits)
-        return self.mz(qubits, regName)
+    def my(self, target, regName=None):
+        with self.insertPoint, self.loc:
+            i1Ty = IntegerType.get_signless(1, context=self.ctx)
+            qubitTy = target.mlirValue.type
+            retTy = i1Ty
+            stdvecTy = cc.StdvecType.get(self.ctx, i1Ty)
+            if quake.VeqType.isinstance(target.mlirValue.type):
+                retTy = stdvecTy
+            res = quake.MyOp(retTy, [], [target.mlirValue]) if regName == None else quake.MzOp(
+                retTy, [], target, StrAttr.get(regName, context=self.ctx))
+            return self.__createQuakeValue(res.result)
 
     def adjoint(self, otherKernel, *args):
         raise RuntimeError("adjoint not yet implemented")
@@ -258,14 +274,14 @@ class PyKernel(object):
         for i, arg in enumerate(args):
             mlirType = mlirTypeFromPyType(type(arg), self.ctx)
             if mlirType != self.mlirArgTypes[i]:
-                raise RuntimeError("invalid runtime arg type ({} vs {})".format(mlirType, self.mlirArgTypes[i]))
+                raise RuntimeError("invalid runtime arg type ({} vs {})".format(
+                    mlirType, self.mlirArgTypes[i]))
 
             # Convert np arrays to lists
             if cc.StdvecType.isinstance(mlirType) and hasattr(arg, "tolist"):
                 processedArgs.append(arg.tolist())
             else:
                 processedArgs.append(arg)
-
 
         cudaq_runtime.pyAltLaunchKernel(
             self.funcName.removeprefix(
@@ -315,4 +331,4 @@ def make_kernel(*args):
     if len([*args]) == 0:
         return kernel
 
-    return kernel, *kernel.argsAsQuakeValues
+    return kernel, *kernel.arguments
