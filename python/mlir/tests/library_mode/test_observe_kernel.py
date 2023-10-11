@@ -164,3 +164,6 @@ def test_observe_list():
     print(sum)
     want_expectation_value = -1.7487948611472093
     assert np.isclose(want_expectation_value, sum, atol=1e-2)
+
+# TODO observe_async
+# TODO observe_async spin_op list

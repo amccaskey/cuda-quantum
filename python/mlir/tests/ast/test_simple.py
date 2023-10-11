@@ -37,3 +37,5 @@ def test_ghz():
 
     counts = cudaq.sample(ghz, 5)
     assert '0'*5 in counts and '1'*5 in counts 
+
+# TODO sample / observe async

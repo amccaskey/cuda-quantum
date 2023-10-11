@@ -23,7 +23,7 @@ class PyKernelDecorator(object):
         self.module = None
         self.executionEngine = None
         self.verbose = verbose
-        self.name = self.kernelFunction.__name__ 
+        self.name = '__nvqpp__mlirgen__' + self.kernelFunction.__name__ 
 
         # Library Mode
         self.library_mode = library_mode
