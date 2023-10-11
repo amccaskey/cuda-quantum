@@ -5,7 +5,8 @@
 # This source code and the accompanying materials are made available under     #
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
-import ast, sys
+import ast
+import sys
 from collections import deque
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
@@ -73,15 +74,16 @@ class PyASTBridge(ast.NodeVisitor):
 
             # Get the arg types and arg names
             # FIXME throw an error if the types aren't annotated
-            argTypes = [
+            self.argTypes = [
                 self.typeFromStr(arg.annotation.id) for arg in node.args.args
             ]
             argNames = [arg.arg for arg in node.args.args]
 
             # Create the function and the entry block
-            f = func.FuncOp('{}'.format(node.name), (argTypes, []),
+            f = func.FuncOp('__nvqpp__mlirgen__{}'.format(node.name), (self.argTypes, []),
                             loc=self.loc)
-            f.attributes.__setitem__('llvm.emit_c_interface', UnitAttr.get())
+            # f.attributes.__setitem__('llvm.emit_c_interface', UnitAttr.get())
+            f.attributes.__setitem__('cudaq-entrypoint', UnitAttr.get())
             e = f.add_entry_block()
 
             # Add the block args to the symbol table
@@ -94,6 +96,10 @@ class PyASTBridge(ast.NodeVisitor):
                 self.generic_visit(node)
                 ret = func.ReturnOp([])
 
+            attr = DictAttr.get({'__nvqpp__mlirgen__'+node.name: StringAttr.get(
+                '__nvqpp__mlirgen__'+node.name+'_entryPointRewrite', context=self.ctx)}, context=self.ctx)
+            self.module.operation.attributes.__setitem__('quake.mangled_name_map', attr)
+
     def visit_Assign(self, node):
         self.generic_visit(node)
         self.symbolTable[node.targets[0].id] = self.popValue()
@@ -101,7 +107,7 @@ class PyASTBridge(ast.NodeVisitor):
     def visit_Call(self, node):
         if self.verbose:
             print("[Visit Call]")
-        
+
         # do not walk the FunctionDef decorator_list args
         if isinstance(
                 node.func, ast.Attribute
@@ -146,9 +152,9 @@ class PyASTBridge(ast.NodeVisitor):
         if isinstance(node.value, int):
             i64Ty = self.getIntegerType(64)
             self.pushValue(
-                    arith.ConstantOp(i64Ty,
-                                     self.getIntegerAttr(i64Ty,
-                                                         node.value)).result)
+                arith.ConstantOp(i64Ty,
+                                 self.getIntegerAttr(i64Ty,
+                                                     node.value)).result)
             return
         else:
             raise Exception("unhandled constant: {}".format(ast.unparse(node)))
@@ -165,17 +171,19 @@ class PyASTBridge(ast.NodeVisitor):
         if quake.VeqType.isinstance(var.type):
             qrefTy = self.getRefType()
             self.pushValue(
-                    quake.ExtractRefOp(qrefTy, var, -1, index=idx))
+                quake.ExtractRefOp(qrefTy, var, -1, index=idx))
         else:
-            raise Exception("unhandled subscript: {}".format(ast.unparse(node)))
+            raise Exception(
+                "unhandled subscript: {}".format(ast.unparse(node)))
 
     def visit_For(self, node):
         if node.iter.func.id != 'range' and len(node.iter.args) == 1:
-            raise Exception("CUDA Quantum only supports `for VAR in range(UPPER):`")
+            raise Exception(
+                "CUDA Quantum only supports `for VAR in range(UPPER):`")
 
         if self.verbose:
             print('[Visit For]')
-        
+
         # Get the rangeOperand, this is the upper bound on the loop
         self.generic_visit(node.iter)
         rangeOperand = self.popValue()
@@ -205,7 +213,8 @@ class PyASTBridge(ast.NodeVisitor):
             whileBlock = Block.create_at_start(loop.whileRegion, [])
             with InsertionPoint(whileBlock):
                 loaded = cc.LoadOp(alloca)
-                c = arith.CmpIOp(IntegerAttr.get(iTy, 2), loaded, rangeOperand).result
+                c = arith.CmpIOp(IntegerAttr.get(iTy, 2),
+                                 loaded, rangeOperand).result
                 cc.ConditionOp(c, [])
 
             stepBlock = Block.create_at_start(loop.stepRegion, [])
@@ -229,20 +238,23 @@ class PyASTBridge(ast.NodeVisitor):
         if isinstance(node.op, ast.Add):
             if IntegerType.isinstance(left.type):
                 self.pushValue(
-                               arith.AddIOp(left, right).result)
+                    arith.AddIOp(left, right).result)
                 return
             else:
-                raise Exception("unhandled BinOp.Add types: {}".format(ast.unparse(node)))
-        
+                raise Exception(
+                    "unhandled BinOp.Add types: {}".format(ast.unparse(node)))
+
         if isinstance(node.op, ast.Sub):
             if IntegerType.isinstance(left.type):
                 self.pushValue(
-                               arith.SubIOp(left, right).result)
+                    arith.SubIOp(left, right).result)
                 return
             else:
-                raise Exception("unhandled BinOp.Add types: {}".format(ast.unparse(node)))
+                raise Exception(
+                    "unhandled BinOp.Add types: {}".format(ast.unparse(node)))
         else:
-            raise Exception("unhandled binary operator: {}".format(ast.unparse(node)))
+            raise Exception(
+                "unhandled binary operator: {}".format(ast.unparse(node)))
 
     def visit_Name(self, node):
         if self.verbose:
@@ -256,7 +268,7 @@ class PyASTBridge(ast.NodeVisitor):
                 self.pushValue(self.symbolTable[node.id])
             return
         # elif node.id == 'cudaq':
-        #     return 
+        #     return
         # else:
         #     raise Exception("unhandled name node: {}".format(ast.unparse(node)))
 
@@ -270,4 +282,4 @@ def compile_to_quake(astModule, **kwargs):
     pm = PassManager.parse("builtin.module(canonicalize,cse)",
                            context=bridge.ctx)
     pm.run(bridge.module)
-    return bridge.module
+    return bridge.module, bridge.argTypes

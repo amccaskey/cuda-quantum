@@ -395,15 +395,15 @@ def test_observe_async_single_param(angle, want_state, want_expectation,
             assert want_state in sub_register_counts
 
     # Make sure that we throw an exception if user provides no/the wrong args.
-    # with pytest.raises(RuntimeError) as error:
-    #     # None.
-    #     cudaq.observe_async(kernel, hamiltonian)
-    # with pytest.raises(RuntimeError) as error:
-    #     # Too many.
-    #     cudaq.observe_async(kernel, hamiltonian, np.pi, np.pi)
-    # with pytest.raises(Exception) as error:
-    #     # Bad QPU id.
-    #     future = cudaq.observe_async(kernel, hamiltonian, np.pi, qpu_id=12)
+    with pytest.raises(RuntimeError) as error:
+        # None.
+        cudaq.observe_async(kernel, hamiltonian)
+    with pytest.raises(RuntimeError) as error:
+        # Too many.
+        cudaq.observe_async(kernel, hamiltonian, np.pi, np.pi)
+    with pytest.raises(Exception) as error:
+        # Bad QPU id.
+        future = cudaq.observe_async(kernel, hamiltonian, np.pi, qpu_id=12)
 
 
 @pytest.mark.parametrize(
@@ -478,26 +478,26 @@ def test_observe_async_multi_param(angle_0, angle_1, angles, want_state,
             assert want_state in sub_register_counts
 
 #     # Make sure that we throw an exception if user provides no/the wrong args.
-#     with pytest.raises(RuntimeError) as error:
-#         # None.
-#         cudaq.observe_async(kernel, hamiltonian)
-#     with pytest.raises(RuntimeError) as error:
-#         # Too few.
-#         cudaq.observe_async(kernel, hamiltonian, np.pi, np.pi)
-#     with pytest.raises(Exception) as error:
-#         # Too many list elements.
-#         future = cudaq.observe_async(kernel,
-#                                      hamiltonian,
-#                                      np.pi,
-#                                      np.pi, [np.pi, np.pi, np.pi],
-#                                      qpu_id=12)
-#     with pytest.raises(Exception) as error:
-#         # Bad QPU id.
-#         future = cudaq.observe_async(kernel,
-#                                      hamiltonian,
-#                                      np.pi,
-#                                      np.pi, [np.pi, np.pi],
-#                                      qpu_id=12)
+    with pytest.raises(RuntimeError) as error:
+        # None.
+        cudaq.observe_async(kernel, hamiltonian)
+    with pytest.raises(RuntimeError) as error:
+        # Too few.
+        cudaq.observe_async(kernel, hamiltonian, np.pi, np.pi)
+    with pytest.raises(Exception) as error:
+        # Too many list elements.
+        future = cudaq.observe_async(kernel,
+                                     hamiltonian,
+                                     np.pi,
+                                     np.pi, [np.pi, np.pi, np.pi],
+                                     qpu_id=12)
+    with pytest.raises(Exception) as error:
+        # Bad QPU id.
+        future = cudaq.observe_async(kernel,
+                                     hamiltonian,
+                                     np.pi,
+                                     np.pi, [np.pi, np.pi],
+                                     qpu_id=12)
 
 
 @pytest.mark.parametrize("angles, want_state, want_expectation",

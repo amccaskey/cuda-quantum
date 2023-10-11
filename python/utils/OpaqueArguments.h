@@ -52,8 +52,6 @@ public:
   /// @brief Return the number of arguments
   std::size_t size() { return args.size(); }
 
-  std::vector<void *> &arguments() { return args; }
-
   /// Destructor, clean up the memory
   ~OpaqueArguments() {
     for (std::size_t counter = 0; auto &ptr : args)
@@ -193,14 +191,12 @@ inline void packArgs(OpaqueArguments &argData, py::args args) {
       argData.emplace_back(ourAllocatedArg, [](void *ptr) {
         delete static_cast<double *>(ptr);
       });
-    }
-    if (py::isinstance<py::int_>(arg)) {
-      int *ourAllocatedArg = new int();
+    } else if (py::isinstance<py::int_>(arg)) {
+      long *ourAllocatedArg = new long();
       *ourAllocatedArg = PyLong_AsLong(arg.ptr());
       argData.emplace_back(ourAllocatedArg,
-                           [](void *ptr) { delete static_cast<int *>(ptr); });
-    }
-    if (py::isinstance<py::list>(arg)) {
+                           [](void *ptr) { delete static_cast<long *>(ptr); });
+    } else if (py::isinstance<py::list>(arg)) {
       auto casted = py::cast<py::list>(arg);
       std::vector<double> *ourAllocatedArg =
           new std::vector<double>(casted.size());
@@ -210,7 +206,9 @@ inline void packArgs(OpaqueArguments &argData, py::args args) {
       argData.emplace_back(ourAllocatedArg, [](void *ptr) {
         delete static_cast<std::vector<double> *>(ptr);
       });
-    }
+    } else
+      throw std::runtime_error("Could not pack argument: " +
+                               py::str(args).cast<std::string>());
   }
 }
 

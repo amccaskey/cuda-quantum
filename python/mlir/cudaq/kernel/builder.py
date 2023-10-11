@@ -263,13 +263,65 @@ class PyKernel(object):
     def c_if(self, measurement, thenBlockCallable):
         raise RuntimeError("c_if not implemented yet.")
 
-    def for_loop(self, start, stop, bodyCallable):
-        raise RuntimeError("for_loop not yet implemented.")
+    def for_loop(self, start, end, bodyCallable):
+        with self.insertPoint, self.loc:
+            iTy = mlirTypeFromPyType(int, self.ctx)
+            startVal = None
+            endVal = None
+            if isinstance(start, int):
+                startVal = arith.ConstantOp(iTy, IntegerAttr.get(iTy, start)).result
+            elif isinstance(start,QuakeValue):
+                startVal = start.mlirValue 
+            else:
+                raise RuntimeError("invalid start value passed to for_loop: ", start)
+            
+            if isinstance(end, int):
+                endVal = arith.ConstantOp(iTy, IntegerAttr.get(iTy, end)).result
+            elif isinstance(end,QuakeValue):
+                endVal = end.mlirValue 
+            else:
+                raise RuntimeError("invalid end value passed to for_loop: ", start)
+            
+            one = arith.ConstantOp(iTy, IntegerAttr.get(iTy, 1))
+            scope = cc.ScopeOp([])
+            scopeBlock = Block.create_at_start(scope.initRegion, [])
+            with InsertionPoint(scopeBlock):
+                alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, iTy),
+                                    TypeAttr.get(iTy)).result
+                cc.StoreOp(startVal, alloca)
+                # self.symbolTable[varName] = alloca
+
+                loop = cc.LoopOp([], [], BoolAttr.get(False))
+                bodyBlock = Block.create_at_start(loop.bodyRegion, [])
+                with InsertionPoint(bodyBlock):
+                    loadedIdx = cc.LoadOp(alloca).result 
+                    # Override the current insertion point with the current one
+                    tmpIp = self.insertPoint
+                    self.insertPoint = InsertionPoint(bodyBlock)
+                    bodyCallable(self.__createQuakeValue(loadedIdx))
+                    # restore the insertion point
+                    self.insertPoint = tmpIp
+                    cc.ContinueOp([])
+
+                whileBlock = Block.create_at_start(loop.whileRegion, [])
+                with InsertionPoint(whileBlock):
+                    loaded = cc.LoadOp(alloca)
+                    c = arith.CmpIOp(IntegerAttr.get(iTy, 2), loaded, endVal).result
+                    cc.ConditionOp(c, [])
+
+                stepBlock = Block.create_at_start(loop.stepRegion, [])
+                with InsertionPoint(stepBlock):
+                    loaded = cc.LoadOp(alloca)
+                    incr = arith.AddIOp(loaded, one).result
+                    cc.StoreOp(incr, alloca)
+                    cc.ContinueOp([])
+                cc.ContinueOp([])
 
     def __call__(self, *args):
         if len(args) != len(self.mlirArgTypes):
             raise RuntimeError("invalid number of arguments passed to kernel {} (passed {} but requires {})".format(
                 self.funcName, len(args), len(self.mlirArgTypes)))
+        
         # validate the arg types
         processedArgs = []
         for i, arg in enumerate(args):
@@ -285,7 +337,6 @@ class PyKernel(object):
                 processedArgs.append(arg)
 
         cudaq_runtime.pyAltLaunchKernel(self.name, self.module, *processedArgs)
-        return
 
 
 setattr(PyKernel, 'h', partialmethod(__singleTargetOperation, 'h'))

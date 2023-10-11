@@ -529,53 +529,52 @@ def test_qreg_reset():
     assert ('00' in counts)
 
 
-# def test_for_loop():
-#     """
-#     Test that we can build a kernel expression with a for loop.
-#     """
-#     circuit, inSize = cudaq.make_kernel(int)
-#     qubits = circuit.qalloc(inSize)
-#     circuit.h(qubits[0])
-#     # can pass concrete integers for both
-#     circuit.for_loop(0, inSize - 1,
-#                      lambda index: circuit.cx(qubits[index], qubits[index + 1]))
-#     print(circuit)
-#     counts = cudaq.sample(circuit, 5)
-#     assert len(counts) == 2
-#     assert '0' * 5 in counts
-#     assert '1' * 5 in counts
+def test_for_loop():
+    """
+    Test that we can build a kernel expression with a for loop.
+    """
+    circuit, inSize = cudaq.make_kernel(int)
+    qubits = circuit.qalloc(inSize)
+    circuit.h(qubits[0])
+    # can pass concrete integers for both
+    circuit.for_loop(0, inSize - 1,
+                     lambda index: circuit.cx(qubits[index], qubits[index + 1]))
+    print(circuit)
+    counts = cudaq.sample(circuit, 5)
+    assert len(counts) == 2
+    assert '0' * 5 in counts
+    assert '1' * 5 in counts
 
-#     counts.dump()
+    counts.dump()
 
 
 def test_sample_n():
     """
     Test that we can broadcast the sample call over a number of argument sets
     """
-    # circuit, inSize = cudaq.make_kernel(int)
-    # qubits = circuit.qalloc(inSize)
-    # circuit.h(qubits[0])
-    # # can pass concrete integers for both
-    # circuit.for_loop(0, inSize - 1,
-    #                  lambda index: circuit.cx(qubits[index], qubits[index + 1]))
-    # # circuit.mz(qubits)
-    # print(circuit)
+    circuit, inSize = cudaq.make_kernel(int)
+    qubits = circuit.qalloc(inSize)
+    circuit.h(qubits[0])
+    # can pass concrete integers for both
+    circuit.for_loop(0, inSize - 1,
+                     lambda index: circuit.cx(qubits[index], qubits[index + 1]))
+    # circuit.mz(qubits)
 
-    # allCounts = cudaq.sample(circuit, [3, 4, 5, 6, 7])
-    # first0 = '000'
-    # first1 = '111'
-    # for c in allCounts:
-    #     print(c)
-    #     assert first0 in c and first1 in c
-    #     first0 += '0'
-    #     first1 += '1'
+    allCounts = cudaq.sample(circuit, [3, 4, 5, 6, 7])
+    first0 = '000'
+    first1 = '111'
+    for c in allCounts:
+        print(c)
+        assert first0 in c and first1 in c
+        first0 += '0'
+        first1 += '1'
 
-    # testNpArray = np.random.randint(3, high=8, size=6)
-    # print(testNpArray)
-    # allCounts = cudaq.sample(circuit, testNpArray)
-    # for i, c in enumerate(allCounts):
-    #     print(c)
-    #     assert '0' * testNpArray[i] in c and '1' * testNpArray[i] in c
+    testNpArray = np.random.randint(3, high=8, size=6)
+    print(testNpArray)
+    allCounts = cudaq.sample(circuit, testNpArray)
+    for i, c in enumerate(allCounts):
+        print(c)
+        assert '0' * testNpArray[i] in c and '1' * testNpArray[i] in c
 
     circuit, angles = cudaq.make_kernel(list)
     q = circuit.qalloc(2)

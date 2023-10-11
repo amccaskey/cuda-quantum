@@ -26,6 +26,11 @@ void bindObserveAsync(py::module &mod) {
       "observe_async",
       [&](py::object &kernel, spin_op &spin_operator, py::args args,
           std::size_t qpu_id, int shots) {
+        auto kernelBlockArgs = kernel.attr("arguments");
+        if (py::len(kernelBlockArgs) != args.size())
+          throw std::runtime_error(
+              "Invalid number of arguments passed to observe_async.");
+
         auto &platform = cudaq::get_platform();
         auto *argData = new cudaq::OpaqueArguments();
         cudaq::packArgs(*argData, args);

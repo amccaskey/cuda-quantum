@@ -7,8 +7,10 @@
 # ============================================================================ #
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 from ..kernel.builder import PyKernel
+from ..kernel.kernel_decorator import PyKernelDecorator
 from mlir_cudaq.dialects import quake, cc
 
+import numpy as np 
 
 def __isBroadcast(kernel, *args):
     # kernel could be a PyKernel or PyKernelDecorator
@@ -31,7 +33,26 @@ def __isBroadcast(kernel, *args):
                 return True
 
         return False
+    elif isinstance(kernel, PyKernelDecorator) and kernel.library_mode == True:
+        # kernel.signature == {'name':type, ...}
+        argTypes = kernel.signature 
+        if len(argTypes) == 0 or len(args) == 0: return False 
+        firstArg = args[0]
+        firstArgType = next(iter(argTypes))
+        print(argTypes, firstArgType)
+        firstArgTypeIsStdvec = argTypes[firstArgType] == list or argTypes[firstArgType] == np.ndarray 
+        if isinstance(firstArg, list) and not firstArgTypeIsStdvec:
+            return True
+        
+        if hasattr(firstArg, "shape"):
+            shape = firstArg.shape
+            if len(shape) == 1 and not firstArgTypeIsStdvec:
+                return True
 
+            if len(shape) == 2:
+                return True
+        
+        return False
 
 def __createArgumentSet(*args):
     nArgSets = len(args[0])
