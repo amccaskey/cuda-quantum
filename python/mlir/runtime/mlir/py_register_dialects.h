@@ -1,4 +1,4 @@
-/*******************************************************************************
+/****************************************************************-*- C++ -*-****
  * Copyright (c) 2022 - 2023 NVIDIA Corporation & Affiliates.                  *
  * All rights reserved.                                                        *
  *                                                                             *
@@ -6,14 +6,12 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#include <pybind11/numpy.h>
-#include <pybind11/pytypes.h>
-#include <pybind11/stl.h>
+#pragma once
+
+#include <pybind11/pybind11.h>
 
 namespace py = pybind11;
 
 namespace cudaq {
-
-void bindCommonKernels(py::module &mod) {}
-
+void bindRegisterDialects(py::module &mod);
 } // namespace cudaq

@@ -17,7 +17,6 @@ from cudaq import spin
 def assert_close(want, got, tolerance=1.e-4) -> bool:
     return abs(want - got) < tolerance
 
-
 def test_observe_result():
     """
     Test the `cudaq.ObserveResult` class to ensure its member
@@ -288,195 +287,195 @@ def test_observe_multi_param(angle_0, angle_1, angles, want_state,
     #     cudaq.observe(kernel, hamiltonian, np.pi, np.pi, [np.pi, np.pi, np.pi])
 
 
-# @pytest.mark.parametrize("want_state, want_expectation",
-#                          [["0", 1.0], ["1", -1.0]])
-# @pytest.mark.parametrize("shots_count", [-1, 10])
-# def test_observe_async_no_params(want_state, want_expectation, shots_count):
-#     """
-#     Test `cudaq.observe_async()` when no parameters are provided for 
-#     two instances: 
-#     1. We leave the qubit in the 0 state and call `observe()`
-#     2. We rotate the qubit to the 1 state and call `observe()`
+@pytest.mark.parametrize("want_state, want_expectation",
+                         [["0", 1.0], ["1", -1.0]])
+@pytest.mark.parametrize("shots_count", [-1, 10])
+def test_observe_async_no_params(want_state, want_expectation, shots_count):
+    """
+    Test `cudaq.observe_async()` when no parameters are provided for 
+    two instances: 
+    1. We leave the qubit in the 0 state and call `observe()`
+    2. We rotate the qubit to the 1 state and call `observe()`
 
-#     Tests both with and without shots mode.
-#     """
-#     kernel = cudaq.make_kernel()
-#     qubit = kernel.qalloc()
+    Tests both with and without shots mode.
+    """
+    kernel = cudaq.make_kernel()
+    qubit = kernel.qalloc()
 
-#     if want_state == "0":
-#         # Keep qubit in the 0-state.
-#         # <kernel |H| kernel> = 1.0
-#         pass
-#     else:
-#         # Place the qubit in the 1-state.
-#         # <kernel |H| kernel> = -1.0
-#         kernel.x(qubit)
+    if want_state == "0":
+        # Keep qubit in the 0-state.
+        # <kernel |H| kernel> = 1.0
+        pass
+    else:
+        # Place the qubit in the 1-state.
+        # <kernel |H| kernel> = -1.0
+        kernel.x(qubit)
 
-#     # Measuring in the Z-basis.
-#     hamiltonian = spin.z(0)
+    # Measuring in the Z-basis.
+    hamiltonian = spin.z(0)
 
-#     # Call `cudaq.observe()` at the specified number of shots.
-#     future = cudaq.observe_async(kernel=kernel,
-#                                  spin_operator=hamiltonian,
-#                                  qpu_id=0,
-#                                  shots_count=shots_count)
-#     observe_result = future.get()
-#     got_expectation = observe_result.expectation_z()
-#     assert want_expectation == got_expectation
+    # Call `cudaq.observe()` at the specified number of shots.
+    future = cudaq.observe_async(kernel=kernel,
+                                 spin_operator=hamiltonian,
+                                 qpu_id=0,
+                                 shots_count=shots_count)
+    observe_result = future.get()
+    got_expectation = observe_result.expectation_z()
+    assert want_expectation == got_expectation
 
-#     # Test that this throws an exception, the problem here
-#     # is we are on a quantum platform with 1 QPU, and we're asking
-#     # to run an async job on the 13th QPU with device id 12.
-#     with pytest.raises(Exception) as error:
-#         future = cudaq.observe_async(kernel, hamiltonian, qpu_id=12)
-
-
-# @pytest.mark.parametrize("angle, want_state, want_expectation",
-#                          [[np.pi, "1", -2.0], [0.0, "0", 2.0]])
-# @pytest.mark.parametrize("shots_count", [-1, 10])
-# def test_observe_async_single_param(angle, want_state, want_expectation,
-#                                     shots_count):
-#     """
-#     Test `cudaq.observe_async()` on a parameterized circuit that takes
-#     one argument. Checks with shots mode turned both on and off.
-
-#     First round we test a kernel with rx gates by np.pi. This should
-#     result in the 1-state for both qubits and `<Z> = -2.0`.
-
-#     Second round we test a kernel with rx gates by 0.0. This should
-#     result in the 0-state for both qubits and `<Z> = 2.0`.
-#     """
-#     qubit_count = 2
-#     kernel, theta = cudaq.make_kernel(float)
-#     qreg = kernel.qalloc(qubit_count)
-
-#     # Rotate both qubits by the provided `theta`.
-#     kernel.rx(theta, qreg[0])
-#     kernel.rx(theta, qreg[1])
-
-#     # Measure both qubits in the Z-basis.
-#     hamiltonian = spin.z(0) + spin.z(1)
-
-#     # Call `cudaq.observe()` at the specified number of shots.
-#     future = cudaq.observe_async(kernel,
-#                                  hamiltonian,
-#                                  angle,
-#                                  shots_count=shots_count)
-#     observe_result = future.get()
-#     got_expectation = observe_result.expectation_z()
-#     assert want_expectation == got_expectation
-
-#     # If shots mode was enabled, check those results.
-#     if shots_count != -1:
-#         sample_result = observe_result.counts()
-#         register_names = sample_result.register_names
-#         if '__global__' in register_names:
-#             register_names.remove('__global__')
-#         # Check that each register is in the proper state.
-#         for index, sub_term in enumerate(hamiltonian):
-#             # Extract the register name from the spin term.
-#             got_name = str(sub_term).split(" ")[1].rstrip()
-#             # Pull the counts for that hamiltonian sub term from the
-#             # `ObserveResult::counts` overload.
-#             sub_term_counts = observe_result.counts(sub_term=sub_term)
-#             # Pull the counts for that hamiltonian sub term from the
-#             # `SampleResult` dictionary by its name.
-#             sub_register_counts = sample_result.get_register_counts(got_name)
-#             # Sub-term should have an expectation value proportional to the
-#             # expectation over the entire system.
-#             assert sub_term_counts.expectation_z(
-#             ) == want_expectation / qubit_count
-#             assert sub_register_counts.expectation_z(
-#             ) == want_expectation / qubit_count
-#             # Should have `shots_count` results for each.
-#             assert sum(sub_term_counts.values()) == shots_count
-#             assert sum(sub_register_counts.values()) == shots_count
-#             # Check the state.
-#             assert want_state in sub_term_counts
-#             assert want_state in sub_register_counts
-
-#     # Make sure that we throw an exception if user provides no/the wrong args.
-#     with pytest.raises(RuntimeError) as error:
-#         # None.
-#         cudaq.observe_async(kernel, hamiltonian)
-#     with pytest.raises(RuntimeError) as error:
-#         # Too many.
-#         cudaq.observe_async(kernel, hamiltonian, np.pi, np.pi)
-#     with pytest.raises(Exception) as error:
-#         # Bad QPU id.
-#         future = cudaq.observe_async(kernel, hamiltonian, np.pi, qpu_id=12)
+    # Test that this throws an exception, the problem here
+    # is we are on a quantum platform with 1 QPU, and we're asking
+    # to run an async job on the 13th QPU with device id 12.
+    with pytest.raises(Exception) as error:
+        future = cudaq.observe_async(kernel, hamiltonian, qpu_id=12)
 
 
-# @pytest.mark.parametrize(
-#     "angle_0, angle_1, angles, want_state, want_expectation",
-#     [[np.pi, np.pi, [np.pi, np.pi], "1", -4.0],
-#      [0.0, 0.0, [0.0, 0.0], "0", 4.0]])
-# @pytest.mark.parametrize("shots_count", [-1, 10])
-# def test_observe_async_multi_param(angle_0, angle_1, angles, want_state,
-#                                    want_expectation, shots_count):
-#     """
-#     Test `cudaq.observe_async()` on a parameterized circuit that takes
-#     multiple arguments of different types. Checks with shots mode 
-#     turned both on and off.
+@pytest.mark.parametrize("angle, want_state, want_expectation",
+                         [[np.pi, "1", -2.0], [0.0, "0", 2.0]])
+@pytest.mark.parametrize("shots_count", [-1, 10])
+def test_observe_async_single_param(angle, want_state, want_expectation,
+                                    shots_count):
+    """
+    Test `cudaq.observe_async()` on a parameterized circuit that takes
+    one argument. Checks with shots mode turned both on and off.
 
-#     First round we test a kernel with rx gates by np.pi. This should
-#     result in the 1-state for all qubits and `<Z> = -4.0`.
+    First round we test a kernel with rx gates by np.pi. This should
+    result in the 1-state for both qubits and `<Z> = -2.0`.
 
-#     Second round we test a kernel with rx gates by 0.0. This should
-#     result in the 0-state for all qubits and `<Z> = 4.0`.
-#     """
-#     qubit_count = 4
-#     kernel, theta_0, theta_1, thetas = cudaq.make_kernel(float, float, list)
-#     qreg = kernel.qalloc(qubit_count)
+    Second round we test a kernel with rx gates by 0.0. This should
+    result in the 0-state for both qubits and `<Z> = 2.0`.
+    """
+    qubit_count = 2
+    kernel, theta = cudaq.make_kernel(float)
+    qreg = kernel.qalloc(qubit_count)
 
-#     # Rotate each qubit by their respective angles.
-#     kernel.rx(theta_0, qreg[0])
-#     kernel.rx(theta_1, qreg[1])
-#     kernel.rx(thetas[0], qreg[2])
-#     kernel.rx(thetas[1], qreg[3])
+    # Rotate both qubits by the provided `theta`.
+    kernel.rx(theta, qreg[0])
+    kernel.rx(theta, qreg[1])
 
-#     # Measure each qubit in the Z-basis.
-#     hamiltonian = spin.z(0) + spin.z(1) + spin.z(2) + spin.z(3)
+    # Measure both qubits in the Z-basis.
+    hamiltonian = spin.z(0) + spin.z(1)
 
-#     # Call `cudaq.observe()` at the specified number of shots.
-#     future = cudaq.observe_async(kernel,
-#                                  hamiltonian,
-#                                  angle_0,
-#                                  angle_1,
-#                                  angles,
-#                                  shots_count=shots_count)
-#     observe_result = future.get()
-#     got_expectation = observe_result.expectation_z()
-#     assert want_expectation == got_expectation
+    # Call `cudaq.observe()` at the specified number of shots.
+    future = cudaq.observe_async(kernel,
+                                 hamiltonian,
+                                 angle,
+                                 shots_count=shots_count)
+    observe_result = future.get()
+    got_expectation = observe_result.expectation_z()
+    assert want_expectation == got_expectation
 
-#     # If shots mode was enabled, check those results.
-#     if shots_count != -1:
-#         sample_result = observe_result.counts()
-#         register_names = sample_result.register_names
-#         if '__global__' in register_names:
-#             register_names.remove('__global__')
-#         # Check that each register is in the proper state.
-#         for index, sub_term in enumerate(hamiltonian):
-#             # Extract the register name from the spin term.
-#             got_name = str(sub_term).split(" ")[1].rstrip()
-#             # Pull the counts for that hamiltonian sub term from the
-#             # `ObserveResult::counts` overload.
-#             sub_term_counts = observe_result.counts(sub_term=sub_term)
-#             # Pull the counts for that hamiltonian sub term from the
-#             # `SampleResult` dictionary by its name.
-#             sub_register_counts = sample_result.get_register_counts(got_name)
-#             # Sub-term should have an expectation value proportional to the
-#             # expectation over the entire system.
-#             assert sub_term_counts.expectation_z(
-#             ) == want_expectation / qubit_count
-#             assert sub_register_counts.expectation_z(
-#             ) == want_expectation / qubit_count
-#             # Should have `shots_count` results for each.
-#             assert sum(sub_term_counts.values()) == shots_count
-#             assert sum(sub_register_counts.values()) == shots_count
-#             # Check the state.
-#             assert want_state in sub_term_counts
-#             assert want_state in sub_register_counts
+    # If shots mode was enabled, check those results.
+    if shots_count != -1:
+        sample_result = observe_result.counts()
+        register_names = sample_result.register_names
+        if '__global__' in register_names:
+            register_names.remove('__global__')
+        # Check that each register is in the proper state.
+        for index, sub_term in enumerate(hamiltonian):
+            # Extract the register name from the spin term.
+            got_name = str(sub_term).split(" ")[1].rstrip()
+            # Pull the counts for that hamiltonian sub term from the
+            # `ObserveResult::counts` overload.
+            sub_term_counts = observe_result.counts(sub_term=sub_term)
+            # Pull the counts for that hamiltonian sub term from the
+            # `SampleResult` dictionary by its name.
+            sub_register_counts = sample_result.get_register_counts(got_name)
+            # Sub-term should have an expectation value proportional to the
+            # expectation over the entire system.
+            assert sub_term_counts.expectation_z(
+            ) == want_expectation / qubit_count
+            assert sub_register_counts.expectation_z(
+            ) == want_expectation / qubit_count
+            # Should have `shots_count` results for each.
+            assert sum(sub_term_counts.values()) == shots_count
+            assert sum(sub_register_counts.values()) == shots_count
+            # Check the state.
+            assert want_state in sub_term_counts
+            assert want_state in sub_register_counts
+
+    # Make sure that we throw an exception if user provides no/the wrong args.
+    # with pytest.raises(RuntimeError) as error:
+    #     # None.
+    #     cudaq.observe_async(kernel, hamiltonian)
+    # with pytest.raises(RuntimeError) as error:
+    #     # Too many.
+    #     cudaq.observe_async(kernel, hamiltonian, np.pi, np.pi)
+    # with pytest.raises(Exception) as error:
+    #     # Bad QPU id.
+    #     future = cudaq.observe_async(kernel, hamiltonian, np.pi, qpu_id=12)
+
+
+@pytest.mark.parametrize(
+    "angle_0, angle_1, angles, want_state, want_expectation",
+    [[np.pi, np.pi, [np.pi, np.pi], "1", -4.0],
+     [0.0, 0.0, [0.0, 0.0], "0", 4.0]])
+@pytest.mark.parametrize("shots_count", [-1, 10])
+def test_observe_async_multi_param(angle_0, angle_1, angles, want_state,
+                                   want_expectation, shots_count):
+    """
+    Test `cudaq.observe_async()` on a parameterized circuit that takes
+    multiple arguments of different types. Checks with shots mode 
+    turned both on and off.
+
+    First round we test a kernel with rx gates by np.pi. This should
+    result in the 1-state for all qubits and `<Z> = -4.0`.
+
+    Second round we test a kernel with rx gates by 0.0. This should
+    result in the 0-state for all qubits and `<Z> = 4.0`.
+    """
+    qubit_count = 4
+    kernel, theta_0, theta_1, thetas = cudaq.make_kernel(float, float, list)
+    qreg = kernel.qalloc(qubit_count)
+
+    # Rotate each qubit by their respective angles.
+    kernel.rx(theta_0, qreg[0])
+    kernel.rx(theta_1, qreg[1])
+    kernel.rx(thetas[0], qreg[2])
+    kernel.rx(thetas[1], qreg[3])
+
+    # Measure each qubit in the Z-basis.
+    hamiltonian = spin.z(0) + spin.z(1) + spin.z(2) + spin.z(3)
+
+    # Call `cudaq.observe()` at the specified number of shots.
+    future = cudaq.observe_async(kernel,
+                                 hamiltonian,
+                                 angle_0,
+                                 angle_1,
+                                 angles,
+                                 shots_count=shots_count)
+    observe_result = future.get()
+    got_expectation = observe_result.expectation_z()
+    assert want_expectation == got_expectation
+
+    # If shots mode was enabled, check those results.
+    if shots_count != -1:
+        sample_result = observe_result.counts()
+        register_names = sample_result.register_names
+        if '__global__' in register_names:
+            register_names.remove('__global__')
+        # Check that each register is in the proper state.
+        for index, sub_term in enumerate(hamiltonian):
+            # Extract the register name from the spin term.
+            got_name = str(sub_term).split(" ")[1].rstrip()
+            # Pull the counts for that hamiltonian sub term from the
+            # `ObserveResult::counts` overload.
+            sub_term_counts = observe_result.counts(sub_term=sub_term)
+            # Pull the counts for that hamiltonian sub term from the
+            # `SampleResult` dictionary by its name.
+            sub_register_counts = sample_result.get_register_counts(got_name)
+            # Sub-term should have an expectation value proportional to the
+            # expectation over the entire system.
+            assert sub_term_counts.expectation_z(
+            ) == want_expectation / qubit_count
+            assert sub_register_counts.expectation_z(
+            ) == want_expectation / qubit_count
+            # Should have `shots_count` results for each.
+            assert sum(sub_term_counts.values()) == shots_count
+            assert sum(sub_register_counts.values()) == shots_count
+            # Check the state.
+            assert want_state in sub_term_counts
+            assert want_state in sub_register_counts
 
 #     # Make sure that we throw an exception if user provides no/the wrong args.
 #     with pytest.raises(RuntimeError) as error:

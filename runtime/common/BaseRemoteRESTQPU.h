@@ -13,10 +13,6 @@
 #include "common/RestClient.h"
 #include "common/RuntimeMLIR.h"
 #include "cudaq.h"
-#include "cudaq/platform/qpu.h"
-#include "cudaq/platform/quantum_platform.h"
-#include "cudaq/spin_op.h"
-#include "nvqpp_config.h"
 #include "cudaq/Frontend/nvqpp/AttributeNames.h"
 #include "cudaq/Optimizer/CodeGen/OpenQASMEmitter.h"
 #include "cudaq/Optimizer/CodeGen/Passes.h"
@@ -24,6 +20,10 @@
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
 #include "cudaq/Support/Plugin.h"
+#include "cudaq/platform/qpu.h"
+#include "cudaq/platform/quantum_platform.h"
+#include "cudaq/spin_op.h"
+#include "nvqpp_config.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Module.h"
@@ -134,7 +134,7 @@ protected:
     return defaultVal;
   }
 
-  virtual std::tuple<ModuleOp, MLIRContext *, void*>
+  virtual std::tuple<ModuleOp, MLIRContext *, void *>
   extractQuakeCodeAndContext(const std::string &kernelName, void *data) = 0;
   virtual void cleanupContext(MLIRContext *context) { return; }
 

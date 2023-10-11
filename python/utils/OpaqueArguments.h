@@ -52,6 +52,8 @@ public:
   /// @brief Return the number of arguments
   std::size_t size() { return args.size(); }
 
+  std::vector<void *> &arguments() { return args; }
+
   /// Destructor, clean up the memory
   ~OpaqueArguments() {
     for (std::size_t counter = 0; auto &ptr : args)

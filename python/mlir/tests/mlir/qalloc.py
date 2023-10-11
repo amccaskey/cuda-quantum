@@ -76,7 +76,6 @@ def test_kernel_qalloc_quake_val():
     kernel, value = cudaq.make_kernel(int)
     qreg = kernel.qalloc(value)
     qubit_count = 10
-    kernel(qubit_count)
     print(kernel)
 
 

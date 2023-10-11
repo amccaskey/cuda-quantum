@@ -6,7 +6,7 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#pragma once 
+#pragma once
 
 #include "mlir/CAPI/Registration.h"
 

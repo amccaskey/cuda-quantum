@@ -47,7 +47,7 @@ TranslateFromMLIRRegistration::TranslateFromMLIRRegistration(
 // twice
 class PyRemoteRESTQPU : public cudaq::BaseRemoteRESTQPU {
 protected:
-  std::tuple<ModuleOp, MLIRContext *, void*>
+  std::tuple<ModuleOp, MLIRContext *, void *>
   extractQuakeCodeAndContext(const std::string &kernelName,
                              void *data) override {
     struct ArgsWrapper {

@@ -386,57 +386,57 @@ def test_sample_result_observe(shots_count):
     assert str(sample_result) == "{ }\n"
 
 
-# def test_sample_async():
-#     """Tests `cudaq.sample_async` on a simple kernel with no args."""
-#     kernel = cudaq.make_kernel()
-#     qubits = kernel.qalloc(2)
-#     kernel.h(qubits[0])
-#     kernel.cx(qubits[0], qubits[1])
-#     kernel.mz(qubits)
+def test_sample_async():
+    """Tests `cudaq.sample_async` on a simple kernel with no args."""
+    kernel = cudaq.make_kernel()
+    qubits = kernel.qalloc(2)
+    kernel.h(qubits[0])
+    kernel.cx(qubits[0], qubits[1])
+    kernel.mz(qubits)
 
-#     # Invalid QPU
-#     with pytest.raises(Exception) as error:
-#         future = cudaq.sample_async(kernel, qpu_id=1)
+    # Invalid QPU
+    with pytest.raises(Exception) as error:
+        future = cudaq.sample_async(kernel, qpu_id=1)
 
-#     # Default 0th qpu
-#     future = cudaq.sample_async(kernel)
-#     counts = future.get()
-#     assert (len(counts) == 2)
-#     assert ('00' in counts)
-#     assert ('11' in counts)
+    # Default 0th qpu
+    future = cudaq.sample_async(kernel)
+    counts = future.get()
+    assert (len(counts) == 2)
+    assert ('00' in counts)
+    assert ('11' in counts)
 
-#     # Can specify qpu id
-#     future = cudaq.sample_async(kernel, qpu_id=0)
-#     counts = future.get()
-#     assert (len(counts) == 2)
-#     assert ('00' in counts)
-#     assert ('11' in counts)
+    # Can specify qpu id
+    future = cudaq.sample_async(kernel, qpu_id=0)
+    counts = future.get()
+    assert (len(counts) == 2)
+    assert ('00' in counts)
+    assert ('11' in counts)
 
-#     with pytest.raises(Exception) as error:
-#         # Invalid qpu_id type.
-#         result = cudaq.sample_async(kernel, qpu_id=12)
+    with pytest.raises(Exception) as error:
+        # Invalid qpu_id type.
+        result = cudaq.sample_async(kernel, qpu_id=12)
 
 
-# def test_sample_async_params():
-#     """Tests `cudaq.sample_async` on a simple kernel that accepts args."""
-#     kernel, theta, phi = cudaq.make_kernel(float, float)
-#     qubits = kernel.qalloc(2)
-#     kernel.rx(theta, qubits[0])
-#     kernel.ry(phi, qubits[0])
-#     kernel.cx(qubits[0], qubits[1])
-#     kernel.mz(qubits)
+def test_sample_async_params():
+    """Tests `cudaq.sample_async` on a simple kernel that accepts args."""
+    kernel, theta, phi = cudaq.make_kernel(float, float)
+    qubits = kernel.qalloc(2)
+    kernel.rx(theta, qubits[0])
+    kernel.ry(phi, qubits[0])
+    kernel.cx(qubits[0], qubits[1])
+    kernel.mz(qubits)
 
-#     # Creating the bell state with rx and ry instead of hadamard
-#     # need a pi rotation and a pi/2 rotation
-#     future = cudaq.sample_async(kernel, np.pi, np.pi / 2.)
-#     counts = future.get()
-#     assert (len(counts) == 2)
-#     assert ('00' in counts)
-#     assert ('11' in counts)
+    # Creating the bell state with rx and ry instead of hadamard
+    # need a pi rotation and a pi/2 rotation
+    future = cudaq.sample_async(kernel, np.pi, np.pi / 2.)
+    counts = future.get()
+    assert (len(counts) == 2)
+    assert ('00' in counts)
+    assert ('11' in counts)
 
-#     with pytest.raises(Exception) as error:
-#         # Invalid qpu_id type.
-#         result = cudaq.sample_async(kernel, 0.0, 0.0, qpu_id=12)
+    with pytest.raises(Exception) as error:
+        # Invalid qpu_id type.
+        result = cudaq.sample_async(kernel, 0.0, 0.0, qpu_id=12)
 
 
 def test_sample_marginalize():

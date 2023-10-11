@@ -121,6 +121,7 @@ class PyKernel(object):
         self.module = Module.create(loc=self.loc)
         self.funcName = '__nvqpp__mlirgen____nvqppBuilderKernel_{}'.format(''.join(
             random.choice(string.ascii_uppercase + string.digits) for _ in range(10)))
+        self.name = self.funcName.removeprefix('__nvqpp__mlirgen__')
         self.funcNameEntryPoint = self.funcName + '_entryPointRewrite'
         attr = DictAttr.get({self.funcName: StringAttr.get(
             self.funcNameEntryPoint, context=self.ctx)}, context=self.ctx)
@@ -283,9 +284,7 @@ class PyKernel(object):
             else:
                 processedArgs.append(arg)
 
-        cudaq_runtime.pyAltLaunchKernel(
-            self.funcName.removeprefix(
-                '__nvqpp__mlirgen__'), self.module, *processedArgs)
+        cudaq_runtime.pyAltLaunchKernel(self.name, self.module, *processedArgs)
         return
 
 

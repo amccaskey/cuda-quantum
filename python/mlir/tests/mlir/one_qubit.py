@@ -34,7 +34,6 @@ def test_kernel_non_param_1q():
     kernel.s(qubit[0])
     kernel.tdg(qubit[0])
     kernel.sdg(qubit[0])
-    kernel()
     # Kernel arguments should still be an empty list.
     assert kernel.arguments == []
     # Kernel should still have 0 parameters.
@@ -73,7 +72,6 @@ def test_kernel_param_1q():
     kernel.ry(parameter, qubit[0])
     kernel.rz(parameter, qubit[0])
     kernel.r1(parameter, qubit[0])
-    kernel(3.14)
     # Should have 1 argument and parameter.
     got_arguments = kernel.arguments
     got_argument_count = kernel.argument_count

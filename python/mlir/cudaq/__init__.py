@@ -38,6 +38,10 @@ AmplitudeDampingChannel = cudaq_runtime.AmplitudeDampingChannel
 PhaseFlipChannel = cudaq_runtime.PhaseFlipChannel 
 BitFlipChannel = cudaq_runtime.BitFlipChannel
 
+# Functions
+sample_async = cudaq_runtime.sample_async
+observe_async = cudaq_runtime.observe_async 
+
 # Quantum Instruction Set
 h = h()
 x = x()
