@@ -72,44 +72,44 @@ def test_simple_sampling_qpe():
     assert '100' in counts
 
 
-# def test_broadcast():
-#     """Test that sample and observe broadcasting works."""
+def test_broadcast():
+    """Test that sample and observe broadcasting works."""
 
-#     @cudaq.kernel
-#     def circuit(inSize: int):
-#         qubits = cudaq.qvector(inSize)
-#         h(qubits[0])
-#         for i in range(inSize-1):
-#             x.ctrl(qubits[i], qubits[i+1])
+    @cudaq.kernel
+    def circuit(inSize: int):
+        qubits = cudaq.qvector(inSize)
+        h(qubits[0])
+        for i in range(inSize-1):
+            x.ctrl(qubits[i], qubits[i+1])
 
-#     cudaq.set_random_seed(13)
-#     allCounts = cudaq.sample(circuit, [3, 4, 5, 6, 7])
-#     first0 = '000'
-#     first1 = '111'
-#     for c in allCounts:
-#         print(c)
-#         assert first0 in c and first1 in c
-#         first0 += '0'
-#         first1 += '1'
+    cudaq.set_random_seed(13)
+    allCounts = cudaq.sample(circuit, [3, 4, 5, 6, 7])
+    first0 = '000'
+    first1 = '111'
+    for c in allCounts:
+        print(c)
+        assert first0 in c and first1 in c
+        first0 += '0'
+        first1 += '1'
 
-#     np.random.seed(13)
-#     testNpArray = np.random.randint(3, high=8, size=6)
-#     print(testNpArray)
-#     allCounts = cudaq.sample(circuit, testNpArray)
-#     for i, c in enumerate(allCounts):
-#         print(c)
-#         assert '0' * testNpArray[i] in c and '1' * testNpArray[i] in c
+    np.random.seed(13)
+    testNpArray = np.random.randint(3, high=8, size=6)
+    print(testNpArray)
+    allCounts = cudaq.sample(circuit, testNpArray)
+    for i, c in enumerate(allCounts):
+        print(c)
+        assert '0' * testNpArray[i] in c and '1' * testNpArray[i] in c
 
-#     @cudaq.kernel
-#     def circuit(angles: list):
-#         q = cudaq.qvector(2)
-#         rx(angles[0], q[0])
-#         ry(angles[1], q[0])
-#         x.ctrl(q[0], q[1])
+    @cudaq.kernel
+    def circuit(angles: list):
+        q = cudaq.qvector(2)
+        rx(angles[0], q[0])
+        ry(angles[1], q[0])
+        x.ctrl(q[0], q[1])
 
-#     runtimeAngles = np.random.uniform(low=1.0, high=np.pi, size=(10, 2))
-#     print(runtimeAngles)
-#     allCounts = cudaq.sample(circuit, runtimeAngles)
-#     for i, c in enumerate(allCounts):
-#         print(runtimeAngles[i, :], c)
-#         assert len(c) == 2
+    runtimeAngles = np.random.uniform(low=1.0, high=np.pi, size=(10, 2))
+    print(runtimeAngles)
+    allCounts = cudaq.sample(circuit, runtimeAngles)
+    for i, c in enumerate(allCounts):
+        print(runtimeAngles[i, :], c)
+        assert len(c) == 2
