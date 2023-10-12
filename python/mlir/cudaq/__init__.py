@@ -7,7 +7,7 @@
 # ============================================================================ #
 
 from .kernel.kernel_decorator import kernel
-from .kernel.builder import make_kernel, QuakeValue
+from .kernel.kernel_builder import make_kernel, QuakeValue
 from .kernel.qubit_qis import h, x, y, z, s, t, rx, ry, rz, r1, swap, mx, my, mz, adjoint, control, compute_action
 from .runtime.sample import sample 
 from .runtime.observe import observe

@@ -12,9 +12,10 @@ from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.execution_engine import *
 from mlir_cudaq.dialects import quake, cc
-from ..language.ast_bridge import compile_to_quake
+from .ast_bridge import compile_to_quake
 from .quake_value import mlirTypeFromPyType
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
+
 
 class PyKernelDecorator(object):
 
@@ -23,7 +24,7 @@ class PyKernelDecorator(object):
         self.module = None
         self.executionEngine = None
         self.verbose = verbose
-        self.name = '__nvqpp__mlirgen__' + self.kernelFunction.__name__ 
+        self.name = self.kernelFunction.__name__
 
         # Library Mode
         self.library_mode = library_mode
@@ -38,19 +39,20 @@ class PyKernelDecorator(object):
         if verbose and importlib.util.find_spec('astpretty') is not None:
             import astpretty
             astpretty.pprint(self.astModule.body[0])
-        
+
         if not self.library_mode:
-            # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop, 
+            # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop,
             # range-based for loop to for loop, etc.)
             #
-            # FIXME Update to return required FuncOps (other kernels) not present 
+            # FIXME Update to return required FuncOps (other kernels) not present
             # in this module
-            self.module, self.argTypes = compile_to_quake(self.astModule, verbose=self.verbose)
+            self.module, self.argTypes = compile_to_quake(
+                self.astModule, verbose=self.verbose)
             # Add the other FuncOps to this module (FIXME need global dict of PyKernelDecorators)
-        else: 
+        else:
             # Need to build up the arg types here
             self.signature = inspect.getfullargspec(function).annotations
-            
+
             return
 
     def __str__(self):
@@ -64,7 +66,7 @@ class PyKernelDecorator(object):
         if self.library_mode:
             self.kernelFunction(*args)
             return
-     
+
         # validate the arg types
         processedArgs = []
         for i, arg in enumerate(args):
@@ -80,6 +82,7 @@ class PyKernelDecorator(object):
                 processedArgs.append(arg)
 
         cudaq_runtime.pyAltLaunchKernel(self.name, self.module, *processedArgs)
+
 
 def kernel(function=None, **kwargs):
     """The `cudaq.kernel` represents the CUDA Quantum language function 

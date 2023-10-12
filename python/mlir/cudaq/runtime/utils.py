@@ -6,7 +6,7 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
-from ..kernel.builder import PyKernel
+from ..kernel.kernel_builder import PyKernel
 from ..kernel.kernel_decorator import PyKernelDecorator
 from mlir_cudaq.dialects import quake, cc
 

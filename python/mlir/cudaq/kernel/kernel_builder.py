@@ -111,7 +111,20 @@ def __singleTargetSingleParameterControlOperation(self, opName, parameter, contr
 
 
 class PyKernel(object):
+    """The :class:`Kernel` provides an API for dynamically constructing quantum 
+    circuits. The :class:`Kernel` programmatically represents the circuit as an MLIR 
+    function using the Quake dialect.
 
+    Note:
+        See :func:`make_kernel` for the :class:`Kernel` constructor.
+
+    Attributes:
+        name (str): The name of the :class:`Kernel` function. Read-only.
+        arguments (List[:class:`QuakeValue`]): The arguments accepted by the 
+            :class:`Kernel` function. Read-only.
+        argument_count (int): The number of arguments accepted by the 
+            :class:`Kernel` function. Read-only.
+    """
     def __init__(self, argTypeList):
         self.ctx = Context()
         quake.register_dialect(self.ctx)
@@ -166,6 +179,20 @@ class PyKernel(object):
         return str(cloned)
 
     def qalloc(self, size=None):
+        """Allocate a register of qubits of size `qubit_count` and return a 
+        handle to them as a :class:`QuakeValue`.
+        
+        Args:
+            qubit_count (Union[`int`,`QuakeValue`): The number of qubits to allocate.
+        Returns:
+            :class:`QuakeValue`: A handle to the allocated qubits in the MLIR.
+
+        .. code-block:: python
+
+            # Example:
+            kernel = cudaq.make_kernel()
+            qubits = kernel.qalloc(10)
+        """
         with self.insertPoint, self.loc:
             if size == None:
                 qubitTy = quake.RefType.get(self.ctx)
@@ -181,6 +208,10 @@ class PyKernel(object):
                     return self.__createQuakeValue(quake.AllocaOp(veqTy).result)
 
     def exp_pauli(self, theta, qubits, pauliWord):
+        """Apply a general Pauli tensor product rotation, `exp(i theta P)`, on 
+        the specified qubit register. The Pauli tensor product is provided 
+        as a string, e.g. `XXYX` for a 4-qubit term. The angle parameter 
+        can be provided as a concrete float or a `QuakeValue`."""
         # FIXME implement for qubits...
         with self.insertPoint, self.loc:
             thetaVal = None
@@ -197,6 +228,19 @@ class PyKernel(object):
             quake.ExpPauliOp(thetaVal, qubits.mlirValue, slVal)
 
     def swap(self, qubitA, qubitB):
+        """Swap the states of the provided qubits. 
+
+        .. code-block:: python
+
+            # Example:
+            kernel = cudaq.make_kernel()
+            # Allocate qubit/s to the `kernel`.
+            qubits = kernel.qalloc(2)
+            # Place the 0th qubit in the 1-state.
+            kernel.x(qubits[0])
+            # Swap their states.
+            kernel.swap(qubits[0], qubits[1]))
+        """
         with self.insertPoint, self.loc:
             quake.SwapOp([], [], [], [qubitA.mlirValue, qubitB.mlirValue])
 
@@ -264,6 +308,38 @@ class PyKernel(object):
         raise RuntimeError("c_if not implemented yet.")
 
     def for_loop(self, start, end, bodyCallable):
+        """Add a for loop that starts from the given `start` index, 
+        ends at the given `stop` index (non inclusive), applying the 
+        provided `function` within `self` at each iteration.
+
+        Args:
+        start (int or :class:`QuakeValue`): The beginning iterator value for the for loop.
+        stop (int or :class:`QuakeValue`): The final iterator value (non-inclusive) for the for loop.
+        function (Callable): The callable function to apply within the `kernel` at
+            each iteration.
+
+        .. code-block:: python
+
+        # Example:
+        # Create a kernel function that takes an `int` argument.
+        kernel, size = cudaq.make_kernel(int)
+        # Parameterize the allocated number of qubits by the int.
+        qubits = kernel.qalloc(size)
+        kernel.h(qubits[0])
+
+        def foo(index: int):
+            # A function that will be applied to `kernel` in a for loop.
+            kernel.cx(qubits[index], qubits[index+1])
+
+        # Create a for loop in `kernel`, parameterized by the `size`
+        # argument for its `stop` iterator.
+        kernel.for_loop(start=0, stop=size-1, function=foo)
+
+        # Execute the kernel, passing along a concrete value (5) for 
+        # the `size` argument.
+        counts = cudaq.sample(kernel, 5)
+        print(counts)
+        """
         with self.insertPoint, self.loc:
             iTy = mlirTypeFromPyType(int, self.ctx)
             startVal = None
@@ -318,6 +394,28 @@ class PyKernel(object):
                 cc.ContinueOp([])
 
     def __call__(self, *args):
+        """Just-In-Time (JIT) compile `self` (:class:`Kernel`), and call 
+        the kernel function at the provided concrete arguments.
+
+        Args:
+            *arguments (Optional[Any]): The concrete values to evaluate the 
+                kernel function at. Leave empty if the `target` kernel doesn't 
+                accept any arguments.
+
+        .. code-block:: python
+
+        # Example:
+        # Create a kernel that accepts an int and float as its 
+        # arguments.
+        kernel, qubit_count, angle = cudaq.make_kernel(int, float)
+        # Parameterize the number of qubits by `qubit_count`.
+        qubits = kernel.qalloc(qubit_count)
+        # Apply an `rx` rotation on the first qubit by `angle`.
+        kernel.rx(angle, qubits[0])
+        # Call the `Kernel` on the given number of qubits (5) and at 
+        a concrete angle (pi).
+        kernel(5, 3.14))
+        """
         if len(args) != len(self.mlirArgTypes):
             raise RuntimeError("invalid number of arguments passed to kernel {} (passed {} but requires {})".format(
                 self.funcName, len(args), len(self.mlirArgTypes)))
