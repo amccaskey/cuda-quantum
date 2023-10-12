@@ -133,7 +133,8 @@ public:
 
   /// Measure the qudit and return the observed state (0,1,2,3,...)
   /// e.g. for qubits, this can return 0 or 1;
-  virtual int measure(const QuditInfo &target) = 0;
+  virtual int measure(const QuditInfo &target,
+                      const std::string registerName = "") = 0;
 
   /// Measure the current state in the given Pauli basis, return
   /// the expectation value <term>.

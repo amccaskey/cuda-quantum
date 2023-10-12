@@ -36,7 +36,7 @@ void pyAltLaunchKernel(const std::string &name, MlirModule module,
   auto cloned = mod.clone();
   auto context = cloned.getContext();
   registerLLVMDialectTranslation(*context);
-  
+
   PassManager pm(context);
   pm.addPass(cudaq::opt::createGenerateDeviceCodeLoader(/*genAsQuake=*/true));
   pm.addPass(cudaq::opt::createGenerateKernelExecution());

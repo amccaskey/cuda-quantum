@@ -245,6 +245,7 @@ class PyKernel(object):
             quake.SwapOp([], [], [], [qubitA.mlirValue, qubitB.mlirValue])
 
     def reset(self, target):
+        """Reset the provided qubit or qubits."""
         with self.insertPoint, self.loc:
             if not quake.VeqType.isinstance(target.mlirValue.type):
                 quake.ResetOp([], target.mlirValue)

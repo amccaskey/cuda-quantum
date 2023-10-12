@@ -269,23 +269,25 @@ class swap(object):
             __class__.__name__, [], qubitIds[:len(qubitIds)-2], [qubitIds[-2], qubitIds[-1]])
 
 
-def mz(*args):
+def mz(*args, register_name = ''):
     """Measure the qubit along the z-axis."""
     qubitIds = processQubitIds('mz', *args)
-    [cudaq_runtime.measure(q) for q in qubitIds]
+    res = [cudaq_runtime.measure(q, register_name) for q in qubitIds]
+    if len(res) == 1: return res[0] 
+    else: return res
 
 
-def my(*args):
+def my(*args, register_name = ''):
     """Measure the qubit along the y-axis."""
     s.adj(*args)
     h()(*args)
-    mz(*args)
+    return mz(*args, register_name)
 
 
-def mx(*args):
+def mx(*args, register_name = ''):
     """Measure the qubit along the x-axis."""
     h()(*args)
-    mz(*args)
+    return mz(*args, register_name)
 
 
 def adjoint(kernel, *args):

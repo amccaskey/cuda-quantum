@@ -130,17 +130,20 @@ def test_grover():
     assert '011' in counts
 
 
-# def test_dynamic_circuit():
-#     """Test that we correctly sample circuits with 
-#        mid-circuit measurements and conditionals."""
-#     @cudaq.kernel
-#     def simple():
-#         q = cudaq.qvector(2)
-#         h(q[0])
-#         i = mz(q[0], "c0")
-#         if i:
-#             x(q[1])
-#         mz(q)
+def test_dynamic_circuit():
+    """Test that we correctly sample circuits with 
+       mid-circuit measurements and conditionals."""
+    @cudaq.kernel
+    def simple():
+        q = cudaq.qvector(2)
+        h(q[0])
+        i = mz(q[0], register_name="c0")
+        if i:
+            x(q[1])
+        mz(q)
 
-#     counts = cudaq.sample(simple)
-#     counts.dump()
+    counts = cudaq.sample(simple)
+    counts.dump()
+    c0 = counts.get_register_counts('c0')
+    assert '0' in c0 and '1' in c0
+    assert '00' in counts and '11' in counts

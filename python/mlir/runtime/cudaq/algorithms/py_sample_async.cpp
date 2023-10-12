@@ -16,8 +16,7 @@
 namespace py = pybind11;
 
 namespace cudaq {
-void pyAltLaunchKernel(const std::string &, MlirModule, OpaqueArguments &
-                       );
+void pyAltLaunchKernel(const std::string &, MlirModule, OpaqueArguments &);
 
 void bindSampleAsync(py::module &mod) {
   py::class_<async_sample_result>(
@@ -48,7 +47,7 @@ for more information on this programming pattern.)#")
       [&](py::object &kernel, py::args args, std::size_t shots,
           std::size_t qpu_id) {
         auto &platform = cudaq::get_platform();
-        auto * argData = new cudaq::OpaqueArguments();
+        auto *argData = new cudaq::OpaqueArguments();
         cudaq::packArgs(*argData, args);
         auto kernelName = kernel.attr("name").cast<std::string>();
         auto kernelMod = kernel.attr("module").cast<MlirModule>();

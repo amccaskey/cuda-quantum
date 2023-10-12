@@ -44,8 +44,12 @@ void bindExecutionManager(py::module &mod) {
     cudaq::getExecutionManager()->endCtrlRegion(nControls);
   });
 
-  mod.def("measure", [](std::size_t id) {
-    cudaq::getExecutionManager()->measure(cudaq::QuditInfo(2, id));
-  });
+  mod.def(
+      "measure",
+      [](std::size_t id, const std::string &regName) {
+        return cudaq::getExecutionManager()->measure(cudaq::QuditInfo(2, id),
+                                                     regName);
+      },
+      py::arg("qubit"), py::arg("register_name") = "");
 }
 } // namespace cudaq

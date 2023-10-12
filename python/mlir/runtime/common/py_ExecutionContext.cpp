@@ -9,8 +9,8 @@
 #include "common/ExecutionContext.h"
 #include "cudaq/platform.h"
 #include <fmt/core.h>
-#include <pybind11/stl.h>
 #include <pybind11/complex.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -22,6 +22,8 @@ void bindExecutionContext(py::module &mod) {
       .def(py::init<std::string, int>())
       .def_readonly("result", &cudaq::ExecutionContext::result)
       .def_readonly("simulationData", &cudaq::ExecutionContext::simulationData)
+      .def_readwrite("hasConditionalsOnMeasureResults",
+                     &cudaq::ExecutionContext::hasConditionalsOnMeasureResults)
       .def_readwrite("totalIterations",
                      &cudaq::ExecutionContext::totalIterations)
       .def_readwrite("batchIteration", &cudaq::ExecutionContext::batchIteration)
@@ -44,5 +46,9 @@ void bindExecutionContext(py::module &mod) {
         self.reset_exec_ctx();
       },
       "");
+  mod.def("supportsConditionalFeedback", []() {
+    auto &platform = cudaq::get_platform();
+    return platform.supports_conditional_feedback();
+  });
 }
 } // namespace cudaq

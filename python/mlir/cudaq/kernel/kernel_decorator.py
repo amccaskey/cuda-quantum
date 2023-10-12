@@ -14,6 +14,7 @@ from mlir_cudaq.execution_engine import *
 from mlir_cudaq.dialects import quake, cc
 from .ast_bridge import compile_to_quake
 from .quake_value import mlirTypeFromPyType
+from .analysis import MidCircuitMeasurementAnalyzer
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 
@@ -39,6 +40,10 @@ class PyKernelDecorator(object):
         if verbose and importlib.util.find_spec('astpretty') is not None:
             import astpretty
             astpretty.pprint(self.astModule.body[0])
+
+        analyzer = MidCircuitMeasurementAnalyzer()
+        analyzer.visit(self.astModule)
+        self.metadata = {'conditionalOnMeasure': analyzer.hasMidCircuitMeasures}
 
         if not self.library_mode:
             # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop,
