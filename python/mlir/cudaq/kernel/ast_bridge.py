@@ -13,6 +13,8 @@ from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith
 
+nvqppPrefix = '__nvqpp__mlirgen__'
+
 
 class PyASTBridge(ast.NodeVisitor):
 
@@ -57,6 +59,8 @@ class PyASTBridge(ast.NodeVisitor):
     def typeFromStr(self, typeStr):
         if typeStr == 'int':
             return self.getIntegerType(64)
+        elif typeStr == 'float':
+            return F64Type.get()
         else:
             raise Exception('{} is not a supported type yet.'.format(typeStr))
 
@@ -79,10 +83,10 @@ class PyASTBridge(ast.NodeVisitor):
             ]
             argNames = [arg.arg for arg in node.args.args]
 
+            fullName = nvqppPrefix + node.name
             # Create the function and the entry block
-            f = func.FuncOp('__nvqpp__mlirgen__{}'.format(node.name), (self.argTypes, []),
+            f = func.FuncOp(fullName, (self.argTypes, []),
                             loc=self.loc)
-            # f.attributes.__setitem__('llvm.emit_c_interface', UnitAttr.get())
             f.attributes.__setitem__('cudaq-entrypoint', UnitAttr.get())
             e = f.add_entry_block()
 
@@ -96,9 +100,10 @@ class PyASTBridge(ast.NodeVisitor):
                 self.generic_visit(node)
                 ret = func.ReturnOp([])
 
-            attr = DictAttr.get({'__nvqpp__mlirgen__'+node.name: StringAttr.get(
-                '__nvqpp__mlirgen__'+node.name+'_entryPointRewrite', context=self.ctx)}, context=self.ctx)
-            self.module.operation.attributes.__setitem__('quake.mangled_name_map', attr)
+            attr = DictAttr.get({fullName: StringAttr.get(
+                fullName+'_entryPointRewrite', context=self.ctx)}, context=self.ctx)
+            self.module.operation.attributes.__setitem__(
+                'quake.mangled_name_map', attr)
 
     def visit_Assign(self, node):
         self.generic_visit(node)

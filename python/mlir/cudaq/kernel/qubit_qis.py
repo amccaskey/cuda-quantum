@@ -10,6 +10,7 @@
 # qubit, qvector, qview all defined in C++
 # (better tracking of construction / destruction)
 
+from abc import abstractmethod, ABCMeta
 import inspect
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 qvector = cudaq_runtime.qvector
@@ -33,232 +34,79 @@ def processQubitIds(opName, *args):
     return qubitIds
 
 
-class h(object):
-    """The Hadmard operation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(*args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
+class quantum_operation(object):
+    """A quantum_operation provides a base class interface for invoking 
+    a specific quantum gate, as well as controlled and adjoint versions 
+    of the gate."""
 
     @staticmethod
-    def ctrl(*args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
+    @abstractmethod
+    def get_name():
+        """Return the name of this operation."""
+        pass
+
+    @classmethod
+    def get_num_parameters(cls):
+        """Return the number of rotational parameters this operation requires."""
+        return 0
+
+    @classmethod
+    def __call__(cls, *args):
+        """Invoke the quantum operation. The args can contain float parameters (of the
+        correct number according to get_num_parameters) and quantum types (qubit, qvector, qview).
+        """
+        opName = cls.get_name()
+        parameters = list(args)[:cls.get_num_parameters()]
+        quantumArguments = list(args)[cls.get_num_parameters():]
+        [cudaq_runtime.applyQuantumOperation(opName, parameters, [], [
+                                             q]) for q in processQubitIds(opName, *quantumArguments)]
+
+    @classmethod
+    def ctrl(cls, *args):
+        """Invoke the general controlled version of the quantum operation. 
+        The args can contain float parameters (of the correct number according
+        to get_num_parameters) and quantum types (qubit, qvector, qview)."""
+        opName = cls.get_name()
+        parameters = list(args)[:cls.get_num_parameters()]
+        quantumArguments = list(args)[cls.get_num_parameters():]
+        qubitIds = processQubitIds(opName, *quantumArguments)
         cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
+            opName, parameters, qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
 
-    @staticmethod
-    def adj(target):
-        if isinstance(target, qvector):
-            for q in target:
-                cudaq_runtime.applyQuantumOperation(
-                    __class__.__name__, [], [], [q.id()], True)
-            return
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], [], [target.id()], True)
-
-
-class x(object):
-    """The Pauli X operation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(*args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(*args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(target):
-        if isinstance(target, qvector):
-            for q in target:
-                cudaq_runtime.applyQuantumOperation(
-                    __class__.__name__, [], [], [q.id()], True)
-            return
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], [], [target.id()], True)
+    @classmethod
+    def adj(cls, *args):
+        """Invoke the general adjoint version of the quantum operation. 
+        The args can contain float parameters (of the correct number according
+        to get_num_parameters) and quantum types (qubit, qvector, qview)."""
+        opName = cls.get_name()
+        parameters = list(args)[:cls.get_num_parameters()]
+        quantumArguments = list(args)[cls.get_num_parameters():]
+        [cudaq_runtime.applyQuantumOperation(opName, [-1 * p for p in parameters], [], [
+                                             q]) for q in processQubitIds(opName, *quantumArguments)]
 
 
-class y(object):
-    """The Pauli Y operation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(*args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
+# Define our quantum operatations
+h = type('h', (quantum_operation,), {'get_name': staticmethod(lambda: 'h')})
+x = type('x', (quantum_operation,), {'get_name': staticmethod(lambda: 'x')})
+y = type('y', (quantum_operation,), {'get_name': staticmethod(lambda: 'y')})
+z = type('z', (quantum_operation,), {'get_name': staticmethod(lambda: 'z')})
+s = type('s', (quantum_operation,), {'get_name': staticmethod(lambda: 's')})
+t = type('t', (quantum_operation,), {'get_name': staticmethod(lambda: 't')})
 
-    @staticmethod
-    def ctrl(*args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(target):
-        if isinstance(target, qvector):
-            for q in target:
-                cudaq_runtime.applyQuantumOperation(
-                    __class__.__name__, [], [], [q.id()], True)
-            return
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], [], [target.id()], True)
-
-
-class z(object):
-    """The Pauli Z operation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(*args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(*args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(target):
-        if isinstance(target, qvector):
-            for q in target:
-                cudaq_runtime.applyQuantumOperation(
-                    __class__.__name__, [], [], [q.id()], True)
-            return
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], [], [target.id()], True)
-
-
-class s(object):
-    """The S operation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(*args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(*args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(target):
-        if isinstance(target, qvector):
-            for q in target:
-                cudaq_runtime.applyQuantumOperation(
-                    __class__.__name__, [], [], [q.id()], True)
-            return
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], [], [target.id()], True)
-
-
-class t(object):
-    """The T operation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(*args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(*args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(target):
-        if isinstance(target, qvector):
-            for q in target:
-                cudaq_runtime.applyQuantumOperation(
-                    __class__.__name__, [], [], [q.id()], True)
-            return
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], [], [target.id()], True)
-
-
-class rx(object):
-    """The Rx rotation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(parameter, *args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [parameter], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(parameter, *args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [parameter], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(parameter, target):
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [-parameter], [], [target.id()])
-
-
-class ry(object):
-    """The Ry rotation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(parameter, *args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [parameter], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(parameter, *args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [parameter], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(parameter, target):
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [-parameter], [], [target.id()])
-
-
-class rz(object):
-    """The Rz rotation. Can be controlled on any number of qubits via the `ctrl` method."""
-    @staticmethod
-    def __call__(parameter, *args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [parameter], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(parameter, *args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [parameter], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(parameter, target):
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [-parameter], [], [target.id()])
-
-
-class r1(object):
-    """The general phase rotation. Can be controlled on any number of qubits via the `ctrl` method."""
-
-    @staticmethod
-    def __call__(parameter, *args):
-        [cudaq_runtime.applyQuantumOperation(__class__.__name__, [parameter], [], [
-                                             q]) for q in processQubitIds(__class__.__name__, *args)]
-
-    @staticmethod
-    def ctrl(parameter, *args):
-        qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [parameter], qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
-
-    @staticmethod
-    def adj(parameter, target):
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [-parameter], [], [target.id()])
+rx = type('rx', (quantum_operation,), {'get_name': staticmethod(
+    lambda: 'rx'), 'get_num_parameters': staticmethod(lambda: 1)})
+ry = type('ry', (quantum_operation,), {'get_name': staticmethod(
+    lambda: 'ry'), 'get_num_parameters': staticmethod(lambda: 1)})
+rz = type('rz', (quantum_operation,), {'get_name': staticmethod(
+    lambda: 'rz'), 'get_num_parameters': staticmethod(lambda: 1)})
+r1 = type('r1', (quantum_operation,), {'get_name': staticmethod(
+    lambda: 'r1'), 'get_num_parameters': staticmethod(lambda: 1)})
 
 
 class swap(object):
     """The swap operation. Can be controlled on any number of qubits via the `ctrl` method."""
     @staticmethod
     def __call__(first, second):
-        print(__class__.__name__)
         cudaq_runtime.applyQuantumOperation(
             __class__.__name__, [], [], [first.id(), second.id()])
 
@@ -269,22 +117,24 @@ class swap(object):
             __class__.__name__, [], qubitIds[:len(qubitIds)-2], [qubitIds[-2], qubitIds[-1]])
 
 
-def mz(*args, register_name = ''):
+def mz(*args, register_name=''):
     """Measure the qubit along the z-axis."""
     qubitIds = processQubitIds('mz', *args)
     res = [cudaq_runtime.measure(q, register_name) for q in qubitIds]
-    if len(res) == 1: return res[0] 
-    else: return res
+    if len(res) == 1:
+        return res[0]
+    else:
+        return res
 
 
-def my(*args, register_name = ''):
+def my(*args, register_name=''):
     """Measure the qubit along the y-axis."""
     s.adj(*args)
     h()(*args)
     return mz(*args, register_name)
 
 
-def mx(*args, register_name = ''):
+def mx(*args, register_name=''):
     """Measure the qubit along the x-axis."""
     h()(*args)
     return mz(*args, register_name)
