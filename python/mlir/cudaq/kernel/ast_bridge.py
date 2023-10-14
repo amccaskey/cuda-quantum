@@ -8,6 +8,7 @@
 import ast
 import sys
 from collections import deque
+import numpy as np
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
@@ -37,12 +38,29 @@ class PyASTBridge(ast.NodeVisitor):
     def getRefType(self):
         return quake.RefType.get(self.ctx)
 
+    def isQuantumType(self, ty):
+        return quake.RefType.isinstance(ty) or quake.VeqType.isinstance(ty)
+
     def getIntegerType(self, width):
         return IntegerType.get_signless(width)
 
     def getIntegerAttr(self, type, value):
         return IntegerAttr.get(type, value)
 
+    def getFloatType(self):
+        return F64Type.get()
+
+    def getFloatAttr(self, type, value):
+        return FloatAttr.get(type, value)
+    
+    def getConstantFloat(self, value):
+        ty = self.getFloatType()
+        return arith.ConstantOp(ty, self.getFloatAttr(ty, value)).result 
+    
+    def getConstantInt(self, value):
+        ty = self.getIntegerType(64)
+        return arith.ConstantOp(ty, self.getIntegerAttr(ty, value)).result 
+    
     def pushValue(self, value):
         if self.verbose:
             print('{}push {}'.format(self.increment * ' ', value))
@@ -55,14 +73,25 @@ class PyASTBridge(ast.NodeVisitor):
         if self.verbose:
             print('{}pop {}'.format(self.increment * ' ', val))
         return val
+    
+    def mlirTypeFromAnnotation(self, annotation):
+        if annotation == None:
+            raise RuntimeError(
+                'cudaq.kernel functions must have argument type annotations.')
 
-    def typeFromStr(self, typeStr):
-        if typeStr == 'int':
+        if hasattr(annotation, 'attr') and annotation.value.id == 'cudaq':
+            if annotation.attr == 'qview' or annotation.attr == 'qvector':
+                return self.getVeqType()
+            if annotation.attr == 'qubit':
+                return self.getRefType()
+
+        if annotation.id == 'int':
             return self.getIntegerType(64)
-        elif typeStr == 'float':
+        elif annotation.id == 'float':
             return F64Type.get()
         else:
-            raise Exception('{} is not a supported type yet.'.format(typeStr))
+            raise RuntimeError(
+                '{} is not a supported type yet.'.format(annotation.id))
 
     def generic_visit(self, node):
         for field, value in reversed(list(ast.iter_fields(node))):
@@ -77,37 +106,75 @@ class PyASTBridge(ast.NodeVisitor):
         with self.ctx, InsertionPoint(self.module.body), self.loc:
 
             # Get the arg types and arg names
-            # FIXME throw an error if the types aren't annotated
+            # this will throw an error if the types aren't annotated
             self.argTypes = [
-                self.typeFromStr(arg.annotation.id) for arg in node.args.args
+                self.mlirTypeFromAnnotation(arg.annotation) for arg in node.args.args
             ]
+            # Get the argument names
             argNames = [arg.arg for arg in node.args.args]
 
+            # the full function name in MLIR is __nvqpp__mlirgen__ + the function name
             fullName = nvqppPrefix + node.name
-            # Create the function and the entry block
+
+            # Create the FuncOp
             f = func.FuncOp(fullName, (self.argTypes, []),
                             loc=self.loc)
-            f.attributes.__setitem__('cudaq-entrypoint', UnitAttr.get())
-            e = f.add_entry_block()
+
+            # Set this kernel as an entry point if the arg types are classical only
+            def isQuantumTy(ty): return quake.RefType.isinstance(
+                ty) or quake.VeqType.isinstance(ty)
+            areQuantumTypes = [isQuantumTy(ty) for ty in self.argTypes]
+            if True not in areQuantumTypes:
+                f.attributes.__setitem__('cudaq-entrypoint', UnitAttr.get())
+
+            # Create the entry block
+            entry = f.add_entry_block()
 
             # Add the block args to the symbol table
-            blockArgs = e.arguments
+            blockArgs = entry.arguments
             for i, b in enumerate(blockArgs):
                 self.symbolTable[argNames[i]] = b
 
             # Set the insertion point to the start of the entry block
-            with InsertionPoint(e):
+            with InsertionPoint(entry):
+                # Visit the function
                 self.generic_visit(node)
+                # Add the return operation
                 ret = func.ReturnOp([])
 
-            attr = DictAttr.get({fullName: StringAttr.get(
-                fullName+'_entryPointRewrite', context=self.ctx)}, context=self.ctx)
-            self.module.operation.attributes.__setitem__(
-                'quake.mangled_name_map', attr)
+            if True not in areQuantumTypes:
+                attr = DictAttr.get({fullName: StringAttr.get(
+                    fullName+'_entryPointRewrite', context=self.ctx)}, context=self.ctx)
+                self.module.operation.attributes.__setitem__(
+                    'quake.mangled_name_map', attr)
 
     def visit_Assign(self, node):
+        print ('[Visti Assign {}]'.format(ast.unparse(node)))
         self.generic_visit(node)
-        self.symbolTable[node.targets[0].id] = self.popValue()
+
+        rhsVal = self.popValue()
+        if self.isQuantumType(rhsVal.type):
+            self.symbolTable[node.targets[0].id] = rhsVal
+            return
+
+        # We should allocate and store
+        alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, rhsVal.type),
+                                 TypeAttr.get(rhsVal.type)).result
+        cc.StoreOp(rhsVal, alloca)
+        self.symbolTable[node.targets[0].id] = alloca
+
+    def visit_Attribute(self, node):
+        if self.verbose:
+            print('[Visit Attribute]')
+
+        if node.value.id in self.symbolTable and node.attr == 'size' and quake.VeqType.isinstance(self.symbolTable[node.value.id].type):
+            self.pushValue(quake.VeqSizeOp(self.getIntegerType(
+                64), self.symbolTable[node.value.id]).result)
+            return
+    
+        if node.value.id in ['np', 'numpy'] and node.attr == 'pi':
+            self.pushValue(self.getConstantFloat(np.pi))
+            return
 
     def visit_Call(self, node):
         if self.verbose:
@@ -127,6 +194,25 @@ class PyASTBridge(ast.NodeVisitor):
                 qubit = self.popValue()
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
                 opCtor([], [], [], [qubit])
+                return 
+            
+            if node.func.id in ["rx", "ry", "rz", "r1"]:
+                # should have 1 value on the stack if
+                # this is a vanilla hadamard
+                qubit = self.popValue()
+                param = self.popValue()
+                opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
+                opCtor([], [param], [], [qubit])
+                return 
+
+            if node.func.id == 'swap':
+                # should have 1 value on the stack if
+                # this is a vanilla hadamard
+                qubitB = self.popValue()
+                qubitA = self.popValue()
+                opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
+                opCtor([], [], [], [qubitA, qubitB])
+                return
 
         elif isinstance(node.func, ast.Attribute):
             if node.func.value.id == 'cudaq' and node.func.attr == 'qvector':
@@ -146,23 +232,45 @@ class PyASTBridge(ast.NodeVisitor):
                 controls = [
                     self.popValue() for i in range(len(self.valueStack))
                 ]
-                # controls = [c for c in controls]
                 opCtor = getattr(quake,
                                  '{}Op'.format(node.func.value.id.title()))
                 opCtor([], [], controls, [target])
+                return 
+
+            if node.func.value.id in ['rx', 'ry', 'rz', 'r1'] and node.func.attr == 'ctrl':
+                target = self.popValue()
+                controls = [
+                    self.popValue() for i in range(len(self.valueStack))
+                ]
+                param = controls[-1]
+                opCtor = getattr(quake,
+                                 '{}Op'.format(node.func.value.id.title()))
+                opCtor([], [param], controls[:-1], [target])
+                return
+            
+            if node.func.value.id == 'swap':
+                # should have 1 value on the stack if
+                # this is a vanilla hadamard
+                qubitB = self.popValue()
+                qubitA = self.popValue()
+                controls = [
+                    self.popValue() for i in range(len(self.valueStack))
+                ]
+                opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
+                opCtor([], [], controls, [qubitA, qubitB])
+                return 
 
     def visit_Constant(self, node):
         if self.verbose:
             print("[Visit Constant {}]".format(node.value))
         if isinstance(node.value, int):
-            i64Ty = self.getIntegerType(64)
-            self.pushValue(
-                arith.ConstantOp(i64Ty,
-                                 self.getIntegerAttr(i64Ty,
-                                                     node.value)).result)
+            self.pushValue(self.getConstantInt(node.value))
             return
+        elif isinstance(node.value, float):
+            self.pushValue(self.getConstantFloat(node.value))
+            return 
         else:
-            raise Exception("unhandled constant: {}".format(ast.unparse(node)))
+            raise RuntimeError("unhandled constant: {}".format(ast.unparse(node)))
 
     def visit_Subscript(self, node):
         if self.verbose:
@@ -178,16 +286,21 @@ class PyASTBridge(ast.NodeVisitor):
             self.pushValue(
                 quake.ExtractRefOp(qrefTy, var, -1, index=idx))
         else:
-            raise Exception(
+            raise RuntimeError(
                 "unhandled subscript: {}".format(ast.unparse(node)))
 
     def visit_For(self, node):
-        if node.iter.func.id != 'range' and len(node.iter.args) == 1:
-            raise Exception(
+        if node.iter.func.id != 'range':
+            raise RuntimeError(
                 "CUDA Quantum only supports `for VAR in range(UPPER):`")
 
         if self.verbose:
             print('[Visit For]')
+
+        # New Strategy: 
+        # walk the iter, it should return push an array of items on the stack
+        # the loop here is then our basic cc loop from 0 to N (where N is the size of 
+        # the array, each iteration we extract the ith element of the array)
 
         # Get the rangeOperand, this is the upper bound on the loop
         self.generic_visit(node.iter)
@@ -201,6 +314,7 @@ class PyASTBridge(ast.NodeVisitor):
         one = arith.ConstantOp(iTy, IntegerAttr.get(iTy, 1))
 
         # create a scope
+        # create a scope
         scope = cc.ScopeOp([])
         scopeBlock = Block.create_at_start(scope.initRegion, [])
         with InsertionPoint(scopeBlock):
@@ -212,12 +326,13 @@ class PyASTBridge(ast.NodeVisitor):
             loop = cc.LoopOp([], [], BoolAttr.get(False))
             bodyBlock = Block.create_at_start(loop.bodyRegion, [])
             with InsertionPoint(bodyBlock):
-                self.generic_visit(node.body[0])
+                [self.visit(b) for b in node.body]
                 cc.ContinueOp([])
 
             whileBlock = Block.create_at_start(loop.whileRegion, [])
             with InsertionPoint(whileBlock):
                 loaded = cc.LoadOp(alloca)
+                # Use Predicate::ne since 
                 c = arith.CmpIOp(IntegerAttr.get(iTy, 2),
                                  loaded, rangeOperand).result
                 cc.ConditionOp(c, [])
@@ -230,6 +345,24 @@ class PyASTBridge(ast.NodeVisitor):
                 cc.ContinueOp([])
             cc.ContinueOp([])
 
+    def visit_UnaryOp(self, node):
+        if self.verbose:
+            print("[Visit Unary = {}]".format(ast.unparse(node)))
+
+        self.generic_visit(node)
+        operand = self.popValue()
+        if isinstance(node.op, ast.USub):
+            if F64Type.isinstance(operand.type):
+                self.pushValue(arith.NegFOp(operand).result)
+            else:
+                negOne = self.getConstantInt(-1)
+                self.pushValue(arith.MulIOp(negOne, operand).result)
+            return 
+
+        raise RuntimeError("unhandled UnaryOp: {}".format(ast.unparse(node)))
+
+
+        
     def visit_BinOp(self, node):
         if self.verbose:
             print("[Visit BinaryOp = {}]".format(ast.unparse(node)))
@@ -246,7 +379,7 @@ class PyASTBridge(ast.NodeVisitor):
                     arith.AddIOp(left, right).result)
                 return
             else:
-                raise Exception(
+                raise RuntimeError(
                     "unhandled BinOp.Add types: {}".format(ast.unparse(node)))
 
         if isinstance(node.op, ast.Sub):
@@ -255,10 +388,18 @@ class PyASTBridge(ast.NodeVisitor):
                     arith.SubIOp(left, right).result)
                 return
             else:
-                raise Exception(
+                raise RuntimeError(
                     "unhandled BinOp.Add types: {}".format(ast.unparse(node)))
+        if isinstance(node.op, ast.FloorDiv):
+            if IntegerType.isinstance(left.type):
+                self.pushValue(
+                    arith.FloorDivSIOp(left, right).result)
+                return
+            else:
+                raise RuntimeError(
+                    "unhandled BinOp.FloorDiv types: {}".format(ast.unparse(node)))
         else:
-            raise Exception(
+            raise RuntimeError(
                 "unhandled binary operator: {}".format(ast.unparse(node)))
 
     def visit_Name(self, node):
@@ -275,7 +416,7 @@ class PyASTBridge(ast.NodeVisitor):
         # elif node.id == 'cudaq':
         #     return
         # else:
-        #     raise Exception("unhandled name node: {}".format(ast.unparse(node)))
+        #     raise RuntimeError("unhandled name node: {}".format(ast.unparse(node)))
 
 
 def compile_to_quake(astModule, **kwargs):

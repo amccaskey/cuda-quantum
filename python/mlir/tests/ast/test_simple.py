@@ -38,4 +38,37 @@ def test_ghz():
     counts = cudaq.sample(ghz, 5)
     assert '0'*5 in counts and '1'*5 in counts 
 
+def test_no_annotations():
+    with pytest.raises(RuntimeError) as error:
+        @cudaq.kernel(jit=True, verbose=True)
+        def ghz(N):
+            q = cudaq.qvector(N)
+            h(q[0])
+            for i in range(N-1):
+                x.ctrl(q[i], q[i+1])
+    
+def test_kernel_composition():
+    @cudaq.kernel(jit=True, verbose=True)
+    def iqft(): #qubits:cudaq.qview):
+        qubits = cudaq.qvector(4)
+        N = qubits.size()
+        for i in range(N//2):
+            swap(qubits[i], qubits[N-i-1])
+
+        for i in range(N-1):
+            h(qubits[i])
+            j = i + 1
+            # for k = i; k > -1; k--)
+            # == for l = 0; l < (i)
+            # for y in [i, i-1, i-2, i-3, ..., 0]
+            for y in range(i, -1, -1):
+                r1.ctrl(-np.pi, qubits[j], qubits[y])
+
+        h(qubits[N-1])
+    print(iqft)
+
+    iqft()
+    # def entry(N:int):
+
+
 # TODO sample / observe async
