@@ -50,7 +50,7 @@ def test_no_annotations():
 def test_kernel_composition():
     @cudaq.kernel(jit=True, verbose=True)
     def iqft(): #qubits:cudaq.qview):
-        qubits = cudaq.qvector(4)
+        qubits = cudaq.qvector(3)
         N = qubits.size()
         for i in range(N//2):
             swap(qubits[i], qubits[N-i-1])
@@ -59,7 +59,7 @@ def test_kernel_composition():
             h(qubits[i])
             j = i + 1
             for y in range(i, -1, -1):
-                r1.ctrl(-np.pi, qubits[j], qubits[y])
+                r1.ctrl(-np.pi/ 2**(j-y), qubits[j], qubits[y])
 
         h(qubits[N-1])
 

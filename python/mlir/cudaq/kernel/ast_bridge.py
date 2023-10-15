@@ -149,7 +149,7 @@ class PyASTBridge(ast.NodeVisitor):
                     'quake.mangled_name_map', attr)
 
     def visit_Assign(self, node):
-        print('[Visit Assign {}]'.format(ast.unparse(node)))
+        if self.verbose: print('[Visit Assign {}]'.format(ast.unparse(node)))
         self.generic_visit(node)
 
         rhsVal = self.popValue()
@@ -524,6 +524,21 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 raise RuntimeError(
                     "unhandled BinOp.FloorDiv types: {}".format(ast.unparse(node)))
+        if isinstance(node.op, ast.Div):
+            if IntegerType.isinstance(left.type):
+                left = arith.SIToFPOp(self.getFloatType(), left).result
+            if IntegerType.isinstance(right.type):
+                right = arith.SIToFPOp(self.getFloatType(), right).result
+
+            self.pushValue(arith.DivFOp(left, right).result)
+            return 
+        if isinstance(node.op, ast.Pow):
+            if IntegerType.isinstance(left.type):
+                left = arith.SIToFPOp(self.getFloatType(), left).result
+            if IntegerType.isinstance(right.type):
+                right = arith.SIToFPOp(self.getFloatType(), right).result
+            self.pushValue(math.PowFOp(left, right).result)
+            return 
         else:
             raise RuntimeError(
                 "unhandled binary operator: {}".format(ast.unparse(node)))
