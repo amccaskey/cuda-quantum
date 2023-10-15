@@ -58,17 +58,14 @@ def test_kernel_composition():
         for i in range(N-1):
             h(qubits[i])
             j = i + 1
-            # for k = i; k > -1; k--)
-            # == for l = 0; l < (i)
-            # for y in [i, i-1, i-2, i-3, ..., 0]
             for y in range(i, -1, -1):
                 r1.ctrl(-np.pi, qubits[j], qubits[y])
 
         h(qubits[N-1])
+
     print(iqft)
 
     iqft()
-    # def entry(N:int):
 
 
 # TODO sample / observe async

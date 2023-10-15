@@ -95,6 +95,17 @@ void registerCCDialectAndTypes(py::module &m) {
       ccMod, "PointerType",
       [](MlirType type) { return unwrap(type).isa<cudaq::cc::PointerType>(); })
       .def_classmethod(
+          "getElementType",
+          [](py::object cls, MlirType type) {
+            auto ty = unwrap(type);
+            auto casted = ty.dyn_cast<cudaq::cc::PointerType>();
+            if (!casted)
+              throw std::runtime_error(
+                  "invalid type passed to PointerType.getElementType(), must "
+                  "be cc.ptr type.");
+            return wrap(casted.getElementType());
+          })
+      .def_classmethod(
           "get", [](py::object cls, MlirContext ctx, MlirType elementType) {
             return wrap(
                 cudaq::cc::PointerType::get(unwrap(ctx), unwrap(elementType)));
@@ -103,6 +114,17 @@ void registerCCDialectAndTypes(py::module &m) {
   mlir_type_subclass(
       ccMod, "ArrayType",
       [](MlirType type) { return unwrap(type).isa<cudaq::cc::ArrayType>(); })
+      .def_classmethod(
+          "getElementType",
+          [](py::object cls, MlirType type) {
+            auto ty = unwrap(type);
+            auto casted = ty.dyn_cast<cudaq::cc::ArrayType>();
+            if (!casted)
+              throw std::runtime_error(
+                  "invalid type passed to ArrayType.getElementType(), must "
+                  "be cc.array type.");
+            return wrap(casted.getElementType());
+          })
       .def_classmethod(
           "get",
           [](py::object cls, MlirContext ctx, MlirType elementType,
