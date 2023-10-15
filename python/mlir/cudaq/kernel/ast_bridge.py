@@ -149,7 +149,8 @@ class PyASTBridge(ast.NodeVisitor):
                     'quake.mangled_name_map', attr)
 
     def visit_Assign(self, node):
-        if self.verbose: print('[Visit Assign {}]'.format(ast.unparse(node)))
+        if self.verbose:
+            print('[Visit Assign {}]'.format(ast.unparse(node)))
         self.generic_visit(node)
 
         rhsVal = self.popValue()
@@ -208,7 +209,8 @@ class PyASTBridge(ast.NodeVisitor):
                 if isinstance(node.args[2], ast.UnaryOp):
                     if isinstance(node.args[2].op, ast.USub):
                         if isinstance(node.args[2].operand, ast.Constant):
-                            if node.args[2].operand.value > 0: # greater than bc USub node above
+                            # greater than bc USub node above
+                            if node.args[2].operand.value > 0:
                                 isDecrementing = True
                         else:
                             raise RuntimeError(
@@ -231,7 +233,8 @@ class PyASTBridge(ast.NodeVisitor):
 
             # The total number of elements in the iterable
             # we are generating should be N == endVal - startVal
-            totalSize = math.AbsIOp(arith.SubIOp(endVal, startVal).result).result
+            totalSize = math.AbsIOp(arith.SubIOp(
+                endVal, startVal).result).result
 
             # Create an array of i64 of the totalSize
             arrTy = cc.ArrayType.get(self.ctx, iTy)
@@ -285,7 +288,7 @@ class PyASTBridge(ast.NodeVisitor):
 
         if isinstance(node.func, ast.Name):
             # Just visit the args, we know the name
-            [self.visit(arg) for arg in node.args] 
+            [self.visit(arg) for arg in node.args]
             if node.func.id in ["h", "x", "y", "z", "s", "t"]:
                 # should have 1 value on the stack if
                 # this is a vanilla hadamard
@@ -391,11 +394,8 @@ class PyASTBridge(ast.NodeVisitor):
 
     def visit_For(self, node):
         """Visit the For Stmt node. This node represents the typical 
-        Python for statement, `for VAR in ITERABLE`."""
-
-        if node.iter.func.id != 'range':
-            raise RuntimeError(
-                "CUDA Quantum only supports `for VAR in range(UPPER):`")
+        Python for statement, `for VAR in ITERABLE`. Supports range(...) 
+        and qvector iterables."""
 
         if self.verbose:
             print('[Visit For]')
@@ -404,18 +404,47 @@ class PyASTBridge(ast.NodeVisitor):
         # an iterable sequence. We model this in visit_Call (range is a called function)
         # as a cc.array of integer elements. So we visit that node here
         self.visit(node.iter)
-        assert len(self.valueStack) == 2
+        assert len(self.valueStack) > 0 and len(self.valueStack) < 3
 
-        # and now the iterable on the stack is a pointer to a cc.array
-        totalSize = self.popValue()
-        iterable = self.popValue()
+        totalSize = None
+        iterable = None
+        extractFunctor = None
+        if len(self.valueStack) == 1:
+            iterable = self.popValue()
+            if quake.VeqType.isinstance(iterable.type):
+                size = quake.VeqType.getSize(iterable.type)
+                if size:
+                    totalSize = self.getConstantInt(size)
+                else:
+                    totalSize = quake.VeqSizeOp(
+                        self.getIntegerType(64), iterable).result
 
-        # Double check our types are right
-        assert cc.PointerType.isinstance(iterable.type)
-        arrayType = cc.PointerType.getElementType(iterable.type)
-        assert cc.ArrayType.isinstance(arrayType)
-        elementType = cc.ArrayType.getElementType(arrayType)
-        assert IntegerType.isinstance(elementType)
+                def functor(iter, idx):
+                    return quake.ExtractRefOp(self.getRefType(), iter, -1, index=idx).result
+                extractFunctor = functor
+
+            else:
+                raise RuntimeError(
+                    '{} iterable type not yet supported.'.format(iterable.type))
+
+        else:
+            # and now the iterable on the stack is a pointer to a cc.array
+            totalSize = self.popValue()
+            iterable = self.popValue()
+
+            # Double check our types are right
+            assert cc.PointerType.isinstance(iterable.type)
+            arrayType = cc.PointerType.getElementType(iterable.type)
+            assert cc.ArrayType.isinstance(arrayType)
+            elementType = cc.ArrayType.getElementType(arrayType)
+            assert IntegerType.isinstance(elementType)
+
+            def functor(iter, idx):
+                eleAddr = cc.ComputePtrOp(cc.PointerType.get(self.ctx, iTy), iter, [
+                                          idx], DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
+                return cc.LoadOp(eleAddr).result
+
+            extractFunctor = functor
 
         # Get the name of the variable, VAR in for VAR in range(...)
         varName = node.target.id
@@ -441,14 +470,9 @@ class PyASTBridge(ast.NodeVisitor):
             with InsertionPoint(bodyBlock):
                 # in the body, we load the iteration variable, call it k
                 loaded = cc.LoadOp(alloca)
-                # We get a pointer to the kth element of the range iterable array
-                eleAddr = cc.ComputePtrOp(
-                    cc.PointerType.get(self.ctx, iTy), iterable, [
-                        loaded],
-                    DenseI32ArrayAttr.get([-2147483648], context=self.ctx))
 
-                # Store the element in the symbol table for the body block
-                self.symbolTable[varName] = cc.LoadOp(eleAddr).result
+                # We get a pointer to the kth element of the range iterable array
+                self.symbolTable[varName] = extractFunctor(iterable, loaded)
 
                 # Construct the code for the body
                 [self.visit(b) for b in node.body]
@@ -458,8 +482,7 @@ class PyASTBridge(ast.NodeVisitor):
             with InsertionPoint(whileBlock):
                 # In this while block, we load the k variable,
                 # and check that the value of it is less than
-                # the total number of elements in the range, a variable we
-                # store as __rangeTotalSize__
+                # the total number of elements in the range
                 loaded = cc.LoadOp(alloca)
                 c = arith.CmpIOp(IntegerAttr.get(iTy, 2),
                                  loaded, totalSize).result
@@ -531,14 +554,14 @@ class PyASTBridge(ast.NodeVisitor):
                 right = arith.SIToFPOp(self.getFloatType(), right).result
 
             self.pushValue(arith.DivFOp(left, right).result)
-            return 
+            return
         if isinstance(node.op, ast.Pow):
             if IntegerType.isinstance(left.type):
                 left = arith.SIToFPOp(self.getFloatType(), left).result
             if IntegerType.isinstance(right.type):
                 right = arith.SIToFPOp(self.getFloatType(), right).result
             self.pushValue(math.PowFOp(left, right).result)
-            return 
+            return
         else:
             raise RuntimeError(
                 "unhandled binary operator: {}".format(ast.unparse(node)))
@@ -554,6 +577,7 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 self.pushValue(self.symbolTable[node.id])
             return
+
 
 def compile_to_quake(astModule, **kwargs):
     verbose = 'verbose' in kwargs and kwargs['verbose']

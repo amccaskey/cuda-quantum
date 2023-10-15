@@ -113,5 +113,3 @@ def test_broadcast():
     for i, c in enumerate(allCounts):
         print(runtimeAngles[i, :], c)
         assert len(c) == 2
-    
-# TODO sample_async

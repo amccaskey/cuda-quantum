@@ -67,5 +67,14 @@ def test_kernel_composition():
 
     iqft()
 
+def test_qreg_iter():
+    @cudaq.kernel(jit=True, verbose=True)
+    def foo(N:int):
+        q = cudaq.qvector(N)
+        for r in q:
+            x(r)
 
-# TODO sample / observe async
+    foo(10)
+
+# TODO kernel composition, for q in qreg, control / adjoint kernels, if stmts, while loop,
+#  async, exp_pauli, common kernels
