@@ -43,7 +43,8 @@ class PyKernelDecorator(object):
 
         analyzer = MidCircuitMeasurementAnalyzer()
         analyzer.visit(self.astModule)
-        self.metadata = {'conditionalOnMeasure': analyzer.hasMidCircuitMeasures}
+        self.metadata = {
+            'conditionalOnMeasure': analyzer.hasMidCircuitMeasures}
 
         if not self.library_mode:
             # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop,

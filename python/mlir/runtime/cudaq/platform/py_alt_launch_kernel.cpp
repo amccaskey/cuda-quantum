@@ -105,11 +105,12 @@ void bindAltLaunchKernel(py::module &mod) {
 
   mod.def(
       "pyAltLaunchKernel",
-      [](const std::string &name, MlirModule module, py::args runtimeArgs) {
+      [](const std::string &kernelName, MlirModule module,
+         py::args runtimeArgs) {
         cudaq::OpaqueArguments args;
         cudaq::packArgs(args, runtimeArgs);
-        pyAltLaunchKernel(name, module, args);
+        pyAltLaunchKernel(kernelName, module, args);
       },
-      "");
+      py::arg("kernelName"), py::arg("module"), "DOC STRING");
 }
 } // namespace cudaq

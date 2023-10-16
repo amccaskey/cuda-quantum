@@ -48,9 +48,9 @@ def test_no_annotations():
                 x.ctrl(q[i], q[i+1])
     
 def test_kernel_composition():
+
     @cudaq.kernel(jit=True, verbose=True)
-    def iqft(): #qubits:cudaq.qview):
-        qubits = cudaq.qvector(3)
+    def iqft(qubits:cudaq.qview):
         N = qubits.size()
         for i in range(N//2):
             swap(qubits[i], qubits[N-i-1])
@@ -65,7 +65,13 @@ def test_kernel_composition():
 
     print(iqft)
 
-    iqft()
+    @cudaq.kernel(jit=True, verbose=True)
+    def entryPoint():
+        q = cudaq.qvector(3)
+        iqft(q)
+    
+    print(entryPoint)
+    entryPoint()
 
 def test_qreg_iter():
     @cudaq.kernel(jit=True, verbose=True)
@@ -76,5 +82,5 @@ def test_qreg_iter():
 
     foo(10)
 
-# TODO kernel composition, for q in qreg, control / adjoint kernels, if stmts, while loop,
+# TODO control / adjoint kernels, if stmts, while loop,
 #  async, exp_pauli, common kernels

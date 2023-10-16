@@ -16,6 +16,13 @@ from mlir_cudaq.dialects import builtin, func, arith, math
 
 nvqppPrefix = '__nvqpp__mlirgen__'
 
+# Keep a global registry of all kernel FuncOps
+# keyed on their name (without __nvqpp__mlirgen__ prefix)
+globalKernelRegistry = {}
+
+# Keep a global registry of all kernel Python ast modules
+# keyed on their name (without __nvqpp__mlirgen__ prefix)
+globalAstRegistry = {}
 
 class PyASTBridge(ast.NodeVisitor):
 
@@ -113,6 +120,8 @@ class PyASTBridge(ast.NodeVisitor):
             # Get the argument names
             argNames = [arg.arg for arg in node.args.args]
 
+            self.name = node.name 
+
             # the full function name in MLIR is __nvqpp__mlirgen__ + the function name
             fullName = nvqppPrefix + node.name
 
@@ -147,6 +156,9 @@ class PyASTBridge(ast.NodeVisitor):
                     fullName+'_entryPointRewrite', context=self.ctx)}, context=self.ctx)
                 self.module.operation.attributes.__setitem__(
                     'quake.mangled_name_map', attr)
+            
+            globalKernelRegistry[node.name] = f
+
 
     def visit_Assign(self, node):
         if self.verbose:
@@ -361,6 +373,17 @@ class PyASTBridge(ast.NodeVisitor):
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
                 opCtor([], [], controls, [qubitA, qubitB])
                 return
+        
+        # handle function call
+        if hasattr(node, 'func') and isinstance(node.func, ast.Name):
+            # FIXME differentiate here between CUDA Quantum kernel calls 
+            # and standard functions calls
+            otherFuncName = node.func.id
+            otherKernel = SymbolTable(self.module.operation)['__nvqpp__mlirgen__'+otherFuncName]
+            [self.visit(arg) for arg in node.args]
+            values = [self.popValue() for _ in node.args]
+            func.CallOp(otherKernel, values)
+
 
     def visit_Constant(self, node):
         if self.verbose:
@@ -578,14 +601,36 @@ class PyASTBridge(ast.NodeVisitor):
                 self.pushValue(self.symbolTable[node.id])
             return
 
+class FindDepKernelsVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.depKernels = {}
+        pass 
+    def visit_Call(self, node):
+        if hasattr(node, 'func') and isinstance(node.func, ast.Name) and node.func.id in globalAstRegistry:
+            print("adding dep kernel ", node.func.id)
+            self.depKernels[node.func.id] = globalAstRegistry[node.func.id]
 
 def compile_to_quake(astModule, **kwargs):
+    global globalAstRegistry
     verbose = 'verbose' in kwargs and kwargs['verbose']
+    
+    # First we need to find any dependent kernels, they have to be 
+    # built as part of this ModuleOp...
+    vis = FindDepKernelsVisitor()
+    vis.visit(astModule)
+    depKernels = vis.depKernels
+
     bridge = PyASTBridge(verbose=verbose)
+    # Add all dependent kernels to the MLIR Module
+    [bridge.visit(ast) for _, ast in depKernels.items()]
+    # Build the MLIR Module for this kernel
     bridge.visit(astModule)
+
     if verbose:
         print(bridge.module)
     pm = PassManager.parse("builtin.module(canonicalize,cse)",
                            context=bridge.ctx)
     pm.run(bridge.module)
+
+    globalAstRegistry[bridge.name] = astModule
     return bridge.module, bridge.argTypes
