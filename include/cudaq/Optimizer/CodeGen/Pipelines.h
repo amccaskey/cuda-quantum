@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Conversion/MathToFuncs/MathToFuncs.h"
 
 namespace cudaq::opt {
 
@@ -33,6 +34,7 @@ void addPipelineToQIR(mlir::PassManager &pm,
       cudaq::opt::createApplyControlNegations());
   cudaq::opt::addAggressiveEarlyInlining(pm);
   pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(cudaq::opt::createApplyOpSpecializationPass());
   pm.addPass(cudaq::opt::createExpandMeasurementsPass());
   pm.addNestedPass<mlir::func::FuncOp>(cudaq::opt::createClassicalMemToReg());
   pm.addPass(mlir::createCanonicalizerPass());
@@ -53,6 +55,7 @@ void addPipelineToQIR(mlir::PassManager &pm,
   if (convertTo.equals("qir-base"))
     pm.addNestedPass<mlir::func::FuncOp>(
         cudaq::opt::createDelayMeasurementsPass());
+  pm.addPass(mlir::createConvertMathToFuncs());
   pm.addPass(cudaq::opt::createConvertToQIRPass());
   if constexpr (QIRProfile) {
     cudaq::opt::addQIRProfilePipeline(pm, convertTo);

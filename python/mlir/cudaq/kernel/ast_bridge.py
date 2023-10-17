@@ -24,6 +24,7 @@ globalKernelRegistry = {}
 # keyed on their name (without __nvqpp__mlirgen__ prefix)
 globalAstRegistry = {}
 
+
 class PyASTBridge(ast.NodeVisitor):
 
     def __init__(self, **kwargs):
@@ -48,7 +49,7 @@ class PyASTBridge(ast.NodeVisitor):
     def isQuantumType(self, ty):
         return quake.RefType.isinstance(ty) or quake.VeqType.isinstance(ty)
 
-    def getIntegerType(self, width):
+    def getIntegerType(self, width=64):
         return IntegerType.get_signless(width)
 
     def getIntegerAttr(self, type, value):
@@ -120,7 +121,7 @@ class PyASTBridge(ast.NodeVisitor):
             # Get the argument names
             argNames = [arg.arg for arg in node.args.args]
 
-            self.name = node.name 
+            self.name = node.name
 
             # the full function name in MLIR is __nvqpp__mlirgen__ + the function name
             fullName = nvqppPrefix + node.name
@@ -156,9 +157,9 @@ class PyASTBridge(ast.NodeVisitor):
                     fullName+'_entryPointRewrite', context=self.ctx)}, context=self.ctx)
                 self.module.operation.attributes.__setitem__(
                     'quake.mangled_name_map', attr)
-            
-            globalKernelRegistry[node.name] = f
 
+            globalKernelRegistry[node.name] = f
+            self.symbolTable.clear()
 
     def visit_Assign(self, node):
         if self.verbose:
@@ -191,7 +192,7 @@ class PyASTBridge(ast.NodeVisitor):
 
     def visit_Call(self, node):
         if self.verbose:
-            print("[Visit Call]")
+            print("[Visit Call] {}".format(ast.unparse(node)))
 
         # do not walk the FunctionDef decorator_list args
         if isinstance(
@@ -251,7 +252,7 @@ class PyASTBridge(ast.NodeVisitor):
             # Create an array of i64 of the totalSize
             arrTy = cc.ArrayType.get(self.ctx, iTy)
             iterable = cc.AllocaOp(cc.PointerType.get(self.ctx, arrTy),
-                                   TypeAttr.get(arrTy), seqSize=totalSize).result
+                                   TypeAttr.get(iTy), seqSize=totalSize).result
 
             # Save this size for later
             # Fill the array based on start, end, and step
@@ -305,6 +306,9 @@ class PyASTBridge(ast.NodeVisitor):
                 # should have 1 value on the stack if
                 # this is a vanilla hadamard
                 qubit = self.popValue()
+                if not quake.RefType.isinstance(qubit.type):
+                    raise Exception('quantum operation on veq not supported yet.')
+
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
                 opCtor([], [], [], [qubit])
                 return
@@ -326,19 +330,82 @@ class PyASTBridge(ast.NodeVisitor):
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
                 opCtor([], [], [], [qubitA, qubitB])
                 return
+            
+            otherFuncName = node.func.id
+            if otherFuncName in globalKernelRegistry:
+                # If in globalKernelRegistry, it has to be in this Module
+                otherKernel = SymbolTable(self.module.operation)[
+                    '__nvqpp__mlirgen__'+otherFuncName]
+                values = [self.popValue() for _ in node.args]
+                func.CallOp(otherKernel, values)
+            else:
+                raise RuntimeError(
+                    "unhandled function call - {}".format(node.func.id))
 
         elif isinstance(node.func, ast.Attribute):
             self.generic_visit(node)
-            if node.func.value.id == 'cudaq' and node.func.attr == 'qvector':
-                size = self.popValue()
-                if hasattr(size, "literal_value"):
-                    ty = self.getVeqType(size.literal_value)
-                    qubits = quake.AllocaOp(ty)
-                else:
-                    ty = self.getVeqType()
-                    qubits = quake.AllocaOp(ty, size=size)
-                self.pushValue(qubits.results[0])
-                return
+            if node.func.value.id == 'cudaq':
+                if node.func.attr == 'qvector':
+                    # Handle cudaq.qvector(N)
+                    size = self.popValue()
+                    if hasattr(size, "literal_value"):
+                        ty = self.getVeqType(size.literal_value)
+                        qubits = quake.AllocaOp(ty)
+                    else:
+                        ty = self.getVeqType()
+                        qubits = quake.AllocaOp(ty, size=size)
+                    self.pushValue(qubits.results[0])
+                    return
+                elif node.func.attr == 'control':
+                    # Handle cudaq.control(kernel, ...)
+                    otherFuncName = node.args[0].id
+                    if otherFuncName not in globalKernelRegistry:
+                        raise RuntimeError(
+                            "{} is not a known quantum kernel (was it annotated?).".format(otherFuncName))
+                    values = [self.popValue()
+                              for _ in range(len(self.valueStack)-1)]
+                    if len(values) != len(globalKernelRegistry[otherFuncName].arguments):
+                        raise RuntimeError(
+                            "incorrect number of runtime arguments for cudaq.control({},..) call.".format(otherFuncName))
+                    controls = self.popValue()
+                    quake.ApplyOp([], [], [controls], values, callee=FlatSymbolRefAttr.get(
+                        nvqppPrefix+otherFuncName))
+                    return
+
+            if node.func.value.id in self.symbolTable:
+                # Method call on one of our variables
+                var = self.symbolTable[node.func.value.id]
+                if quake.VeqType.isinstance(var.type):
+                    # qreg or qview method call
+                    if node.func.attr == 'back':
+                        qrSize = quake.VeqSizeOp(
+                            self.getIntegerType(), var).result
+                        one = self.getConstantInt(1)
+                        endOff = arith.SubIOp(qrSize, one)
+                        if len(node.args):
+                            # extract the subveq
+                            startOff = arith.SubIOp(qrSize, self.popValue())
+                            self.pushValue(quake.SubVeqOp(
+                                self.getVeqType(), var, startOff, endOff).result)
+                        else:
+                            # extract the qubit...
+                            self.pushValue(quake.ExtractRefOp(
+                                self.getRefType(), var, -1, index=endOff).result)
+                        return
+                    if node.func.attr == 'front':
+                        if len(node.args):
+                            # extract the subveq
+                            qrSize = self.popValue()
+                            zero = self.getConstantInt(0)
+                            one = self.getConstantInt(1)
+                            offset = arith.SubIOp(qrSize, one)
+                            self.pushValue(quake.SubVeqOp(
+                                self.getVeqType(), var, zero, offset).result)
+                        else:
+                            # extract the qubit...
+                            self.pushValue(quake.ExtractRefOp(
+                                self.getRefType(), var, -1, index=zero).result)
+                        return
 
             # We have a func name . ctrl
             if node.func.value.id in ['h', 'x', 'y', 'z', 's', 't'] and node.func.attr == 'ctrl':
@@ -373,17 +440,20 @@ class PyASTBridge(ast.NodeVisitor):
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
                 opCtor([], [], controls, [qubitA, qubitB])
                 return
-        
-        # handle function call
-        if hasattr(node, 'func') and isinstance(node.func, ast.Name):
-            # FIXME differentiate here between CUDA Quantum kernel calls 
-            # and standard functions calls
-            otherFuncName = node.func.id
-            otherKernel = SymbolTable(self.module.operation)['__nvqpp__mlirgen__'+otherFuncName]
-            [self.visit(arg) for arg in node.args]
-            values = [self.popValue() for _ in node.args]
-            func.CallOp(otherKernel, values)
 
+    def visit_List(self, node):
+        if self.verbose:
+            print('[Visit List] {}', ast.unparse(node))
+        self.generic_visit(node)
+
+        valueTys = [quake.VeqType.isinstance(
+            v.type) or quake.RefType.isinstance(v.type) for v in self.valueStack]
+        if False not in valueTys:
+            # this is a list of quantum types,
+            # concat them into a veq
+            self.pushValue(quake.ConcatOp(self.getVeqType(), [
+                           self.popValue() for _ in valueTys]).result)
+            return
 
     def visit_Constant(self, node):
         if self.verbose:
@@ -410,7 +480,7 @@ class PyASTBridge(ast.NodeVisitor):
         if quake.VeqType.isinstance(var.type):
             qrefTy = self.getRefType()
             self.pushValue(
-                quake.ExtractRefOp(qrefTy, var, -1, index=idx))
+                quake.ExtractRefOp(qrefTy, var, -1, index=idx).result)
         else:
             raise RuntimeError(
                 "unhandled subscript: {}".format(ast.unparse(node)))
@@ -427,6 +497,8 @@ class PyASTBridge(ast.NodeVisitor):
         # an iterable sequence. We model this in visit_Call (range is a called function)
         # as a cc.array of integer elements. So we visit that node here
         self.visit(node.iter)
+        print("size = ", len(self.valueStack))
+        [print(v) for v in self.valueStack]
         assert len(self.valueStack) > 0 and len(self.valueStack) < 3
 
         totalSize = None
@@ -579,10 +651,22 @@ class PyASTBridge(ast.NodeVisitor):
             self.pushValue(arith.DivFOp(left, right).result)
             return
         if isinstance(node.op, ast.Pow):
+            if IntegerType.isinstance(left.type) and IntegerType.isinstance(right.type):
+                # math.ipowi does not lower to llvm
+                # workaround, use math to funcs conversion
+                self.pushValue(math.IPowIOp(left, right).result)
+                return 
+            
+            if F64Type.isinstance(left.type) and IntegerType.isinstance(right.type):
+                self.pushValue(math.FPowIOp(left,right).result)
+                return 
+
+            # now we know the types are different, default to float
             if IntegerType.isinstance(left.type):
                 left = arith.SIToFPOp(self.getFloatType(), left).result
             if IntegerType.isinstance(right.type):
                 right = arith.SIToFPOp(self.getFloatType(), right).result
+            
             self.pushValue(math.PowFOp(left, right).result)
             return
         else:
@@ -601,20 +685,27 @@ class PyASTBridge(ast.NodeVisitor):
                 self.pushValue(self.symbolTable[node.id])
             return
 
+
 class FindDepKernelsVisitor(ast.NodeVisitor):
     def __init__(self):
         self.depKernels = {}
-        pass 
+        pass
+
     def visit_Call(self, node):
-        if hasattr(node, 'func') and isinstance(node.func, ast.Name) and node.func.id in globalAstRegistry:
-            print("adding dep kernel ", node.func.id)
-            self.depKernels[node.func.id] = globalAstRegistry[node.func.id]
+        if hasattr(node, 'func'):
+            if isinstance(node.func, ast.Name) and node.func.id in globalAstRegistry:
+                print("adding dep kernel ", node.func.id)
+                self.depKernels[node.func.id] = globalAstRegistry[node.func.id]
+            elif isinstance(node.func, ast.Attribute):
+                if node.func.value.id == 'cudaq' and node.func.attr == 'control':
+                    self.depKernels[node.args[0].id] = globalAstRegistry[node.args[0].id]
+
 
 def compile_to_quake(astModule, **kwargs):
     global globalAstRegistry
     verbose = 'verbose' in kwargs and kwargs['verbose']
-    
-    # First we need to find any dependent kernels, they have to be 
+
+    # First we need to find any dependent kernels, they have to be
     # built as part of this ModuleOp...
     vis = FindDepKernelsVisitor()
     vis.visit(astModule)

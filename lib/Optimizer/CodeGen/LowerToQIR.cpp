@@ -1472,6 +1472,20 @@ public:
   }
 };
 
+/// In case we still have a RelaxSizeOp, we can just remove it,
+/// since QIR works on Array * for all sized veqs.
+class RemoveRelaxSizeRewrite : public OpConversionPattern<quake::RelaxSizeOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(quake::RelaxSizeOp relax, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(relax, relax.getInputVec());
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Code generation: converts the Quake IR to QIR.
 //===----------------------------------------------------------------------===//
@@ -1502,7 +1516,7 @@ public:
     cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
     populateFuncToLLVMConversionPatterns(typeConverter, patterns);
 
-    patterns.insert<GetVeqSizeOpRewrite, MxToMz, MyToMz, ReturnBitRewrite>(
+    patterns.insert<GetVeqSizeOpRewrite, RemoveRelaxSizeRewrite, MxToMz, MyToMz, ReturnBitRewrite>(
         context);
     patterns.insert<
         AllocaOpRewrite, AllocaOpPattern, CallableClosureOpPattern,
