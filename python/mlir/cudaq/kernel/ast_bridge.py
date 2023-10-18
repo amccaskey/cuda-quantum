@@ -387,13 +387,24 @@ class PyASTBridge(ast.NodeVisitor):
                         'quantum operation on incorrect type {}.'.format(qubit.type))
 
             if node.func.id in ["rx", "ry", "rz", "r1"]:
-                # should have 1 value on the stack if
-                # this is a vanilla hadamard
-                qubit = self.popValue()
+                target = self.popValue()
                 param = self.popValue()
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
-                opCtor([], [param], [], [qubit])
-                return
+                if quake.VeqType.isinstance(target.type):
+                    def bodyBuilder(iterVal):
+                        q = quake.ExtractRefOp(
+                            self.getRefType(), target, -1, index=iterVal).result
+                        opCtor([], [param], [], [q])
+                    veqSize = quake.VeqSizeOp(
+                        self.getIntegerType(), target).result
+                    self.createInvariantForLoop(veqSize, bodyBuilder)
+                    return
+                elif quake.RefType.isinstance(target.type):
+                    opCtor([], [param], [], [target])
+                    return
+                else:
+                    raise Exception(
+                        'adj quantum operation on incorrect type {}.'.format(target.type))
 
             if node.func.id == 'swap':
                 # should have 1 value on the stack if
@@ -427,6 +438,24 @@ class PyASTBridge(ast.NodeVisitor):
                         ty = self.getVeqType()
                         qubits = quake.AllocaOp(ty, size=size)
                     self.pushValue(qubits.results[0])
+                    return
+                elif node.func.attr == "qubit":
+                    self.pushValue(quake.AllocaOp(self.getRefType()).result)
+                    return
+                elif node.func.attr == 'adjoint':
+                    # Handle cudaq.adjoint(kernel, ...)
+                    otherFuncName = node.args[0].id
+                    if otherFuncName not in globalKernelRegistry:
+                        raise RuntimeError(
+                            "{} is not a known quantum kernel (was it annotated?).".format(otherFuncName))
+                    values = [self.popValue()
+                              for _ in range(len(self.valueStack))]
+                    if len(values) != len(globalKernelRegistry[otherFuncName].arguments):
+                        raise RuntimeError(
+                            "incorrect number of runtime arguments for cudaq.control({},..) call.".format(otherFuncName))
+                    # controls = self.popValue()
+                    quake.ApplyOp([], [], [], values, callee=FlatSymbolRefAttr.get(
+                        nvqppPrefix+otherFuncName), is_adj=True)
                     return
                 elif node.func.attr == 'control':
                     # Handle cudaq.control(kernel, ...)
@@ -500,18 +529,46 @@ class PyASTBridge(ast.NodeVisitor):
                                  '{}Op'.format(node.func.value.id.title()))
                 opCtor([], [param], controls[:-1], [target])
                 return
-
-            if node.func.value.id == 'swap':
-                # should have 1 value on the stack if
-                # this is a vanilla hadamard
-                qubitB = self.popValue()
-                qubitA = self.popValue()
-                controls = [
-                    self.popValue() for i in range(len(self.valueStack))
-                ]
-                opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
-                opCtor([], [], controls, [qubitA, qubitB])
-                return
+            
+            # We have a func name . adj
+            if node.func.value.id in ['h', 'x', 'y', 'z', 's', 't'] and node.func.attr == 'adj':
+                target = self.popValue()
+                opCtor = getattr(quake, '{}Op'.format(node.func.value.id.title()))
+                if quake.VeqType.isinstance(target.type):
+                    def bodyBuilder(iterVal):
+                        q = quake.ExtractRefOp(
+                            self.getRefType(), target, -1, index=iterVal).result
+                        opCtor([], [], [], [q], is_adj=True)
+                    veqSize = quake.VeqSizeOp(
+                        self.getIntegerType(), target).result
+                    self.createInvariantForLoop(veqSize, bodyBuilder)
+                    return
+                elif quake.RefType.isinstance(target.type):
+                    opCtor([], [], [], [target], is_adj=True)
+                    return
+                else:
+                    raise Exception(
+                        'adj quantum operation on incorrect type {}.'.format(target.type))
+                
+            if node.func.value.id in ['rx', 'ry', 'rz', 'r1'] and node.func.attr == 'adj':
+                target = self.popValue()
+                param = self.popValue()
+                opCtor = getattr(quake, '{}Op'.format(node.func.value.id.title()))
+                if quake.VeqType.isinstance(target.type):
+                    def bodyBuilder(iterVal):
+                        q = quake.ExtractRefOp(
+                            self.getRefType(), target, -1, index=iterVal).result
+                        opCtor([], [param], [], [q], is_adj=True)
+                    veqSize = quake.VeqSizeOp(
+                        self.getIntegerType(), target).result
+                    self.createInvariantForLoop(veqSize, bodyBuilder)
+                    return
+                elif quake.RefType.isinstance(target.type):
+                    opCtor([], [param], [], [target], is_adj=True)
+                    return
+                else:
+                    raise Exception(
+                        'adj quantum operation on incorrect type {}.'.format(target.type))
 
     def visit_List(self, node):
         if self.verbose:
@@ -703,7 +760,7 @@ class PyASTBridge(ast.NodeVisitor):
             return
         if isinstance(node.op, ast.Pow):
             if IntegerType.isinstance(left.type) and IntegerType.isinstance(right.type):
-                # math.ipowi does not lower to llvm
+                # math.ipowi does not lower to llvm as is
                 # workaround, use math to funcs conversion
                 self.pushValue(math.IPowIOp(left, right).result)
                 return

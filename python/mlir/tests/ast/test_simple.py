@@ -158,5 +158,59 @@ def test_enumerate():
 
     simple2(3)
 
-# TODO adjoint kernels, if stmts, while loop,
+
+def test_adjoint():
+    """Test that adjoint can be called on kernels and operations."""
+    @cudaq.kernel(jit=True, verbose=True)
+    def single_adjoint_test():
+        q = cudaq.qubit()
+        t(q)
+        t.adj(q)
+
+    counts = cudaq.sample(single_adjoint_test)
+    assert '0' in counts
+    assert len(counts) == 1
+
+    @cudaq.kernel(jit=True, verbose=True)
+    def qvector_adjoint_test():
+        q = cudaq.qvector(2)
+        t(q)
+        t.adj(q)
+
+    counts = cudaq.sample(qvector_adjoint_test)
+    assert '00' in counts
+    assert len(counts) == 1
+
+    @cudaq.kernel(jit=True, verbose=True)
+    def rotation_adjoint_test():
+        q = cudaq.qubit()
+        rx(1.1, q)
+        rx.adj(1.1, q)
+
+        ry(1.1, q)
+        ry.adj(1.1, q)
+
+    counts = cudaq.sample(rotation_adjoint_test)
+    assert '0' in counts
+    assert len(counts) == 1
+
+    @cudaq.kernel(jit=True, verbose=True)
+    def test_kernel_adjoint(q:cudaq.qview):
+        h(q[0])
+        t(q[1])
+        s(q[2])
+
+    @cudaq.kernel(jit=True, verbose=True)
+    def test_caller():
+        q = cudaq.qvector(3)
+        x(q[0])
+        x(q[2])
+        test_kernel_adjoint(q)
+        cudaq.adjoint(test_kernel_adjoint, q)
+
+    counts = cudaq.sample(test_caller)
+    assert len(counts) == 1
+    assert '101' in counts
+
+# TODO if stmts, while loop,
 #  async, exp_pauli, common kernels, kernel function parameter
