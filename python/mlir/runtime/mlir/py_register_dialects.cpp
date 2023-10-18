@@ -136,6 +136,30 @@ void registerCCDialectAndTypes(py::module &m) {
           py::arg("size") = std::numeric_limits<std::int64_t>::min());
 
   mlir_type_subclass(
+      ccMod, "StructType",
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::StructType>(); })
+      .def_classmethod(
+          "get",
+          [](py::object cls, MlirContext ctx, py::list aggregateTypes) {
+            SmallVector<Type> inTys;
+            for (auto &t : aggregateTypes)
+              inTys.push_back(unwrap(t.cast<MlirType>()));
+
+            return wrap(cudaq::cc::StructType::get(unwrap(ctx), inTys));
+          })
+      .def_classmethod("getTypes", [](py::object cls, MlirType structTy) {
+        auto ty = dyn_cast<cudaq::cc::StructType>(unwrap(structTy));
+        if (!ty)
+          throw std::runtime_error(
+              "invalid type passed to StructType.getTypes(), must be a "
+              "cc.struct");
+        std::vector<MlirType> ret;
+        for (auto &t : ty.getMembers())
+          ret.push_back(wrap(t));
+        return ret;
+      });
+
+  mlir_type_subclass(
       ccMod, "StdvecType",
       [](MlirType type) { return unwrap(type).isa<cudaq::cc::StdvecType>(); })
       .def_classmethod(

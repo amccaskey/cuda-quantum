@@ -65,9 +65,6 @@ def test_kernel_composition():
 
     print(iqft)
 
-    def testme():
-        i = 1 
-
     @cudaq.kernel(jit=True, verbose=True)
     def entryPoint():
         q = cudaq.qvector(3)
@@ -113,7 +110,7 @@ def test_simple_sampling_qpe():
         for i in range(N-1):
             h(qubits[i])
             j = i + 1
-            for y in range(i, -1, -1):
+            for k, y in enumerate(range(i, -1, -1)):
                 r1.ctrl(-np.pi / 2**(j-y), qubits[j], qubits[y])
 
         h(qubits[N-1])
@@ -132,9 +129,7 @@ def test_simple_sampling_qpe():
         countingQubits = q.front(nC)
         stateRegister = q.back()
         xGate(stateRegister)
-        # Fixme add quantum op broadcast
-        for i in range(nC):
-            h(countingQubits[i])
+        h(countingQubits)
         for i in range(nC):
             for j in range(2**i):
                 cudaq.control(tGate, [countingQubits[i]], stateRegister)
@@ -144,5 +139,24 @@ def test_simple_sampling_qpe():
     print(qpe)
     qpe(3,1)
 
+def test_enumerate():
+    @cudaq.kernel(jit=True, verbose=True)
+    def simple(numQubits:int):
+        qubits = cudaq.qvector(numQubits)
+        h(qubits.front())
+        for i, qubit in enumerate(qubits.front(numQubits-1)):
+            x.ctrl(qubit, qubits[i+1])
+    
+    cudaq.sample(simple,5).dump()
+
+    @cudaq.kernel(jit=True, verbose=True)
+    def simple2(numQubits:int):
+        qubits = cudaq.qvector(numQubits)
+        h(qubits.front())
+        for i, qubitIdx in enumerate(range(numQubits-1)):
+            x.ctrl(qubits[i], qubits[qubitIdx+1])
+
+    simple2(3)
+
 # TODO adjoint kernels, if stmts, while loop,
-#  async, exp_pauli, common kernels
+#  async, exp_pauli, common kernels, kernel function parameter
