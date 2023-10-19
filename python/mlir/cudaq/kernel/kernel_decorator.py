@@ -20,44 +20,41 @@ from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 class PyKernelDecorator(object):
 
-    def __init__(self, function, verbose=False, library_mode=True, jit=False):
+    def __init__(self, function, verbose=False, library_mode=True, jit=False, module=None, kernelName=None):
         self.kernelFunction = function
-        self.module = None
+        self.module = None if module == None else module
         self.executionEngine = None
         self.verbose = verbose
-        self.name = self.kernelFunction.__name__
+        self.name = kernelName if kernelName != None else self.kernelFunction.__name__ 
 
         # Library Mode
         self.library_mode = library_mode
         if jit == True:
             self.library_mode = False
 
-        src = inspect.getsource(function)
-        leadingSpaces = len(src) - len(src.lstrip())
-        self.funcSrc = '\n'.join(
-            [line[leadingSpaces:] for line in src.split('\n')])
-        self.astModule = ast.parse(self.funcSrc)
-        if verbose and importlib.util.find_spec('astpretty') is not None:
-            import astpretty
-            astpretty.pprint(self.astModule.body[0])
+        if self.kernelFunction is not None:
+            src = inspect.getsource(kernelFunction)
+            leadingSpaces = len(src) - len(src.lstrip())
+            self.funcSrc = '\n'.join(
+                [line[leadingSpaces:] for line in src.split('\n')])
+            self.astModule = ast.parse(self.funcSrc)
+            if verbose and importlib.util.find_spec('astpretty') is not None:
+                import astpretty
+                astpretty.pprint(self.astModule.body[0])
 
-        analyzer = MidCircuitMeasurementAnalyzer()
-        analyzer.visit(self.astModule)
-        self.metadata = {
-            'conditionalOnMeasure': analyzer.hasMidCircuitMeasures}
-
-        if not self.library_mode:
-            # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop,
-            # range-based for loop to for loop, etc.)
-            #
-            # FIXME Update to return required FuncOps (other kernels) not present
-            # in this module
-            self.module, self.argTypes = compile_to_quake(
-                self.astModule, verbose=self.verbose)
-            # Add the other FuncOps to this module (FIXME need global dict of PyKernelDecorators)
-        else:
             # Need to build up the arg types here
-            self.signature = inspect.getfullargspec(function).annotations
+            self.signature = inspect.getfullargspec(kernelFunction).annotations
+
+            # Run analyzers and attach metadata (only have 1 right now)
+            analyzer = MidCircuitMeasurementAnalyzer()
+            analyzer.visit(self.astModule)
+            self.metadata = {
+                'conditionalOnMeasure': analyzer.hasMidCircuitMeasures}
+
+            if not self.library_mode:
+                # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop)
+                self.module, self.argTypes = compile_to_quake(
+                    self.astModule, verbose=self.verbose)
 
             return
 

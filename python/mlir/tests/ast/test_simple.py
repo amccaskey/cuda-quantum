@@ -212,5 +212,20 @@ def test_adjoint():
     assert len(counts) == 1
     assert '101' in counts
 
+def test_synth_and_qir():
+    @cudaq.kernel(jit=True, verbose=True)
+    def ghz(numQubits:int):
+        qubits = cudaq.qvector(numQubits)
+        h(qubits.front())
+        for i, qubitIdx in enumerate(range(numQubits-1)):
+            x.ctrl(qubits[i], qubits[qubitIdx+1])
+
+
+    print(ghz)
+    ghz_synth = cudaq.synthesize(ghz, 5)
+    print(ghz_synth)
+    print(cudaq.to_qir(ghz_synth))
+    print(cudaq.to_qir(ghz_synth, profile='base'))
+
 # TODO if stmts, while loop,
 #  async, exp_pauli, common kernels, kernel function parameter
