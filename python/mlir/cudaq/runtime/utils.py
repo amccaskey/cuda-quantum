@@ -33,13 +33,12 @@ def __isBroadcast(kernel, *args):
                 return True
 
         return False
-    elif isinstance(kernel, PyKernelDecorator) and kernel.library_mode == True:
-        # kernel.signature == {'name':type, ...}
+    
+    elif isinstance(kernel, PyKernelDecorator): 
         argTypes = kernel.signature 
         if len(argTypes) == 0 or len(args) == 0: return False 
         firstArg = args[0]
         firstArgType = next(iter(argTypes))
-        print(argTypes, firstArgType)
         firstArgTypeIsStdvec = argTypes[firstArgType] == list or argTypes[firstArgType] == np.ndarray 
         if isinstance(firstArg, list) and not firstArgTypeIsStdvec:
             return True

@@ -82,7 +82,7 @@ class PyASTBridge(ast.NodeVisitor):
         if self.verbose:
             print('{}pop {}'.format(self.increment * ' ', val))
         return val
-    
+
     def mlirTypeFromAnnotation(self, annotation):
         if annotation == None:
             raise RuntimeError(
@@ -96,15 +96,19 @@ class PyASTBridge(ast.NodeVisitor):
 
         if isinstance(annotation, ast.Subscript) and annotation.value.id == 'Callable':
             if not hasattr(annotation, 'slice'):
-                raise RuntimeError('Callable type must have signature specified.')
-            
-            argTypes = [self.mlirTypeFromAnnotation(a) for a in annotation.slice.elts[0].elts]
+                raise RuntimeError(
+                    'Callable type must have signature specified.')
+
+            argTypes = [self.mlirTypeFromAnnotation(
+                a) for a in annotation.slice.elts[0].elts]
             return cc.CallableType.get(self.ctx, argTypes)
 
         if annotation.id == 'int':
             return self.getIntegerType(64)
         elif annotation.id == 'float':
             return F64Type.get()
+        elif annotation.id == 'list':
+            return cc.StdvecType.get(self.ctx, F64Type.get())
         else:
             raise RuntimeError(
                 '{} is not a supported type yet.'.format(annotation.id))
@@ -204,10 +208,23 @@ class PyASTBridge(ast.NodeVisitor):
             print('[Visit Assign {}]'.format(ast.unparse(node)))
         self.generic_visit(node)
 
-        rhsVal = self.popValue()
-        if self.isQuantumType(rhsVal.type):
-            self.symbolTable[node.targets[0].id] = rhsVal
-            return
+        print("TESTING HERE ", len(self.valueStack))
+        if isinstance(node.targets[0], ast.Tuple):
+            assert len(self.valueStack) == len(node.targets[0].elts)
+            values = [self.popValue() for _ in range(len(node.targets[0].elts))]
+            values.reverse()
+            for i, name in enumerate(node.targets[0].elts):
+                if self.isQuantumType(values[i].type):
+                    self.symbolTable[name.id] = values[i]
+                    print(name.id, values[i])
+                else:
+                    raise RuntimeError("handle tuple assignment for non-qubits")
+            return 
+        else:
+            rhsVal = self.popValue()
+            if self.isQuantumType(rhsVal.type):
+                self.symbolTable[node.targets[0].id] = rhsVal
+                return
 
         # We should allocate and store
         alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, rhsVal.type),
@@ -325,7 +342,9 @@ class PyASTBridge(ast.NodeVisitor):
                         iterEleTy = self.getRefType()
                         totalSize = quake.VeqSizeOp(
                             self.getIntegerType(), iterable).result
-                        extractFunctor = lambda idxVal : quake.ExtractRefOp(iterEleTy, iterable, -1, index=idxVal).result
+
+                        def extractFunctor(idxVal): return quake.ExtractRefOp(
+                            iterEleTy, iterable, -1, index=idxVal).result
                     else:
                         raise RuntimeError(
                             "could not infer enumerate tuple type. {}".format(iterable.type))
@@ -336,9 +355,10 @@ class PyASTBridge(ast.NodeVisitor):
                     iterable = self.popValue()
                     arrTy = cc.PointerType.getElementType(iterable.type)
                     iterEleTy = cc.ArrayType.getElementType(arrTy)
+
                     def localFunc(idxVal):
                         eleAddr = cc.ComputePtrOp(cc.PointerType.get(self.ctx, iterEleTy), iterable, [
-                                          idxVal], DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
+                            idxVal], DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
                         return cc.LoadOp(eleAddr).result
                     extractFunctor = localFunc
 
@@ -349,7 +369,7 @@ class PyASTBridge(ast.NodeVisitor):
                 arrTy = cc.ArrayType.get(self.ctx, structTy)
                 enumIterable = cc.AllocaOp(cc.PointerType.get(self.ctx, arrTy),
                                            TypeAttr.get(structTy), seqSize=totalSize).result
-                
+
                 # Now we need to loop through enumIterable and set the elements
                 def bodyBuilder(iterVar):
                     # Create the struct
@@ -374,25 +394,29 @@ class PyASTBridge(ast.NodeVisitor):
                 return
 
             if node.func.id in ["h", "x", "y", "z", "s", "t"]:
-                # should have 1 value on the stack if
-                # this is a vanilla hadamard
-                qubit = self.popValue()
+                # Here we enable application of the op on all the 
+                # provided arguments, e.g. x(qubit), x(qvector), x(q, r), etc.
+                numValues = len(self.valueStack)
+                qubitTargets = [self.popValue() for _ in range(numValues)]
+                qubitTargets.reverse()
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
-                if quake.VeqType.isinstance(qubit.type):
-                    def bodyBuilder(iterVal):
-                        q = quake.ExtractRefOp(
-                            self.getRefType(), qubit, -1, index=iterVal).result
-                        opCtor([], [], [], [q])
-                    veqSize = quake.VeqSizeOp(
-                        self.getIntegerType(), qubit).result
-                    self.createInvariantForLoop(veqSize, bodyBuilder)
-                    return
-                elif quake.RefType.isinstance(qubit.type):
-                    opCtor([], [], [], [qubit])
-                    return
-                else:
-                    raise Exception(
-                        'quantum operation on incorrect type {}.'.format(qubit.type))
+                for qubit in qubitTargets:
+                    if quake.VeqType.isinstance(qubit.type):
+                        def bodyBuilder(iterVal):
+                            q = quake.ExtractRefOp(
+                                self.getRefType(), qubit, -1, index=iterVal).result
+                            opCtor([], [], [], [q])
+                        veqSize = quake.VeqSizeOp(
+                            self.getIntegerType(), qubit).result
+                        self.createInvariantForLoop(veqSize, bodyBuilder)
+                        # return
+                    elif quake.RefType.isinstance(qubit.type):
+                        opCtor([], [], [], [qubit])
+                        # return
+                    else:
+                        raise Exception(
+                            'quantum operation on incorrect type {}.'.format(qubit.type))
+                return 
 
             if node.func.id in ["rx", "ry", "rz", "r1"]:
                 target = self.popValue()
@@ -414,6 +438,15 @@ class PyASTBridge(ast.NodeVisitor):
                     raise Exception(
                         'adj quantum operation on incorrect type {}.'.format(target.type))
 
+            if node.func.id in ['mx', 'my', 'mz']:
+                qubit = self.popValue()
+                # FIXME Handle registerName
+                opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
+                i1Ty = self.getIntegerType(1)
+                resTy = i1Ty if quake.RefType.isinstance(qubit.type) else cc.StdvecType.get(self.ctx, i1Ty)
+                self.pushValue(opCtor(resTy, [], [qubit]).result)
+                return
+
             if node.func.id == 'swap':
                 # should have 1 value on the stack if
                 # this is a vanilla hadamard
@@ -425,7 +458,8 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.id in globalKernelRegistry:
                 # If in globalKernelRegistry, it has to be in this Module
-                otherKernel = SymbolTable(self.module.operation)['__nvqpp__mlirgen__'+node.func.id]
+                otherKernel = SymbolTable(self.module.operation)[
+                    '__nvqpp__mlirgen__'+node.func.id]
                 values = [self.popValue() for _ in node.args]
                 op = func.CallOp(otherKernel, values)
 
@@ -436,10 +470,10 @@ class PyASTBridge(ast.NodeVisitor):
                     numVals = len(self.valueStack)
                     values = [self.popValue() for _ in range(numVals)]
                     # FIXME check value types match callable type signature
-                    callable = cc.CallableFuncOp(cc.CallableType.getFunctionType(val.type), val).result
+                    callable = cc.CallableFuncOp(
+                        cc.CallableType.getFunctionType(val.type), val).result
                     func.CallIndirectOp([], callable, values)
-                    return 
-
+                    return
 
             else:
                 raise RuntimeError(
@@ -465,6 +499,13 @@ class PyASTBridge(ast.NodeVisitor):
                 elif node.func.attr == 'adjoint':
                     # Handle cudaq.adjoint(kernel, ...)
                     otherFuncName = node.args[0].id
+                    if otherFuncName in self.symbolTable:
+                        # This is a callable argument 
+                        values = [self.popValue()
+                              for _ in range(len(self.valueStack)-2)]
+                        a = quake.ApplyOp([], [self.popValue()], [], values)
+                        return
+                    
                     if otherFuncName not in globalKernelRegistry:
                         raise RuntimeError(
                             "{} is not a known quantum kernel (was it annotated?).".format(otherFuncName))
@@ -477,14 +518,24 @@ class PyASTBridge(ast.NodeVisitor):
                     quake.ApplyOp([], [], [], values, callee=FlatSymbolRefAttr.get(
                         nvqppPrefix+otherFuncName), is_adj=True)
                     return
+                
                 elif node.func.attr == 'control':
                     # Handle cudaq.control(kernel, ...)
                     otherFuncName = node.args[0].id
+                    if otherFuncName in self.symbolTable:
+                        # This is a callable argument 
+                        values = [self.popValue()
+                              for _ in range(len(self.valueStack)-2)]
+                        controls = self.popValue()
+                        a = quake.ApplyOp([], [self.popValue()], [controls], values)
+                        return
+
                     if otherFuncName not in globalKernelRegistry:
                         raise RuntimeError(
                             "{} is not a known quantum kernel (was it annotated?).".format(otherFuncName))
                     values = [self.popValue()
                               for _ in range(len(self.valueStack)-1)]
+                    values.reverse()
                     if len(values) != len(globalKernelRegistry[otherFuncName].arguments):
                         raise RuntimeError(
                             "incorrect number of runtime arguments for cudaq.control({},..) call.".format(otherFuncName))
@@ -538,6 +589,18 @@ class PyASTBridge(ast.NodeVisitor):
                                  '{}Op'.format(node.func.value.id.title()))
                 opCtor([], [], controls, [target])
                 return
+            
+            # We have a func name . ctrl
+            if node.func.value.id == 'swap' and node.func.attr == 'ctrl':
+                targetB = self.popValue()
+                targetA = self.popValue()
+                controls = [
+                    self.popValue() for i in range(len(self.valueStack))
+                ]
+                opCtor = getattr(quake,
+                                 '{}Op'.format(node.func.value.id.title()))
+                opCtor([], [], controls, [targetA, targetB])
+                return
 
             if node.func.value.id in ['rx', 'ry', 'rz', 'r1'] and node.func.attr == 'ctrl':
                 target = self.popValue()
@@ -549,11 +612,12 @@ class PyASTBridge(ast.NodeVisitor):
                                  '{}Op'.format(node.func.value.id.title()))
                 opCtor([], [param], controls[:-1], [target])
                 return
-            
+
             # We have a func name . adj
             if node.func.value.id in ['h', 'x', 'y', 'z', 's', 't'] and node.func.attr == 'adj':
                 target = self.popValue()
-                opCtor = getattr(quake, '{}Op'.format(node.func.value.id.title()))
+                opCtor = getattr(quake, '{}Op'.format(
+                    node.func.value.id.title()))
                 if quake.VeqType.isinstance(target.type):
                     def bodyBuilder(iterVal):
                         q = quake.ExtractRefOp(
@@ -569,11 +633,12 @@ class PyASTBridge(ast.NodeVisitor):
                 else:
                     raise Exception(
                         'adj quantum operation on incorrect type {}.'.format(target.type))
-                
+
             if node.func.value.id in ['rx', 'ry', 'rz', 'r1'] and node.func.attr == 'adj':
                 target = self.popValue()
                 param = self.popValue()
-                opCtor = getattr(quake, '{}Op'.format(node.func.value.id.title()))
+                opCtor = getattr(quake, '{}Op'.format(
+                    node.func.value.id.title()))
                 if quake.VeqType.isinstance(target.type):
                     def bodyBuilder(iterVal):
                         q = quake.ExtractRefOp(
@@ -600,8 +665,12 @@ class PyASTBridge(ast.NodeVisitor):
         if False not in valueTys:
             # this is a list of quantum types,
             # concat them into a veq
-            self.pushValue(quake.ConcatOp(self.getVeqType(), [
-                           self.popValue() for _ in valueTys]).result)
+            if len(self.valueStack) == 1:
+                self.pushValue(self.popValue())
+            else: 
+                # FIXME, may need to reverse the list here, order matters
+                self.pushValue(quake.ConcatOp(self.getVeqType(), [
+                               self.popValue() for _ in valueTys]).result)
             return
 
     def visit_Constant(self, node):
@@ -630,6 +699,15 @@ class PyASTBridge(ast.NodeVisitor):
             qrefTy = self.getRefType()
             self.pushValue(
                 quake.ExtractRefOp(qrefTy, var, -1, index=idx).result)
+        elif cc.StdvecType.isinstance(var.type):
+            eleTy = F64Type.get()
+            elePtrTy = cc.PointerType.get(self.ctx,eleTy)
+            vecPtr = cc.StdvecDataOp(elePtrTy, var).result
+            eleAddr = cc.ComputePtrOp(
+                    elePtrTy, vecPtr, [idx],
+                    DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
+            self.pushValue(cc.LoadOp(eleAddr).result)
+            return 
         else:
             raise RuntimeError(
                 "unhandled subscript: {}".format(ast.unparse(node)))
@@ -702,10 +780,10 @@ class PyASTBridge(ast.NodeVisitor):
         if isinstance(node.target, ast.Name):
             varNames.append(node.target.id)
         else:
-            # has to be a ast.Tuple 
+            # has to be a ast.Tuple
             for elt in node.target.elts:
                 varNames.append(elt.id)
-        
+
         # We'll need a zero and one value of integer type
         iTy = self.getIntegerType(64)
         zero = arith.ConstantOp(iTy, IntegerAttr.get(iTy, 0))
@@ -797,14 +875,22 @@ class PyASTBridge(ast.NodeVisitor):
 
             self.pushValue(math.PowFOp(left, right).result)
             return
+        if isinstance(node.op, ast.Mult):
+            if F64Type.isinstance(left.type):
+                if not F64Type.isinstance(right.type):
+                    right = arith.SIToFPOp(self.getFloatType(), right).result
+
+            # FIXME more type checks
+            self.pushValue(arith.MulFOp(left, right).result)
+            return
         else:
             raise RuntimeError(
-                "unhandled binary operator: {}".format(ast.unparse(node)))
+                "unhandled binary operator: {}, {}".format(ast.unparse(node), node.op))
 
     def visit_Name(self, node):
         if self.verbose:
             print("[Visit Name {}]".format(node.id))
-        
+
         if node.id in self.symbolTable:
             value = self.symbolTable[node.id]
             if cc.PointerType.isinstance(value.type):
@@ -818,7 +904,7 @@ class PyASTBridge(ast.NodeVisitor):
 class FindDepKernelsVisitor(ast.NodeVisitor):
     def __init__(self):
         self.depKernels = {}
-        
+
     def visit_FunctionDef(self, node):
         for arg in node.args.args:
             annotation = arg.annotation
@@ -827,12 +913,13 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
                     'cudaq.kernel functions must have argument type annotations.')
             if isinstance(annotation, ast.Subscript) and annotation.value.id == 'Callable':
                 if not hasattr(annotation, 'slice'):
-                    raise RuntimeError('Callable type must have signature specified.')
-                
+                    raise RuntimeError(
+                        'Callable type must have signature specified.')
+
                 # This is callable, let's add all in scope kernels
-                # FIXME only add those with the same signature 
-                self.depKernels = {k:v for k,v in globalAstRegistry.items()}
-        
+                # FIXME only add those with the same signature
+                self.depKernels = {k: v for k, v in globalAstRegistry.items()}
+
         self.generic_visit(node)
 
     def visit_Call(self, node):
@@ -840,14 +927,14 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
             if isinstance(node.func, ast.Name) and node.func.id in globalAstRegistry:
                 self.depKernels[node.func.id] = globalAstRegistry[node.func.id]
             elif isinstance(node.func, ast.Attribute):
-                if node.func.value.id == 'cudaq' and node.func.attr == 'control':
+                if node.func.value.id == 'cudaq' and node.func.attr == 'control' and node.args[0].id in globalAstRegistry:
                     self.depKernels[node.args[0].id] = globalAstRegistry[node.args[0].id]
 
 
 def compile_to_quake(astModule, **kwargs):
     global globalAstRegistry
     verbose = 'verbose' in kwargs and kwargs['verbose']
-     
+
     # Create the AST Bridge
     bridge = PyASTBridge(verbose=verbose)
 
@@ -857,8 +944,6 @@ def compile_to_quake(astModule, **kwargs):
     vis.visit(astModule)
     depKernels = vis.depKernels
 
-    print('Depkernels ', [k for k, _ in depKernels.items()])
-    [print(globalKernelRegistry[kk]) for kk, k in depKernels.items()]
     # Add all dependent kernels to the MLIR Module
     [bridge.visit(ast) for _, ast in depKernels.items()]
 
@@ -867,11 +952,11 @@ def compile_to_quake(astModule, **kwargs):
 
     if verbose:
         print(bridge.module)
-    
+
     pm = PassManager.parse("builtin.module(canonicalize,cse)",
                            context=bridge.ctx)
     pm.run(bridge.module)
 
     globalAstRegistry[bridge.name] = astModule
-    
+
     return bridge.module, bridge.argTypes
