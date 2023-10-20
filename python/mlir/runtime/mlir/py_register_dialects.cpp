@@ -160,6 +160,24 @@ void registerCCDialectAndTypes(py::module &m) {
       });
 
   mlir_type_subclass(
+      ccMod, "CallableType",
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::CallableType>(); })
+      .def_classmethod("get",
+                       [](py::object cls, MlirContext ctx, py::list inTypes) {
+                         SmallVector<Type> inTys;
+                         for (auto &t : inTypes)
+                           inTys.push_back(unwrap(t.cast<MlirType>()));
+
+                         return wrap(cudaq::cc::CallableType::get(
+                             unwrap(ctx), FunctionType::get(unwrap(ctx), inTys,
+                                                            TypeRange{})));
+                       })
+      .def_classmethod("getFunctionType", [](py::object cls, MlirType type) {
+        return wrap(
+            dyn_cast<cudaq::cc::CallableType>(unwrap(type)).getSignature());
+      });
+
+  mlir_type_subclass(
       ccMod, "StdvecType",
       [](MlirType type) { return unwrap(type).isa<cudaq::cc::StdvecType>(); })
       .def_classmethod(

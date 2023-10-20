@@ -16,7 +16,7 @@
 namespace py = pybind11;
 
 namespace cudaq {
-void pyAltLaunchKernel(const std::string &, MlirModule, OpaqueArguments &);
+void pyAltLaunchKernel(const std::string &, MlirModule, OpaqueArguments &,const std::vector<std::string> &);
 
 void bindSampleAsync(py::module &mod) {
   py::class_<async_sample_result>(
@@ -56,7 +56,7 @@ for more information on this programming pattern.)#")
         py::gil_scoped_release release;
         auto ret = cudaq::details::runSamplingAsync(
             [argData, kernelName, kernelMod]() mutable {
-              pyAltLaunchKernel(kernelName, kernelMod, *argData);
+              pyAltLaunchKernel(kernelName, kernelMod, *argData, {});
               // delete the raw arg data pointer.
               delete argData;
             },

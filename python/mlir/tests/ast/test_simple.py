@@ -227,5 +227,20 @@ def test_synth_and_qir():
     print(cudaq.to_qir(ghz_synth))
     print(cudaq.to_qir(ghz_synth, profile='base'))
 
+from typing import Callable
+def test_callCallable():
+    @cudaq.kernel(jit=True)
+    def xGate(q:cudaq.qubit):
+        x(q)
+    print(xGate)
+
+    @cudaq.kernel(jit=True)#, verbose=True)
+    def callXGate(functor:Callable[[cudaq.qubit], None]):
+        q = cudaq.qvector(2)
+        functor(q[0])
+
+    print(callXGate)
+    callXGate(xGate)
+    
 # TODO if stmts, while loop,
 #  async, exp_pauli, common kernels, kernel function parameter

@@ -212,6 +212,46 @@ inline void packArgs(OpaqueArguments &argData, py::args args) {
   }
 }
 
+inline void
+packArgs(OpaqueArguments &argData, py::args args,
+         const std::function<bool(OpaqueArguments &argData, py::object &arg)>
+             &backupHandler) {
+  for (std::size_t i = 0; i < args.size(); i++) {
+    py::object arg = args[i];
+    if (py::isinstance<py::float_>(arg)) {
+      double *ourAllocatedArg = new double();
+      *ourAllocatedArg = PyFloat_AsDouble(arg.ptr());
+      argData.emplace_back(ourAllocatedArg, [](void *ptr) {
+        delete static_cast<double *>(ptr);
+      });
+      continue;
+    } else if (py::isinstance<py::int_>(arg)) {
+      long *ourAllocatedArg = new long();
+      *ourAllocatedArg = PyLong_AsLong(arg.ptr());
+      argData.emplace_back(ourAllocatedArg,
+                           [](void *ptr) { delete static_cast<long *>(ptr); });
+      continue;
+    } else if (py::isinstance<py::list>(arg)) {
+      auto casted = py::cast<py::list>(arg);
+      std::vector<double> *ourAllocatedArg =
+          new std::vector<double>(casted.size());
+      for (std::size_t counter = 0; auto el : casted) {
+        (*ourAllocatedArg)[counter++] = PyFloat_AsDouble(el.ptr());
+      }
+      argData.emplace_back(ourAllocatedArg, [](void *ptr) {
+        delete static_cast<std::vector<double> *>(ptr);
+      });
+      continue;
+    }
+
+    // Unhandled, see if someone else knows how to handle it
+    auto worked = backupHandler(argData, arg);
+    if (!worked)
+      throw std::runtime_error("Could not pack argument: " +
+                               py::str(args).cast<std::string>());
+  }
+}
+
 /// @brief Return true if the given py::args represents a
 /// request for broadcasting sample or observe over all argument sets.
 /// Kernel arg types can be int, float, list, so

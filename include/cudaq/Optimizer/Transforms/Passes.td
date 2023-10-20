@@ -78,6 +78,12 @@ def BasisConversionPass: Pass<"basis-conversion", "mlir::ModuleOp"> {
   ];
 }
 
+def PySynthCallableBlockArgs : Pass<"py-synth-callable-block-args", "mlir::func::FuncOp"> {
+  let summary = "Synthesize / Inline cc.callable_func on function block arguments..";
+  let description = [{
+  }];
+}
+
 def CheckKernelCalls : Pass<"check-kernel-calls", "mlir::func::FuncOp"> {
   let summary = "Check calls between quantum kernels have been inlined.";
   let description = [{

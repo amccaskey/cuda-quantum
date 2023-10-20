@@ -7,6 +7,7 @@
 # ============================================================================ #
 import ast
 import sys
+from typing import Callable
 from collections import deque
 import numpy as np
 from mlir_cudaq.ir import *
@@ -93,6 +94,13 @@ class PyASTBridge(ast.NodeVisitor):
             if annotation.attr == 'qubit':
                 return self.getRefType()
 
+        if isinstance(annotation, ast.Subscript) and annotation.value.id == 'Callable':
+            if not hasattr(annotation, 'slice'):
+                raise RuntimeError('Callable type must have signature specified.')
+            
+            argTypes = [self.mlirTypeFromAnnotation(a) for a in annotation.slice.elts[0].elts]
+            return cc.CallableType.get(self.ctx, argTypes)
+
         if annotation.id == 'int':
             return self.getIntegerType(64)
         elif annotation.id == 'float':
@@ -178,7 +186,7 @@ class PyASTBridge(ast.NodeVisitor):
             # Set the insertion point to the start of the entry block
             with InsertionPoint(entry):
                 # Visit the function
-                self.generic_visit(node)
+                [self.visit(n) for n in node.body]
                 # Add the return operation
                 ret = func.ReturnOp([])
 
@@ -420,6 +428,18 @@ class PyASTBridge(ast.NodeVisitor):
                 otherKernel = SymbolTable(self.module.operation)['__nvqpp__mlirgen__'+node.func.id]
                 values = [self.popValue() for _ in node.args]
                 op = func.CallOp(otherKernel, values)
+
+            elif node.func.id in self.symbolTable:
+                val = self.symbolTable[node.func.id]
+                if cc.CallableType.isinstance(val.type):
+                    # callable = cc.InstantiateCallableOp(val.type, val, []).result
+                    numVals = len(self.valueStack)
+                    values = [self.popValue() for _ in range(numVals)]
+                    # FIXME check value types match callable type signature
+                    callable = cc.CallableFuncOp(cc.CallableType.getFunctionType(val.type), val).result
+                    func.CallIndirectOp([], callable, values)
+                    return 
+
 
             else:
                 raise RuntimeError(
@@ -798,12 +818,24 @@ class PyASTBridge(ast.NodeVisitor):
 class FindDepKernelsVisitor(ast.NodeVisitor):
     def __init__(self):
         self.depKernels = {}
-        pass
+        
+    def visit_FunctionDef(self, node):
+        for arg in node.args.args:
+            annotation = arg.annotation
+            if annotation == None:
+                raise RuntimeError(
+                    'cudaq.kernel functions must have argument type annotations.')
+            if isinstance(annotation, ast.Subscript) and annotation.value.id == 'Callable':
+                if not hasattr(annotation, 'slice'):
+                    raise RuntimeError('Callable type must have signature specified.')
+                
+                # This is callable, let's add all in scope kernels
+                # FIXME only add those with the same signature 
+                self.depKernels = {k:v for k,v in globalAstRegistry.items()}
 
     def visit_Call(self, node):
         if hasattr(node, 'func'):
             if isinstance(node.func, ast.Name) and node.func.id in globalAstRegistry:
-                print("adding dep kernel ", node.func.id)
                 self.depKernels[node.func.id] = globalAstRegistry[node.func.id]
             elif isinstance(node.func, ast.Attribute):
                 if node.func.value.id == 'cudaq' and node.func.attr == 'control':
@@ -813,6 +845,8 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
 def compile_to_quake(astModule, **kwargs):
     global globalAstRegistry
     verbose = 'verbose' in kwargs and kwargs['verbose']
+     # Create the AST Bridge
+    bridge = PyASTBridge(verbose=verbose)
 
     # First we need to find any dependent kernels, they have to be
     # built as part of this ModuleOp...
@@ -820,17 +854,19 @@ def compile_to_quake(astModule, **kwargs):
     vis.visit(astModule)
     depKernels = vis.depKernels
 
-    bridge = PyASTBridge(verbose=verbose)
     # Add all dependent kernels to the MLIR Module
     [bridge.visit(ast) for _, ast in depKernels.items()]
+
     # Build the MLIR Module for this kernel
     bridge.visit(astModule)
 
     if verbose:
         print(bridge.module)
+    
     pm = PassManager.parse("builtin.module(canonicalize,cse)",
                            context=bridge.ctx)
     pm.run(bridge.module)
 
     globalAstRegistry[bridge.name] = astModule
+    
     return bridge.module, bridge.argTypes

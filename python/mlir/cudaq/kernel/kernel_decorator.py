@@ -8,12 +8,13 @@
 import ast
 import importlib
 import inspect
+from typing import Callable
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.execution_engine import *
 from mlir_cudaq.dialects import quake, cc
 from .ast_bridge import compile_to_quake
-from .quake_value import mlirTypeFromPyType
+from .utils import mlirTypeFromPyType
 from .analysis import MidCircuitMeasurementAnalyzer
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
@@ -25,7 +26,7 @@ class PyKernelDecorator(object):
         self.module = None if module == None else module
         self.executionEngine = None
         self.verbose = verbose
-        self.name = kernelName if kernelName != None else self.kernelFunction.__name__ 
+        self.name = kernelName if kernelName != None else self.kernelFunction.__name__
 
         # Library Mode
         self.library_mode = library_mode
@@ -33,7 +34,7 @@ class PyKernelDecorator(object):
             self.library_mode = False
 
         if self.kernelFunction is not None:
-            src = inspect.getsource(kernelFunction)
+            src = inspect.getsource(self.kernelFunction)
             leadingSpaces = len(src) - len(src.lstrip())
             self.funcSrc = '\n'.join(
                 [line[leadingSpaces:] for line in src.split('\n')])
@@ -43,7 +44,8 @@ class PyKernelDecorator(object):
                 astpretty.pprint(self.astModule.body[0])
 
             # Need to build up the arg types here
-            self.signature = inspect.getfullargspec(kernelFunction).annotations
+            self.signature = inspect.getfullargspec(
+                self.kernelFunction).annotations
 
             # Run analyzers and attach metadata (only have 1 right now)
             analyzer = MidCircuitMeasurementAnalyzer()
@@ -72,11 +74,16 @@ class PyKernelDecorator(object):
 
         # validate the arg types
         processedArgs = []
+        callableNames = []
         for i, arg in enumerate(args):
-            mlirType = mlirTypeFromPyType(type(arg), self.module.context)
-            if mlirType != self.argTypes[i]:
+            mlirType = mlirTypeFromPyType(
+                type(arg), self.module.context, argInstance=arg)
+            if not cc.CallableType.isinstance(mlirType) and mlirType != self.argTypes[i]:
                 raise RuntimeError("invalid runtime arg type ({} vs {})".format(
                     mlirType, self.argTypes[i]))
+            if cc.CallableType.isinstance(mlirType):
+                # Assume this is a PyKernelDecorator
+                callableNames.append(arg.name)
 
             # Convert np arrays to lists
             if cc.StdvecType.isinstance(mlirType) and hasattr(arg, "tolist"):
@@ -84,7 +91,8 @@ class PyKernelDecorator(object):
             else:
                 processedArgs.append(arg)
 
-        cudaq_runtime.pyAltLaunchKernel(self.name, self.module, *processedArgs)
+        cudaq_runtime.pyAltLaunchKernel(
+            self.name, self.module, *processedArgs, callable_names=callableNames)
 
 
 def kernel(function=None, **kwargs):

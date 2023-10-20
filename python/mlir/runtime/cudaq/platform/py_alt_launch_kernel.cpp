@@ -9,6 +9,7 @@
 #include "cudaq/Optimizer/CAPI/Dialects.h"
 #include "cudaq/Optimizer/CodeGen/Passes.h"
 #include "cudaq/Optimizer/CodeGen/Pipelines.h"
+#include "cudaq/Optimizer/Dialect/CC/CCOps.h"
 #include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
@@ -33,13 +34,16 @@ namespace cudaq {
 
 std::tuple<ExecutionEngine *, void *, std::size_t>
 jitAndCreateArgs(const std::string &name, MlirModule module,
-                 cudaq::OpaqueArguments &runtimeArgs) {
+                 cudaq::OpaqueArguments &runtimeArgs,
+                 const std::vector<std::string> &names) {
   auto mod = unwrap(module);
   auto cloned = mod.clone();
   auto context = cloned.getContext();
   registerLLVMDialectTranslation(*context);
 
   PassManager pm(context);
+  pm.addNestedPass<func::FuncOp>(
+      cudaq::opt::createPySynthCallableBlockArgs(names));
   pm.addPass(cudaq::opt::createGenerateDeviceCodeLoader(/*genAsQuake=*/true));
   pm.addPass(cudaq::opt::createGenerateKernelExecution());
   cudaq::opt::addPipelineToQIR<>(pm);
@@ -69,69 +73,29 @@ jitAndCreateArgs(const std::string &name, MlirModule module,
   auto uniqueJit = std::move(jitOrError.get());
   auto *jit = uniqueJit.release();
 
-  auto expectedPtr = jit->lookup(name + ".argsCreator");
-  if (!expectedPtr) {
-    throw std::runtime_error(
-        "cudaq::builder failed to get argsCreator function.");
-  }
-  auto argsCreator =
-      reinterpret_cast<std::size_t (*)(void **, void **)>(*expectedPtr);
   void *rawArgs = nullptr;
-  [[maybe_unused]] auto size = argsCreator(runtimeArgs.data(), &rawArgs);
-
+  std::size_t size = 0;
+  if (runtimeArgs.size()) {
+    auto expectedPtr = jit->lookup(name + ".argsCreator");
+    if (!expectedPtr) {
+      throw std::runtime_error(
+          "cudaq::builder failed to get argsCreator function.");
+    }
+    auto argsCreator =
+        reinterpret_cast<std::size_t (*)(void **, void **)>(*expectedPtr);
+    rawArgs = nullptr;
+    size = argsCreator(runtimeArgs.data(), &rawArgs);
+  }
   return std::make_tuple(jit, rawArgs, size);
 }
 
 void pyAltLaunchKernel(const std::string &name, MlirModule module,
-                       cudaq::OpaqueArguments &runtimeArgs) {
-  auto [jit, rawArgs, size] = jitAndCreateArgs(name, module, runtimeArgs);
-  // auto mod = unwrap(module);
-  // auto cloned = mod.clone();
-  // auto context = cloned.getContext();
-  // registerLLVMDialectTranslation(*context);
-
-  // PassManager pm(context);
-  // pm.addPass(cudaq::opt::createGenerateDeviceCodeLoader(/*genAsQuake=*/true));
-  // pm.addPass(cudaq::opt::createGenerateKernelExecution());
-  // cudaq::opt::addPipelineToQIR<>(pm);
-  // if (failed(pm.run(cloned)))
-  //   throw std::runtime_error(
-  //       "cudaq::builder failed to JIT compile the Quake representation.");
-
-  // ExecutionEngineOptions opts;
-  // opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
-  // opts.jitCodeGenOptLevel = llvm::CodeGenOpt::None;
-  // SmallVector<StringRef, 4> sharedLibs;
-  // opts.llvmModuleBuilder =
-  //     [](Operation *module,
-  //        llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
-  //   llvmContext.setOpaquePointers(false);
-  //   auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
-  //   if (!llvmModule) {
-  //     llvm::errs() << "Failed to emit LLVM IR\n";
-  //     return nullptr;
-  //   }
-  //   ExecutionEngine::setupTargetTriple(llvmModule.get());
-  //   return llvmModule;
-  // };
-
-  // auto jitOrError = ExecutionEngine::create(cloned, opts);
-  // assert(!!jitOrError);
-  // auto uniqueJit = std::move(jitOrError.get());
-  // auto *jit = uniqueJit.release();
-
-  // auto expectedPtr = jit->lookup(name + ".argsCreator");
-  // if (!expectedPtr) {
-  //   throw std::runtime_error(
-  //       "cudaq::builder failed to get argsCreator function.");
-  // }
-  // auto argsCreator =
-  //     reinterpret_cast<std::size_t (*)(void **, void **)>(*expectedPtr);
-  // void *rawArgs = nullptr;
-  // [[maybe_unused]] auto size = argsCreator(runtimeArgs.data(), &rawArgs);
+                       cudaq::OpaqueArguments &runtimeArgs,
+                       const std::vector<std::string> &names) {
+  auto [jit, rawArgs, size] =
+      jitAndCreateArgs(name, module, runtimeArgs, names);
 
   auto mod = unwrap(module);
-
   auto thunkName = name + ".thunk";
   auto thunkPtr = jit->lookup(thunkName);
   if (!thunkPtr)
@@ -158,7 +122,7 @@ void pyAltLaunchKernel(const std::string &name, MlirModule module,
 
 MlirModule synthesizeKernel(const std::string &name, MlirModule module,
                             cudaq::OpaqueArguments &runtimeArgs) {
-  auto [jit, rawArgs, size] = jitAndCreateArgs(name, module, runtimeArgs);
+  auto [jit, rawArgs, size] = jitAndCreateArgs(name, module, runtimeArgs, {});
   auto cloned = unwrap(module).clone();
   auto context = cloned.getContext();
 
@@ -182,7 +146,7 @@ MlirModule synthesizeKernel(const std::string &name, MlirModule module,
 std::string getQIRLL(const std::string &name, MlirModule module,
                      cudaq::OpaqueArguments &runtimeArgs,
                      std::string &profile) {
-  auto [jit, rawArgs, size] = jitAndCreateArgs(name, module, runtimeArgs);
+  auto [jit, rawArgs, size] = jitAndCreateArgs(name, module, runtimeArgs, {});
   auto cloned = unwrap(module).clone();
   auto context = cloned.getContext();
   PassManager pm(context);
@@ -214,16 +178,31 @@ std::string getQIRLL(const std::string &name, MlirModule module,
 }
 
 void bindAltLaunchKernel(py::module &mod) {
+  auto callableArgHandler = [](cudaq::OpaqueArguments &argData,
+                               py::object &arg) {
+    if (py::hasattr(arg, "module")) {
+      // Just give it some dummy data that will not be used.
+      // We synthesize away all callables, the block argument
+      // remains but it is not used, so just give argsCreator
+      // something, and we'll make sure its cleaned up.
+      long *ourAllocatedArg = new long();
+      argData.emplace_back(ourAllocatedArg,
+                           [](void *ptr) { delete static_cast<long *>(ptr); });
+      return true;
+    }
+    return false;
+  };
 
   mod.def(
       "pyAltLaunchKernel",
-      [](const std::string &kernelName, MlirModule module,
-         py::args runtimeArgs) {
+      [&](const std::string &kernelName, MlirModule module,
+          py::args runtimeArgs, std::vector<std::string> callable_names) {
         cudaq::OpaqueArguments args;
-        cudaq::packArgs(args, runtimeArgs);
-        pyAltLaunchKernel(kernelName, module, args);
+        cudaq::packArgs(args, runtimeArgs, callableArgHandler);
+        pyAltLaunchKernel(kernelName, module, args, callable_names);
       },
-      py::arg("kernelName"), py::arg("module"), "DOC STRING");
+      py::arg("kernelName"), py::arg("module"), py::kw_only(),
+      py::arg("callable_names") = std::vector<std::string>{}, "DOC STRING");
 
   mod.def("synthesize", [](py::object kernel, py::args runtimeArgs) {
     MlirModule module = kernel.attr("module").cast<MlirModule>();

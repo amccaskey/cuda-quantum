@@ -19,7 +19,7 @@ namespace cudaq {
 inline constexpr int defaultShotsValue = -1;
 inline constexpr int defaultQpuIdValue = 0;
 
-void pyAltLaunchKernel(const std::string &, MlirModule, OpaqueArguments &);
+void pyAltLaunchKernel(const std::string &, MlirModule, OpaqueArguments &, const std::vector<std::string> &);
 
 void bindObserveAsync(py::module &mod) {
   mod.def(
@@ -41,7 +41,7 @@ void bindObserveAsync(py::module &mod) {
         py::gil_scoped_release release;
         auto ret = details::runObservationAsync(
             [argData, kernelName, kernelMod]() mutable {
-              pyAltLaunchKernel(kernelName, kernelMod, *argData);
+              pyAltLaunchKernel(kernelName, kernelMod, *argData, {});
               delete argData;
             },
             spin_operator, platform, shots, kernelName, qpu_id);
