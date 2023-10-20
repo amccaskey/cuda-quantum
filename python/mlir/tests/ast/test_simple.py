@@ -12,6 +12,12 @@ import numpy as np
 
 import cudaq
 
+@pytest.fixture(autouse=True)
+def do_something():
+    cudaq.__clearKernelRegistries()
+    yield 
+    return 
+
 def test_bell():
     @cudaq.kernel(jit=True)
     def bell():

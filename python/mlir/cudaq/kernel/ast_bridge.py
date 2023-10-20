@@ -832,6 +832,8 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
                 # This is callable, let's add all in scope kernels
                 # FIXME only add those with the same signature 
                 self.depKernels = {k:v for k,v in globalAstRegistry.items()}
+        
+        self.generic_visit(node)
 
     def visit_Call(self, node):
         if hasattr(node, 'func'):
@@ -845,7 +847,8 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
 def compile_to_quake(astModule, **kwargs):
     global globalAstRegistry
     verbose = 'verbose' in kwargs and kwargs['verbose']
-     # Create the AST Bridge
+     
+    # Create the AST Bridge
     bridge = PyASTBridge(verbose=verbose)
 
     # First we need to find any dependent kernels, they have to be
@@ -854,6 +857,8 @@ def compile_to_quake(astModule, **kwargs):
     vis.visit(astModule)
     depKernels = vis.depKernels
 
+    print('Depkernels ', [k for k, _ in depKernels.items()])
+    [print(globalKernelRegistry[kk]) for kk, k in depKernels.items()]
     # Add all dependent kernels to the MLIR Module
     [bridge.visit(ast) for _, ast in depKernels.items()]
 
