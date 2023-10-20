@@ -208,30 +208,30 @@ class PyASTBridge(ast.NodeVisitor):
             print('[Visit Assign {}]'.format(ast.unparse(node)))
         self.generic_visit(node)
 
-        print("TESTING HERE ", len(self.valueStack))
+        varNames = []
+        varValues = []
+
+        # Can assign a, b, c, = Tuple... 
+        # or single assign a = something
         if isinstance(node.targets[0], ast.Tuple):
             assert len(self.valueStack) == len(node.targets[0].elts)
-            values = [self.popValue() for _ in range(len(node.targets[0].elts))]
-            values.reverse()
-            for i, name in enumerate(node.targets[0].elts):
-                if self.isQuantumType(values[i].type):
-                    self.symbolTable[name.id] = values[i]
-                    print(name.id, values[i])
-                else:
-                    raise RuntimeError("handle tuple assignment for non-qubits")
-            return 
+            varValues = [self.popValue() for _ in range(len(node.targets[0].elts))]
+            varValues.reverse()
+            varNames = [name.id for name in node.targets[0].elts]
         else:
-            rhsVal = self.popValue()
-            if self.isQuantumType(rhsVal.type):
-                self.symbolTable[node.targets[0].id] = rhsVal
-                return
-
-        # We should allocate and store
-        alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, rhsVal.type),
-                             TypeAttr.get(rhsVal.type)).result
-        cc.StoreOp(rhsVal, alloca)
-        self.symbolTable[node.targets[0].id] = alloca
-
+            varValues = [self.popValue()]
+            varNames = [node.targets[0].id]
+        
+        for i, value in enumerate(varValues):
+            if self.isQuantumType(value.type):
+                self.symbolTable[varNames[i]] = value 
+            else:
+                # We should allocate and store
+                alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, value.type),
+                             TypeAttr.get(value.type)).result
+                cc.StoreOp(value, alloca)
+                self.symbolTable[node.targets[0].id] = alloca
+            
     def visit_Attribute(self, node):
         if self.verbose:
             print('[Visit Attribute]')

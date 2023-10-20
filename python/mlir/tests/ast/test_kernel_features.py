@@ -99,6 +99,8 @@ def test_control():
         q, r, s = cudaq.qubit(), cudaq.qubit(), cudaq.qubit()
         x(q, s)
         swap.ctrl(q, r, s)
+    
+    print(test)
     counts = cudaq.sample(test)
     assert len(counts) == 1
     assert '110' in counts
