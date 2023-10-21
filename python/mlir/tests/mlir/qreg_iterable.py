@@ -29,23 +29,18 @@ def test_qreg_iter():
 # CHECK:           %[[VAL_2:.*]] = arith.constant 0 : i64
 # CHECK:           %[[VAL_3:.*]] = quake.alloca !quake.veq<?>{{\[}}%[[VAL_0]] : i64]
 # CHECK:           %[[VAL_4:.*]] = quake.veq_size %[[VAL_3]] : (!quake.veq<?>) -> i64
-# CHECK:           cc.scope {
-# CHECK:             %[[VAL_5:.*]] = cc.alloca i64
-# CHECK:             cc.store %[[VAL_2]], %[[VAL_5]] : !cc.ptr<i64>
-# CHECK:             cc.loop while {
-# CHECK:               %[[VAL_6:.*]] = cc.load %[[VAL_5]] : !cc.ptr<i64>
-# CHECK:               %[[VAL_7:.*]] = arith.cmpi slt, %[[VAL_6]], %[[VAL_4]] : i64
-# CHECK:               cc.condition %[[VAL_7]]
-# CHECK:             } do {
-# CHECK:               %[[VAL_8:.*]] = cc.load %[[VAL_5]] : !cc.ptr<i64>
-# CHECK:               %[[VAL_9:.*]] = quake.extract_ref %[[VAL_3]]{{\[}}%[[VAL_8]]] : (!quake.veq<?>, i64) -> !quake.ref
-# CHECK:               quake.x %[[VAL_9]] : (!quake.ref) -> ()
-# CHECK:               cc.continue
-# CHECK:             } step {
-# CHECK:               %[[VAL_10:.*]] = cc.load %[[VAL_5]] : !cc.ptr<i64>
-# CHECK:               %[[VAL_11:.*]] = arith.addi %[[VAL_10]], %[[VAL_1]] : i64
-# CHECK:               cc.store %[[VAL_11]], %[[VAL_5]] : !cc.ptr<i64>
-# CHECK:             }
-# CHECK:           }
+# CHECK:           %[[VAL_5:.*]] = cc.loop while ((%[[VAL_6:.*]] = %[[VAL_2]]) -> (i64)) {
+# CHECK:             %[[VAL_7:.*]] = arith.cmpi slt, %[[VAL_6]], %[[VAL_4]] : i64
+# CHECK:             cc.condition %[[VAL_7]](%[[VAL_6]] : i64)
+# CHECK:           } do {
+# CHECK:           ^bb0(%[[VAL_8:.*]]: i64):
+# CHECK:             %[[VAL_9:.*]] = quake.extract_ref %[[VAL_3]]{{\[}}%[[VAL_8]]] : (!quake.veq<?>, i64) -> !quake.ref
+# CHECK:             quake.x %[[VAL_9]] : (!quake.ref) -> ()
+# CHECK:             cc.continue %[[VAL_8]] : i64
+# CHECK:           } step {
+# CHECK:           ^bb0(%[[VAL_10:.*]]: i64):
+# CHECK:             %[[VAL_11:.*]] = arith.addi %[[VAL_10]], %[[VAL_1]] : i64
+# CHECK:             cc.continue %[[VAL_11]] : i64
+# CHECK:           } {invariant}
 # CHECK:           return
 # CHECK:         }

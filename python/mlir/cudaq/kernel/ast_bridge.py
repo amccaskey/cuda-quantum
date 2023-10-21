@@ -49,7 +49,10 @@ class PyASTBridge(ast.NodeVisitor):
 
     def isQuantumType(self, ty):
         return quake.RefType.isinstance(ty) or quake.VeqType.isinstance(ty)
-
+    
+    def isMeasureResultType(self, ty):
+        return IntegerType.isinstance(ty) and ty == IntegerType.get_signless(1)
+    
     def getIntegerType(self, width=64):
         return IntegerType.get_signless(width)
 
@@ -180,15 +183,15 @@ class PyASTBridge(ast.NodeVisitor):
                 f.attributes.__setitem__('cudaq-entrypoint', UnitAttr.get())
 
             # Create the entry block
-            entry = f.add_entry_block()
+            self.entry = f.add_entry_block()
 
             # Add the block args to the symbol table
-            blockArgs = entry.arguments
+            blockArgs = self.entry.arguments
             for i, b in enumerate(blockArgs):
                 self.symbolTable[argNames[i]] = b
 
             # Set the insertion point to the start of the entry block
-            with InsertionPoint(entry):
+            with InsertionPoint(self.entry):
                 # Visit the function
                 [self.visit(n) for n in node.body]
                 # Add the return operation
@@ -206,7 +209,13 @@ class PyASTBridge(ast.NodeVisitor):
     def visit_Assign(self, node):
         if self.verbose:
             print('[Visit Assign {}]'.format(ast.unparse(node)))
-        self.generic_visit(node)
+        
+        # Retain the variable name for potential children (like mz(q, registerName=...))
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            self.currentAssignVariableName = str(node.targets[0].id)
+            self.generic_visit(node)
+            self.currentAssignVariableName = None
+        else : self.generic_visit(node) 
 
         varNames = []
         varValues = []
@@ -223,8 +232,8 @@ class PyASTBridge(ast.NodeVisitor):
             varNames = [node.targets[0].id]
         
         for i, value in enumerate(varValues):
-            if self.isQuantumType(value.type):
-                self.symbolTable[varNames[i]] = value 
+            if self.isQuantumType(value.type) or self.isMeasureResultType(value.type):
+                self.symbolTable[varNames[i]] = value
             else:
                 # We should allocate and store
                 alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, value.type),
@@ -444,7 +453,7 @@ class PyASTBridge(ast.NodeVisitor):
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
                 i1Ty = self.getIntegerType(1)
                 resTy = i1Ty if quake.RefType.isinstance(qubit.type) else cc.StdvecType.get(self.ctx, i1Ty)
-                self.pushValue(opCtor(resTy, [], [qubit]).result)
+                self.pushValue(opCtor(resTy, [], [qubit], registerName=self.currentAssignVariableName).result)
                 return
 
             if node.func.id == 'swap':
@@ -796,6 +805,21 @@ class PyASTBridge(ast.NodeVisitor):
             [self.visit(b) for b in node.body]
 
         self.createInvariantForLoop(totalSize, bodyBuilder)
+
+    def visit_If(self, node):
+        if self.verbose:
+            print("[Visit If = {}]".format(ast.unparse(node)))
+        
+        self.visit(node.test)
+        condition = self.popValue() 
+
+        ifOp = cc.IfOp([], condition)
+        thenBlock = Block.create_at_start(ifOp.thenRegion, [])
+        with InsertionPoint(thenBlock):
+            [self.visit(b) for b in node.body]
+            cc.ContinueOp([])
+
+
 
     def visit_UnaryOp(self, node):
         if self.verbose:

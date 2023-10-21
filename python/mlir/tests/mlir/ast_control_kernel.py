@@ -20,7 +20,7 @@ def test_control_kernel():
     def applyX(q:cudaq.qubit):
         x(q)
     
-    @cudaq.kernel(jit=True, verbose=True)
+    @cudaq.kernel(jit=True)
     def bell():
         q = cudaq.qvector(2)
         h(q[0])
@@ -35,12 +35,9 @@ def test_control_kernel():
 # CHECK:         }
 
 # CHECK-LABEL:     func.func @__nvqpp__mlirgen__bell() attributes {"cudaq-entrypoint"} {
-# CHECK:           %[[VAL_0:.*]] = quake.alloca !quake.veq<2>
+# CHECK:      %[[VAL_0:.*]] = quake.alloca !quake.veq<2>
 # CHECK:           %[[VAL_1:.*]] = quake.extract_ref %[[VAL_0]][0] : (!quake.veq<2>) -> !quake.ref
 # CHECK:           quake.h %[[VAL_1]] : (!quake.ref) -> ()
-# CHECK:           %[[VAL_2:.*]] = quake.concat %[[VAL_1]] : (!quake.ref) -> !quake.veq<1>
-# CHECK:           %[[VAL_3:.*]] = quake.relax_size %[[VAL_2]] : (!quake.veq<1>) -> !quake.veq<?>
-# CHECK:           %[[VAL_4:.*]] = quake.extract_ref %[[VAL_0]][1] : (!quake.veq<2>) -> !quake.ref
-# CHECK:           quake.apply @__nvqpp__mlirgen__applyX {{\[}}%[[VAL_3]]] %[[VAL_4]] : (!quake.veq<?>, !quake.ref) -> ()
+# CHECK:           %[[VAL_2:.*]] = quake.extract_ref %[[VAL_0]][1] : (!quake.veq<2>) -> !quake.ref
+# CHECK:           quake.apply @__nvqpp__mlirgen__applyX {{\[}}%[[VAL_1]]] %[[VAL_2]] : (!quake.ref, !quake.ref) -> ()
 # CHECK:           return
-# CHECK:         }

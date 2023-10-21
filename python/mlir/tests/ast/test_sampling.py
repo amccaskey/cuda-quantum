@@ -28,7 +28,7 @@ def test_simple_sampling_ghz():
         h(qubits.front())
         for i, qubit in enumerate(qubits.front(numQubits-1)):
             x.ctrl(qubit, qubits[i+1])
-
+    print(simple)
     counts = cudaq.sample(simple, 10)
     assert len(counts) == 2
     assert '0'*10 in counts and '1'*10 in counts

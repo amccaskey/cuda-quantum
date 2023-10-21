@@ -25,12 +25,14 @@
 #include <fmt/core.h>
 #include <pybind11/stl.h>
 
+#include "JITExecutionCache.h"
 #include "utils/OpaqueArguments.h"
 
 namespace py = pybind11;
 using namespace mlir;
 
 namespace cudaq {
+static std::unique_ptr<JITExecutionCache> jitCache;
 
 std::tuple<ExecutionEngine *, void *, std::size_t>
 jitAndCreateArgs(const std::string &name, MlirModule module,
@@ -41,37 +43,53 @@ jitAndCreateArgs(const std::string &name, MlirModule module,
   auto context = cloned.getContext();
   registerLLVMDialectTranslation(*context);
 
-  PassManager pm(context);
-  pm.addNestedPass<func::FuncOp>(
-      cudaq::opt::createPySynthCallableBlockArgs(names));
-  pm.addPass(cudaq::opt::createGenerateDeviceCodeLoader(/*genAsQuake=*/true));
-  pm.addPass(cudaq::opt::createGenerateKernelExecution());
-  cudaq::opt::addPipelineToQIR<>(pm);
-  if (failed(pm.run(cloned)))
-    throw std::runtime_error(
-        "cudaq::builder failed to JIT compile the Quake representation.");
+  // Have we JIT compiled this before?
+  std::string moduleString;
+  {
+    llvm::raw_string_ostream os(moduleString);
+    cloned.print(os);
+  }
+  std::hash<std::string> hasher;
+  auto hashKey = hasher(moduleString);
 
-  ExecutionEngineOptions opts;
-  opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
-  opts.jitCodeGenOptLevel = llvm::CodeGenOpt::None;
-  SmallVector<StringRef, 4> sharedLibs;
-  opts.llvmModuleBuilder =
-      [](Operation *module,
-         llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
-    llvmContext.setOpaquePointers(false);
-    auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
-    if (!llvmModule) {
-      llvm::errs() << "Failed to emit LLVM IR\n";
-      return nullptr;
-    }
-    ExecutionEngine::setupTargetTriple(llvmModule.get());
-    return llvmModule;
-  };
+  ExecutionEngine *jit = nullptr;
+  if (jitCache->hasJITEngine(hashKey))
+    jit = jitCache->getJITEngine(hashKey);
+  else {
 
-  auto jitOrError = ExecutionEngine::create(cloned, opts);
-  assert(!!jitOrError);
-  auto uniqueJit = std::move(jitOrError.get());
-  auto *jit = uniqueJit.release();
+    PassManager pm(context);
+    pm.addNestedPass<func::FuncOp>(
+        cudaq::opt::createPySynthCallableBlockArgs(names));
+    pm.addPass(cudaq::opt::createGenerateDeviceCodeLoader(/*genAsQuake=*/true));
+    pm.addPass(cudaq::opt::createGenerateKernelExecution());
+    cudaq::opt::addPipelineToQIR<>(pm);
+    if (failed(pm.run(cloned)))
+      throw std::runtime_error(
+          "cudaq::builder failed to JIT compile the Quake representation.");
+
+    ExecutionEngineOptions opts;
+    opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
+    opts.jitCodeGenOptLevel = llvm::CodeGenOpt::None;
+    SmallVector<StringRef, 4> sharedLibs;
+    opts.llvmModuleBuilder =
+        [](Operation *module,
+           llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
+      llvmContext.setOpaquePointers(false);
+      auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
+      if (!llvmModule) {
+        llvm::errs() << "Failed to emit LLVM IR\n";
+        return nullptr;
+      }
+      ExecutionEngine::setupTargetTriple(llvmModule.get());
+      return llvmModule;
+    };
+
+    auto jitOrError = ExecutionEngine::create(cloned, opts);
+    assert(!!jitOrError);
+    auto uniqueJit = std::move(jitOrError.get());
+    jit = uniqueJit.release();
+    jitCache->cache(hashKey, jit);
+  }
 
   void *rawArgs = nullptr;
   std::size_t size = 0;
@@ -117,7 +135,6 @@ void pyAltLaunchKernel(const std::string &name, MlirModule module,
     cudaq::altLaunchKernel(name.c_str(), thunk, rawArgs, size, 0);
 
   std::free(rawArgs);
-  delete jit;
 }
 
 MlirModule synthesizeKernel(const std::string &name, MlirModule module,
@@ -139,7 +156,6 @@ MlirModule synthesizeKernel(const std::string &name, MlirModule module,
     throw std::runtime_error(
         "cudaq::builder failed to JIT compile the Quake representation.");
   std::free(rawArgs);
-  delete jit;
   return wrap(cloned);
 }
 
@@ -158,7 +174,6 @@ std::string getQIRLL(const std::string &name, MlirModule module,
     throw std::runtime_error(
         "cudaq::builder failed to JIT compile the Quake representation.");
   std::free(rawArgs);
-  delete jit;
 
   llvm::LLVMContext llvmContext;
   llvmContext.setOpaquePointers(false);
@@ -178,6 +193,8 @@ std::string getQIRLL(const std::string &name, MlirModule module,
 }
 
 void bindAltLaunchKernel(py::module &mod) {
+  jitCache = std::make_unique<JITExecutionCache>();
+
   auto callableArgHandler = [](cudaq::OpaqueArguments &argData,
                                py::object &arg) {
     if (py::hasattr(arg, "module")) {
