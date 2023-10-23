@@ -15,6 +15,16 @@ from typing import Callable
 
 qvector = cudaq_runtime.qvector
 
+nvqppPrefix = '__nvqpp__mlirgen__'
+
+# Keep a global registry of all kernel FuncOps
+# keyed on their name (without __nvqpp__mlirgen__ prefix)
+globalKernelRegistry = {}
+
+# Keep a global registry of all kernel Python ast modules
+# keyed on their name (without __nvqpp__mlirgen__ prefix)
+globalAstRegistry = {}
+
 # By default and to keep things easier,
 # we only deal with int==i64 and float=f64
 def mlirTypeFromPyType(argType, ctx, argInstance = None):

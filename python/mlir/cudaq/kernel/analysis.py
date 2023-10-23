@@ -7,7 +7,7 @@
 # ============================================================================ #
 
 import ast
-
+from .utils import globalAstRegistry, globalKernelRegistry
 
 class MidCircuitMeasurementAnalyzer(ast.NodeVisitor):
     """The `MidCircuitMeasurementAnalyzer` is a utility class searches for 
@@ -53,3 +53,46 @@ class MidCircuitMeasurementAnalyzer(ast.NodeVisitor):
                 if self.isMeasureCallOp(node):
                     self.hasMidCircuitMeasures = True
                     break
+
+
+class FindDepKernelsVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.depKernels = {}
+
+    def visit_FunctionDef(self, node):
+        """
+        Here we will look at this Functions arguments, if 
+        there is a Callable, we will add any seen kernel/AST with the same 
+        signature to the dependent kernels map. This enables the creation 
+        of ModuleOps that contain all the functions necessary to inline and 
+        synthesize callable block arguments.
+        """
+        for arg in node.args.args:
+            annotation = arg.annotation
+            if annotation == None:
+                raise RuntimeError(
+                    'cudaq.kernel functions must have argument type annotations.')
+            if isinstance(annotation, ast.Subscript) and annotation.value.id == 'Callable':
+                if not hasattr(annotation, 'slice'):
+                    raise RuntimeError(
+                        'Callable type must have signature specified.')
+
+                # This is callable, let's add all in scope kernels
+                # FIXME only add those with the same signature
+                self.depKernels = {k: v for k, v in globalAstRegistry.items()}
+
+        self.generic_visit(node)
+
+    def visit_Call(self, node):
+        """
+        Here we look for function calls within this kernel. We will 
+        add these to dependent kernels dictionary. We will also look for 
+        kernels that are passed to control and adjoint.
+        """
+        if hasattr(node, 'func'):
+            if isinstance(node.func, ast.Name) and node.func.id in globalAstRegistry:
+                self.depKernels[node.func.id] = globalAstRegistry[node.func.id]
+            elif isinstance(node.func, ast.Attribute):
+                if node.func.value.id == 'cudaq' and node.func.attr in ['control', 'adjoint'] and node.args[0].id in globalAstRegistry:
+                    self.depKernels[node.args[0].id] = globalAstRegistry[node.args[0].id]
+

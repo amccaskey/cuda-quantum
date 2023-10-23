@@ -152,43 +152,44 @@ def test_grover():
     assert '011' in counts
 
 
-# def test_grover_compute_action():
-#     """Test that compute_action works in tandem with kernel composability."""
-#     @cudaq.kernel(jit=True)
-#     def reflect(qubits:cudaq.qview):
-#         ctrls = qubits.front(qubits.size()-1)
-#         last = qubits.back()
+def test_grover_compute_action():
+    """Test that compute_action works in tandem with kernel composability."""
+    @cudaq.kernel(jit=True)
+    def reflect(qubits:cudaq.qview):
+        ctrls = qubits.front(qubits.size()-1)
+        last = qubits.back()
 
-#         def compute():
-#             h(qubits)
-#             x(qubits)
-#         cudaq.compute_action(compute, lambda: z.ctrl(ctrls, last))
+        def compute():
+            h(qubits)
+            x(qubits)
+        # can also use 
+        # compute = lambda : (h(qubits), x(qubits))
 
-#     print(reflect)
+        cudaq.compute_action(compute, lambda: z.ctrl(ctrls, last))
 
-#     # Order matters, kernels must be "in-scope"
-#     @cudaq.kernel(jit=True)
-#     def oracle(q:cudaq.qview):
-#         z.ctrl(q[0], q[2])
-#         z.ctrl(q[1], q[2])
+    print(reflect)
 
-#     @cudaq.kernel(jit=True)
-#     def grover(N:int, M:int, oracle:Callable[[cudaq.qview],None]):
-#         q = cudaq.qvector(N)
-#         h(q)
-#         for i in range(M):
-#             oracle(q)
-#             reflect(q)
-#         mz(q)
+    # Order matters, kernels must be "in-scope"
+    @cudaq.kernel(jit=True)
+    def oracle(q:cudaq.qview):
+        z.ctrl(q[0], q[2])
+        z.ctrl(q[1], q[2])
 
-#     print(grover)
+    @cudaq.kernel(jit=True)
+    def grover(N:int, M:int, oracle:Callable[[cudaq.qview],None]):
+        q = cudaq.qvector(N)
+        h(q)
+        for i in range(M):
+            oracle(q)
+            reflect(q)
+        mz(q)
 
-#     print(oracle)
+    # print(grover)
 
-#     counts = cudaq.sample(grover, 3, 1, oracle)
-#     assert len(counts) == 2
-#     assert '101' in counts
-#     assert '011' in counts
+    counts = cudaq.sample(grover, 3, 1, oracle)
+    assert len(counts) == 2
+    assert '101' in counts
+    assert '011' in counts
 
 
 def test_dynamic_circuit():

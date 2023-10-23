@@ -81,6 +81,11 @@ def BasisConversionPass: Pass<"basis-conversion", "mlir::ModuleOp"> {
 def PySynthCallableBlockArgs : Pass<"py-synth-callable-block-args", "mlir::func::FuncOp"> {
   let summary = "Synthesize / Inline cc.callable_func on function block arguments..";
   let description = [{
+    This pass is leveraged by the Python bindings to synthesize any 
+    cc.callable block arguments. By synthesis we mean replace all uses of the 
+    callable block argument with a specific in-Module function call (func.call) 
+    retrieved at runtime (the name of the function passed to the kernel at the 
+    cc.callable block argument index).
   }];
 }
 

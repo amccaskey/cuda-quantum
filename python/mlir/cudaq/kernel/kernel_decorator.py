@@ -87,6 +87,8 @@ class PyKernelDecorator(object):
 
             # Convert np arrays to lists
             if cc.StdvecType.isinstance(mlirType) and hasattr(arg, "tolist"):
+                if arg.ndim != 1:
+                    raise RuntimeError('CUDA Quantum kernels only support 1D numpy array arguments.')
                 processedArgs.append(arg.tolist())
             else:
                 processedArgs.append(arg)
@@ -96,10 +98,12 @@ class PyKernelDecorator(object):
 
 
 def kernel(function=None, **kwargs):
-    """The `cudaq.kernel` represents the CUDA Quantum language function 
-        attribute that programmers leverage to indicate the following function 
-        is a CUDA Quantum kernel and should be compile and executed on 
-        an available quantum coprocessor."""
+    """
+    The `cudaq.kernel` represents the CUDA Quantum language function 
+    attribute that programmers leverage to indicate the following function 
+    is a CUDA Quantum kernel and should be compile and executed on 
+    an available quantum coprocessor.
+    """
     if function:
         return PyKernelDecorator(function)
     else:

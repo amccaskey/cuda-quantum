@@ -62,6 +62,7 @@ jitAndCreateArgs(const std::string &name, MlirModule module,
         cudaq::opt::createPySynthCallableBlockArgs(names));
     pm.addPass(cudaq::opt::createGenerateDeviceCodeLoader(/*genAsQuake=*/true));
     pm.addPass(cudaq::opt::createGenerateKernelExecution());
+    pm.addPass(cudaq::opt::createLambdaLiftingPass());
     cudaq::opt::addPipelineToQIR<>(pm);
     if (failed(pm.run(cloned)))
       throw std::runtime_error(
