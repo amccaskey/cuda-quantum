@@ -14,6 +14,8 @@ import numpy as np
 from typing import Callable 
 
 qvector = cudaq_runtime.qvector
+qubit = cudaq_runtime.qubit
+qreg = qvector 
 
 nvqppPrefix = '__nvqpp__mlirgen__'
 
@@ -34,8 +36,10 @@ def mlirTypeFromPyType(argType, ctx, argInstance = None):
         return F64Type.get(ctx)
     if argType == list or argType == np.ndarray:
         return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))
-    if argType == qvector:
+    if argType == qvector or argType == qreg:
         return quake.VeqType.get(ctx)
+    if argType == qubit:
+        return quake.RefType.get(ctx)
     if isinstance(argInstance, Callable):
         return cc.CallableType.get(ctx, argInstance.argTypes)
 

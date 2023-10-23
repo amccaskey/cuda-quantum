@@ -75,11 +75,11 @@ def test_QuakeValueSize():
 
     otherq = kernel.qalloc(runtimeSize)
     s = otherq.size()
-    quake = kernel.raw_quake()
+    quake = kernel.__str__(canonicalize=False)
     assert 'quake.veq_size' in quake
 
     ts = thetas.size()
-    quake = kernel.raw_quake()
+    quake = kernel.__str__(canonicalize=False)
     assert 'cc.stdvec_size' in quake 
 
 def test_QuakeValueLifetimeAndPrint():

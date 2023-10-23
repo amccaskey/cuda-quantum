@@ -224,6 +224,28 @@ class PyASTBridge(ast.NodeVisitor):
         loop.attributes.__setitem__('invariant', UnitAttr.get())
         return
 
+    def __applyQuantumOperation(self, opName, parameters, targets):
+        opCtor = getattr(quake, '{}Op'.format(opName.title()))
+        for quantumValue in targets:
+            if quake.VeqType.isinstance(quantumValue.type):
+
+                def bodyBuilder(iterVal):
+                    q = quake.ExtractRefOp(self.getRefType(),
+                                            quantumValue,
+                                            -1,
+                                            index=iterVal).result
+                    opCtor([], parameters, [], [q])
+
+                veqSize = quake.VeqSizeOp(self.getIntegerType(),
+                                            quantumValue).result
+                self.createInvariantForLoop(veqSize, bodyBuilder)
+            elif quake.RefType.isinstance(quantumValue.type):
+                opCtor([], parameters, [], [quantumValue])
+            else:
+                raise Exception(
+                    'quantum operation on incorrect type {}.'.format(
+                        qubit.type))
+        return
     def generic_visit(self, node):
         for field, value in reversed(list(ast.iter_fields(node))):
             if isinstance(value, list):
@@ -366,6 +388,19 @@ class PyASTBridge(ast.NodeVisitor):
         return
 
     def visit_Assign(self, node):
+        """
+        Map an assign operation in the AST to an equivalent variable value assignment 
+        in the MLIR. This method will first see if this is a tuple assignment, enabling one 
+        to assign multiple values in a single statement, 
+
+        a, b, c = cudaq.qubit(), cudaq.qubit(), cudaq.qvector(2)
+
+        For all assignments, the variable name will be used as a key for the symbol table, 
+        mapping to the corresponding MLIR Value. For values of ref / veq, i1, or cc.callable, 
+        the values will be stored directly in the table. For all aother values, the variable 
+        will be allocated with a cc.alloca op, and the loaded value will be stored in the 
+        symbol table.
+        """
         if self.verbose:
             print('[Visit Assign {}]'.format(ast.unparse(node)))
 
@@ -405,6 +440,11 @@ class PyASTBridge(ast.NodeVisitor):
                 self.symbolTable[node.targets[0].id] = alloca
 
     def visit_Attribute(self, node):
+        """
+        Visit an attribute node and map to valid MLIR code. This method specifically 
+        looks for attributes like method calls (e.g. veq size), or common attributes we'll 
+        see from ubiquitous external modules like numpy.
+        """
         if self.verbose:
             print('[Visit Attribute]')
 
@@ -420,6 +460,41 @@ class PyASTBridge(ast.NodeVisitor):
             return
 
     def visit_Call(self, node):
+        """
+        Map a Python Call operation to equivalent MLIR. This method will first check 
+        for call operations that are ast.Name nodes in the tree (the name of a function to call). 
+        It will handle the Python range(start, stop, step) function by creating an array of 
+        integers to loop through via an invariant CC loop operation. Subsequent users of the 
+        range() result can iterate through the elements of the returned cc.array. It will handle the 
+        Python enumerate(iterable) function by constructing another invariant loop that builds up and 
+        array of cc.struct<i64, T>, representing the counter and the element. 
+
+        It will next handle any quantum operation (optionally with a rotation parameter). 
+        Single target operations can be represented that take a single qubit reference,
+        multiple single qubits, or a vector of qubits, where the latter two 
+        will apply the operation to every qubit in the vector: 
+
+        q, r = cudaq.qubit(), cudaq.qubit()
+        qubits = cudaq.qubit(2)
+
+        x(q) # apply x to q
+        x(q, r) # apply x to q and r
+        x(qubits) # for q in qubits: apply x 
+        ry(np.pi, qubits)
+
+        Valid single qubit operations are h, x, y, z, s, t, rx, ry, rz, r1. 
+
+        Measurements mx, my, mz are mapped to corresponding quake operations and the return i1 
+        value is added to the value stack. Measurements of single qubit reference and registers of 
+        qubits are supported. 
+
+        General calls to previously seen CUDA Quantum kernels are supported. By this we mean that 
+        an kernel can not be invoked from a kernel unless it was defined before the current kernel.
+        Kernels can also be reversed or controlled with cudaq.adjoint(kernel, ...) and cudaq.control(kernel, ...).
+
+        Finally, general operation modifiers are supported, specifically OPERATION.adj and OPERATION.ctrl 
+        for adjoint and control synthesis of the operation.  
+        """
         if self.verbose:
             print("[Visit Call] {}".format(ast.unparse(node)))
 
@@ -603,55 +678,17 @@ class PyASTBridge(ast.NodeVisitor):
                 numValues = len(self.valueStack)
                 qubitTargets = [self.popValue() for _ in range(numValues)]
                 qubitTargets.reverse()
-                opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
-                for qubit in qubitTargets:
-                    if quake.VeqType.isinstance(qubit.type):
-
-                        def bodyBuilder(iterVal):
-                            q = quake.ExtractRefOp(self.getRefType(),
-                                                   qubit,
-                                                   -1,
-                                                   index=iterVal).result
-                            opCtor([], [], [], [q])
-
-                        veqSize = quake.VeqSizeOp(self.getIntegerType(),
-                                                  qubit).result
-                        self.createInvariantForLoop(veqSize, bodyBuilder)
-                        # return
-                    elif quake.RefType.isinstance(qubit.type):
-                        opCtor([], [], [], [qubit])
-                        # return
-                    else:
-                        raise Exception(
-                            'quantum operation on incorrect type {}.'.format(
-                                qubit.type))
+                self.__applyQuantumOperation(node.func.id, [], qubitTargets)
                 return
 
             if node.func.id in ["rx", "ry", "rz", "r1"]:
-                target = self.popValue()
+                numValues = len(self.valueStack)
+                qubitTargets = [self.popValue() for _ in range(numValues-1)]
+                qubitTargets.reverse()
                 param = self.popValue()
-                opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
-                if quake.VeqType.isinstance(target.type):
-
-                    def bodyBuilder(iterVal):
-                        q = quake.ExtractRefOp(self.getRefType(),
-                                               target,
-                                               -1,
-                                               index=iterVal).result
-                        opCtor([], [param], [], [q])
-
-                    veqSize = quake.VeqSizeOp(self.getIntegerType(),
-                                              target).result
-                    self.createInvariantForLoop(veqSize, bodyBuilder)
-                    return
-                elif quake.RefType.isinstance(target.type):
-                    opCtor([], [param], [], [target])
-                    return
-                else:
-                    raise Exception(
-                        'adj quantum operation on incorrect type {}.'.format(
-                            target.type))
-
+                self.__applyQuantumOperation(node.func.id, [param], qubitTargets)
+                return 
+            
             if node.func.id in ['mx', 'my', 'mz']:
                 qubit = self.popValue()
                 # FIXME Handle registerName
@@ -944,6 +981,11 @@ class PyASTBridge(ast.NodeVisitor):
                             target.type))
 
     def visit_List(self, node):
+        """
+        This method will visit the ast.List node and represent lists of 
+        quantum typed values as a concatenated quake.ConcatOp producing a 
+        single veq instances. 
+        """
         if self.verbose:
             print('[Visit List] {}', ast.unparse(node))
         self.generic_visit(node)
@@ -965,6 +1007,9 @@ class PyASTBridge(ast.NodeVisitor):
             return
 
     def visit_Constant(self, node):
+        """
+        Convert constant values in the code to constant values in the MLIR. 
+        """
         if self.verbose:
             print("[Visit Constant {}]".format(node.value))
         if isinstance(node.value, int):
@@ -978,6 +1023,11 @@ class PyASTBridge(ast.NodeVisitor):
                 ast.unparse(node)))
 
     def visit_Subscript(self, node):
+        """
+        Convert element extractions (__getitem__, operator[](idx)) to 
+        corresponding extraction code in the MLIR. This method handles 
+        extraction for veq types and Stdvec types. 
+        """
         if self.verbose:
             print("[Visit Subscript]")
         self.generic_visit(node)
@@ -1004,16 +1054,16 @@ class PyASTBridge(ast.NodeVisitor):
                 ast.unparse(node)))
 
     def visit_For(self, node):
-        """Visit the For Stmt node. This node represents the typical 
-        Python for statement, `for VAR in ITERABLE`. Supports range(...) 
-        and qvector iterables."""
+        """
+        Visit the For Stmt node. This node represents the typical 
+        Python for statement, `for VAR in ITERABLE`. Currently supported 
+        ITERABLEs are the veq type, the stdvec type, and the result of 
+        range() and enumerate(). 
+        """
 
         if self.verbose:
             print('[Visit For]')
 
-        # We have here a `for VAR in range(...)`, where range produces
-        # an iterable sequence. We model this in visit_Call (range is a called function)
-        # as a cc.array of integer elements. So we visit that node here
         self.visit(node.iter)
         assert len(self.valueStack) > 0 and len(self.valueStack) < 3
 
@@ -1038,6 +1088,20 @@ class PyASTBridge(ast.NodeVisitor):
                                            index=idx).result
                     ]
 
+                extractFunctor = functor
+            elif cc.StdvecType.isinstance(iterable.type):
+                iterEleTy = self.getFloatType()
+                totalSize = cc.StdvecSizeOp(self.getIntegerType(),
+                                            iterable).result
+
+                def functor(iter, idxVal):
+                    elePtrTy = cc.PointerType.get(self.ctx, iterEleTy)
+                    vecPtr = cc.StdvecDataOp(elePtrTy, iter).result
+                    eleAddr = cc.ComputePtrOp(
+                        elePtrTy, vecPtr, [idxVal],
+                        DenseI32ArrayAttr.get([-2147483648],
+                                                context=self.ctx)).result
+                    return [cc.LoadOp(eleAddr).result]
                 extractFunctor = functor
 
             else:
@@ -1100,13 +1164,16 @@ class PyASTBridge(ast.NodeVisitor):
         self.createInvariantForLoop(totalSize, bodyBuilder)
 
     def visit_If(self, node):
+        """
+        Map a Python ast.If node to an if statement operation in the CC dialect. 
+        """
         if self.verbose:
             print("[Visit If = {}]".format(ast.unparse(node)))
 
         self.visit(node.test)
         condition = self.popValue()
         if self.getIntegerType(1) != condition.type:
-            # not equal to 0, then true
+            # not equal to 0, then compare with 1
             condPred = IntegerAttr.get(self.getIntegerType(), 1)
             condition = arith.CmpIOp(condPred, condition,
                                      self.getConstantInt(0)).result
@@ -1124,6 +1191,9 @@ class PyASTBridge(ast.NodeVisitor):
                 cc.ContinueOp([])
 
     def visit_UnaryOp(self, node):
+        """
+        Map unary operations in the Python AST to equivalents in MLIR.
+        """
         if self.verbose:
             print("[Visit Unary = {}]".format(ast.unparse(node)))
 
@@ -1140,6 +1210,11 @@ class PyASTBridge(ast.NodeVisitor):
         raise RuntimeError("unhandled UnaryOp: {}".format(ast.unparse(node)))
 
     def visit_BinOp(self, node):
+        """
+        Visit binary operation nodes in the AST and map them to equivalents in the 
+        MLIR. This method handles arithmetic operations between values. 
+        """
+
         if self.verbose:
             print("[Visit BinaryOp = {}]".format(ast.unparse(node)))
         self.generic_visit(node)
@@ -1221,6 +1296,9 @@ class PyASTBridge(ast.NodeVisitor):
                 ast.unparse(node), node.op))
 
     def visit_Name(self, node):
+        """
+        Visit ast.Name nodes and extract the correct value from the symbol table.
+        """
         if self.verbose:
             print("[Visit Name {}]".format(node.id))
 
@@ -1229,14 +1307,27 @@ class PyASTBridge(ast.NodeVisitor):
             if cc.PointerType.isinstance(value.type):
                 loaded = cc.LoadOp(value).result
                 self.pushValue(loaded)
-            elif cc.CallableType.isinstance(value.type):
+            # FIXME need to handle this one better
+            elif cc.CallableType.isinstance(value.type) and not BlockArgument.isinstance(value):
                 return
             else:
                 self.pushValue(self.symbolTable[node.id])
             return
 
 
-def compile_to_quake(astModule, **kwargs):
+def compile_to_mlir(astModule, **kwargs):
+    """
+    Compile the given Python AST Module for the CUDA Quantum 
+    kernel FunctionDef to an MLIR ModuleOp. 
+    Return both the ModuleOp and the list of function 
+    argument types as MLIR Types. 
+
+    This function will first check to see if there are any dependent 
+    kernels that are required by this function. If so, those kernels 
+    will also be compiled into the ModuleOp. The AST will be stored 
+    later for future potential dependent kernel lookups. 
+    """
+
     global globalAstRegistry
     verbose = 'verbose' in kwargs and kwargs['verbose']
 
@@ -1258,6 +1349,7 @@ def compile_to_quake(astModule, **kwargs):
     if verbose:
         print(bridge.module)
 
+    # Canonicalize the code
     pm = PassManager.parse("builtin.module(canonicalize,cse)",
                            context=bridge.ctx)
     pm.run(bridge.module)

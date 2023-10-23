@@ -21,6 +21,7 @@ spin = cudaq_runtime.spin
 qubit = cudaq_runtime.qubit
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
+qreg = cudaq_runtime.qvector
 SpinOperator = cudaq_runtime.SpinOperator
 Pauli = cudaq_runtime.Pauli
 

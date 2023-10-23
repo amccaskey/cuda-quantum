@@ -537,7 +537,7 @@ def test_for_loop():
     qubits = circuit.qalloc(inSize)
     circuit.h(qubits[0])
     # can pass concrete integers for both
-    circuit.for_loop(0, inSize - 1,
+    circuit.for_loop(0, inSize - 1, 
                      lambda index: circuit.cx(qubits[index], qubits[index + 1]))
     print(circuit)
     counts = cudaq.sample(circuit, 5)

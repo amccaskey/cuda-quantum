@@ -13,14 +13,30 @@ from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.execution_engine import *
 from mlir_cudaq.dialects import quake, cc
-from .ast_bridge import compile_to_quake
+from .ast_bridge import compile_to_mlir
 from .utils import mlirTypeFromPyType
 from .analysis import MidCircuitMeasurementAnalyzer
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
+# This file implements the decorator mechanism needed to 
+# JIT compile CUDA Quantum kernels. It exposes the cudaq.kernel() 
+# decorator which hooks us into the JIT compilation infrastructure 
+# which maps the AST representation to an MLIR representation and ultimately 
+# executable code. 
+
 
 class PyKernelDecorator(object):
+    """
+    The PyKernelDecorator serves as a standard Python decorator that 
+    takes the decorated function as input and optionally lowers its 
+    AST representation to executable code via MLIR. This decorator enables 
+    both library-mode execution (no JIT, just library calls to affect local simulation 
+    of the quantum code) and full JIT compilation mode, where the function is lowered
+    to an MLIR representation. 
 
+    This decorator exposes a call overload that executes the code via the 
+    MLIR ExecutionEngine if not in library mode. 
+    """
     def __init__(self,
                  function,
                  verbose=False,
@@ -62,7 +78,7 @@ class PyKernelDecorator(object):
 
             if not self.library_mode:
                 # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop)
-                self.module, self.argTypes = compile_to_quake(
+                self.module, self.argTypes = compile_to_mlir(
                     self.astModule, verbose=self.verbose)
 
             return
@@ -116,6 +132,9 @@ def kernel(function=None, **kwargs):
     attribute that programmers leverage to indicate the following function 
     is a CUDA Quantum kernel and should be compile and executed on 
     an available quantum coprocessor.
+
+    One can indicate JIT compilation to MLIR via the jit=True flag. Verbose 
+    logging can also be enabled via verbose=True. 
     """
     if function:
         return PyKernelDecorator(function)
