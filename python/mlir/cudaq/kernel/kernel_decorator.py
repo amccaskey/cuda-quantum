@@ -21,7 +21,13 @@ from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 class PyKernelDecorator(object):
 
-    def __init__(self, function, verbose=False, library_mode=True, jit=False, module=None, kernelName=None):
+    def __init__(self,
+                 function,
+                 verbose=False,
+                 library_mode=True,
+                 jit=False,
+                 module=None,
+                 kernelName=None):
         self.kernelFunction = function
         self.module = None if module == None else module
         self.executionEngine = None
@@ -51,7 +57,8 @@ class PyKernelDecorator(object):
             analyzer = MidCircuitMeasurementAnalyzer()
             analyzer.visit(self.astModule)
             self.metadata = {
-                'conditionalOnMeasure': analyzer.hasMidCircuitMeasures}
+                'conditionalOnMeasure': analyzer.hasMidCircuitMeasures
+            }
 
             if not self.library_mode:
                 # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop)
@@ -76,9 +83,11 @@ class PyKernelDecorator(object):
         processedArgs = []
         callableNames = []
         for i, arg in enumerate(args):
-            mlirType = mlirTypeFromPyType(
-                type(arg), self.module.context, argInstance=arg)
-            if not cc.CallableType.isinstance(mlirType) and mlirType != self.argTypes[i]:
+            mlirType = mlirTypeFromPyType(type(arg),
+                                          self.module.context,
+                                          argInstance=arg)
+            if not cc.CallableType.isinstance(
+                    mlirType) and mlirType != self.argTypes[i]:
                 raise RuntimeError("invalid runtime arg type ({} vs {})".format(
                     mlirType, self.argTypes[i]))
             if cc.CallableType.isinstance(mlirType):
@@ -88,13 +97,17 @@ class PyKernelDecorator(object):
             # Convert np arrays to lists
             if cc.StdvecType.isinstance(mlirType) and hasattr(arg, "tolist"):
                 if arg.ndim != 1:
-                    raise RuntimeError('CUDA Quantum kernels only support 1D numpy array arguments.')
+                    raise RuntimeError(
+                        'CUDA Quantum kernels only support 1D numpy array arguments.'
+                    )
                 processedArgs.append(arg.tolist())
             else:
                 processedArgs.append(arg)
 
-        cudaq_runtime.pyAltLaunchKernel(
-            self.name, self.module, *processedArgs, callable_names=callableNames)
+        cudaq_runtime.pyAltLaunchKernel(self.name,
+                                        self.module,
+                                        *processedArgs,
+                                        callable_names=callableNames)
 
 
 def kernel(function=None, **kwargs):
