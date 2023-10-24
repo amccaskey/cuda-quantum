@@ -992,6 +992,31 @@ class PyASTBridge(ast.NodeVisitor):
                         'adj quantum operation on incorrect type {}.'.format(
                             target.type))
 
+    def visit_ListComp(self, node):
+        """
+        This method currently supports lowering simple list comprehensions 
+        to the MLIR. By simple, we mean expressions like 
+        `[expr(iter) for iter in iterable]`
+        """
+
+        if len(node.generators) > 1:
+            raise RuntimeError(
+                "currently only support single generators for list comprehension."
+            )
+
+        if not isinstance(node.generators[0].target, ast.Name):
+            raise RuntimeError(
+                "only support named targets in list comprehension")
+
+        # now we know we have [expr(r) for r in iterable]
+        # reuse what we do in visit_For()
+        forNode = ast.For()
+        forNode.iter = node.generators[0].iter
+        forNode.target = node.generators[0].target
+        forNode.body = [node.elt]
+        self.visit_For(forNode)
+        return
+
     def visit_List(self, node):
         """
         This method will visit the ast.List node and represent lists of 
@@ -1017,6 +1042,32 @@ class PyASTBridge(ast.NodeVisitor):
                     quake.ConcatOp(self.getVeqType(),
                                    [self.popValue() for _ in valueTys]).result)
             return
+
+        # not a list of quantum types
+        values = [self.popValue() for _ in valueTys]
+        values.reverse()
+        firstTy = values[0].type
+        for v in values:
+            if firstTy != v.type:
+                raise RuntimeError(
+                    "non-homogenous list not allowed - must all be same type.")
+
+        arrSize = self.getConstantInt(len(node.elts))
+        arrTy = cc.ArrayType.get(self.ctx, values[0].type)
+        alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, arrTy),
+                             TypeAttr.get(values[0].type),
+                             seqSize=arrSize).result
+
+        for i, v in enumerate(values):
+            eleAddr = cc.ComputePtrOp(
+                cc.PointerType.get(self.ctx, values[0].type), alloca,
+                [self.getConstantInt(i)],
+                DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
+            cc.StoreOp(v, eleAddr)
+
+        self.pushValue(
+            cc.StdvecInitOp(cc.StdvecType.get(self.ctx, values[0].type), alloca,
+                            arrSize).result)
 
     def visit_Constant(self, node):
         """

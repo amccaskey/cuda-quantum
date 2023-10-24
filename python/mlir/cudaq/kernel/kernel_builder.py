@@ -482,7 +482,7 @@ class PyKernel(object):
 
     def from_state(self, qubits, state):
         raise RuntimeError("from_state not yet implemented.")
-    
+
     def cswap(self, controls, qubitA, qubitB):
         """
         Controlled swap of the states of the provided qubits. 
