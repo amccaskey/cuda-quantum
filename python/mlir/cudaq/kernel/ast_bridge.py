@@ -728,6 +728,15 @@ class PyASTBridge(ast.NodeVisitor):
                         cc.CallableType.getFunctionType(val.type), val).result
                     func.CallIndirectOp([], callable, values)
                     return
+            elif node.func.id == 'exp_pauli':
+                for v in self.valueStack: print(v)
+
+                pauliWord = self.popValue()
+                qubits = self.popValue()
+                theta = self.popValue()
+
+                quake.ExpPauliOp(theta, qubits, pauliWord)
+                return 
 
             else:
                 raise RuntimeError("unhandled function call - {}".format(
@@ -1017,6 +1026,10 @@ class PyASTBridge(ast.NodeVisitor):
             return
         elif isinstance(node.value, float):
             self.pushValue(self.getConstantFloat(node.value))
+            return
+        elif isinstance(node.value, str):
+            strLitTy = cc.PointerType.get(self.ctx, cc.ArrayType.get(self.ctx, self.getIntegerType(8), len(node.value)+1))
+            self.pushValue(cc.CreateStringLiteralOp(strLitTy, StringAttr.get(node.value)).result)
             return
         else:
             raise RuntimeError("unhandled constant: {}".format(

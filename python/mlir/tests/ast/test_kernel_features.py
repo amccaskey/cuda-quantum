@@ -75,6 +75,30 @@ def test_adjoint():
     assert len(counts) == 1
     assert '101' in counts
 
+def test_exp_pauli():
+    h2_data = [
+      3, 1, 1, 3, 0.0454063,  0,  2,  0, 0, 0, 0.17028,    0,
+      0, 0, 2, 0, -0.220041,  -0, 1,  3, 3, 1, 0.0454063,  0,
+      0, 0, 0, 0, -0.106477,  0,  0,  2, 0, 0, 0.17028,    0,
+      0, 0, 0, 2, -0.220041,  -0, 3,  3, 1, 1, -0.0454063, -0,
+      2, 2, 0, 0, 0.168336,   0,  2,  0, 2, 0, 0.1202,     0,
+      0, 2, 0, 2, 0.1202,     0,  2,  0, 0, 2, 0.165607,   0,
+      0, 2, 2, 0, 0.165607,   0,  0,  0, 2, 2, 0.174073,   0,
+      1, 1, 3, 3, -0.0454063, -0, 15
+    ]
+    h = cudaq.SpinOperator(h2_data, 4)
+
+    @cudaq.kernel(jit=True, verbose=True)
+    def kernel(theta:float):
+        q = cudaq.qvector(4)
+        x(q[0])
+        x(q[1])
+        exp_pauli(theta, q, 'XXXY')
+
+    print(kernel)
+    want_exp = cudaq.observe(kernel, h, .11).expectation_z()
+    assert np.isclose(want_exp, -1.13, atol=1e-2)
+
 
 # Fail due to Issue 806 (swap lowering) and 805
 # @pytest.mark.xfail

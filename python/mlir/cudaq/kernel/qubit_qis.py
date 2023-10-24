@@ -16,12 +16,14 @@ from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
 qubit = cudaq_runtime.qubit
-
+SpinOperator = cudaq_runtime.SpinOperator
 
 def processQubitIds(opName, *args):
-    """Return the qubit unique ID integers for a general tuple of 
+    """
+    Return the qubit unique ID integers for a general tuple of 
     kernel arguments, where all arguments are assumed to be qubit-like 
-    (qvector, qview, qubit)."""
+    (qvector, qview, qubit).
+    """
     qubitIds = []
     for a in args:
         if isinstance(a, qubit):
@@ -35,24 +37,31 @@ def processQubitIds(opName, *args):
 
 
 class quantum_operation(object):
-    """A quantum_operation provides a base class interface for invoking 
+    """
+    A quantum_operation provides a base class interface for invoking 
     a specific quantum gate, as well as controlled and adjoint versions 
-    of the gate."""
+    of the gate.
+    """
 
     @staticmethod
     @abstractmethod
     def get_name():
-        """Return the name of this operation."""
+        """
+        Return the name of this operation.
+        """
         pass
 
     @classmethod
     def get_num_parameters(cls):
-        """Return the number of rotational parameters this operation requires."""
+        """
+        Return the number of rotational parameters this operation requires.
+        """
         return 0
 
     @classmethod
     def __call__(cls, *args):
-        """Invoke the quantum operation. The args can contain float parameters (of the
+        """
+        Invoke the quantum operation. The args can contain float parameters (of the
         correct number according to get_num_parameters) and quantum types (qubit, qvector, qview).
         """
         opName = cls.get_name()
@@ -63,9 +72,11 @@ class quantum_operation(object):
 
     @classmethod
     def ctrl(cls, *args):
-        """Invoke the general controlled version of the quantum operation. 
+        """
+        Invoke the general controlled version of the quantum operation. 
         The args can contain float parameters (of the correct number according
-        to get_num_parameters) and quantum types (qubit, qvector, qview)."""
+        to get_num_parameters) and quantum types (qubit, qvector, qview).
+        """
         opName = cls.get_name()
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
@@ -75,9 +86,11 @@ class quantum_operation(object):
 
     @classmethod
     def adj(cls, *args):
-        """Invoke the general adjoint version of the quantum operation. 
+        """
+        Invoke the general adjoint version of the quantum operation. 
         The args can contain float parameters (of the correct number according
-        to get_num_parameters) and quantum types (qubit, qvector, qview)."""
+        to get_num_parameters) and quantum types (qubit, qvector, qview).
+        """
         opName = cls.get_name()
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
@@ -104,7 +117,9 @@ r1 = type('r1', (quantum_operation,), {'get_name': staticmethod(
 
 
 class swap(object):
-    """The swap operation. Can be controlled on any number of qubits via the `ctrl` method."""
+    """
+    The swap operation. Can be controlled on any number of qubits via the `ctrl` method.
+    """
     @staticmethod
     def __call__(first, second):
         cudaq_runtime.applyQuantumOperation(
@@ -116,6 +131,11 @@ class swap(object):
         cudaq_runtime.applyQuantumOperation(
             __class__.__name__, [], qubitIds[:len(qubitIds)-2], [qubitIds[-2], qubitIds[-1]])
 
+def exp_pauli(theta, qubits, pauliWord):
+    """
+    Apply a general Pauli tensor product rotation, `exp(i theta P)`,
+    """
+    cudaq_runtime.applyQuantumOperation('exp_pauli', [theta], [], [q.id() for q in qubits], False, SpinOperator.from_word(pauliWord))
 
 def mz(*args, register_name=''):
     """Measure the qubit along the z-axis."""
