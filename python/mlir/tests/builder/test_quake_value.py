@@ -31,7 +31,7 @@ def test_quake_value_operators(type_):
     test = 1. * value_0
     assert type(test) == cudaq.QuakeValue
     assert test != value_0
-    kernel.dump()
+    print(kernel.__str__(canonicalize=False))
 
     # Addition.
     test = value_0 + 1.
@@ -65,7 +65,7 @@ def test_quake_value_operators(type_):
 
     # Division 
     test = value_0 / 8
-    kernel.dump()
+    print(kernel.__str__(canonicalize=False))
 
 def test_QuakeValueSize():
     kernel, thetas, runtimeSize = cudaq.make_kernel(list, int)

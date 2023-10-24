@@ -19,6 +19,7 @@ from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 from .utils import mlirTypeFromPyType
+
 qvector = cudaq_runtime.qvector
 
 class QuakeValue(object):

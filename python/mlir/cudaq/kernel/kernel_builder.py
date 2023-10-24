@@ -8,7 +8,8 @@
 from functools import partialmethod
 import random
 import string
-from .quake_value import QuakeValue, mlirTypeFromPyType
+from .quake_value import QuakeValue
+from .utils import mlirTypeFromPyType, nvqppPrefix
 
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
@@ -129,9 +130,9 @@ class PyKernel(object):
         self.regCounter = 0
         self.loc = Location.unknown(context=self.ctx)
         self.module = Module.create(loc=self.loc)
-        self.funcName = '__nvqpp__mlirgen____nvqppBuilderKernel_{}'.format(''.join(
+        self.funcName = '{}__nvqppBuilderKernel_{}'.format(nvqppPrefix, ''.join(
             random.choice(string.ascii_uppercase + string.digits) for _ in range(10)))
-        self.name = self.funcName.removeprefix('__nvqpp__mlirgen__')
+        self.name = self.funcName.removeprefix(nvqppPrefix)
         self.funcNameEntryPoint = self.funcName + '_entryPointRewrite'
         attr = DictAttr.get({self.funcName: StringAttr.get(
             self.funcNameEntryPoint, context=self.ctx)}, context=self.ctx)
@@ -275,7 +276,7 @@ class PyKernel(object):
         with self.insertPoint, self.loc:
             otherModule = Module.parse(str(target.module), self.ctx)
             otherFuncCloned = self.__cloneOrGetFunction(
-                '__nvqpp__mlirgen__' + target.name, self.module, otherModule)
+                nvqppPrefix + target.name, self.module, otherModule)
             self.__addAllCalledFunctionsRecursively(
                 otherFuncCloned, self.module, otherModule)
             otherFTy = otherFuncCloned.body.blocks[0].arguments

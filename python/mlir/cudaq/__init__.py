@@ -21,9 +21,10 @@ spin = cudaq_runtime.spin
 qubit = cudaq_runtime.qubit
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
-qreg = cudaq_runtime.qvector
 SpinOperator = cudaq_runtime.SpinOperator
 Pauli = cudaq_runtime.Pauli
+# to be deprecated
+qreg = cudaq_runtime.qvector
 
 # Optimizers + Gradients
 optimizers = cudaq_runtime.optimizers
