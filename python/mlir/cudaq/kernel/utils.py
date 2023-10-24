@@ -10,12 +10,12 @@ from mlir_cudaq.dialects import quake, cc
 
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
-import numpy as np 
-from typing import Callable 
+import numpy as np
+from typing import Callable
 
 qvector = cudaq_runtime.qvector
 qubit = cudaq_runtime.qubit
-qreg = qvector 
+qreg = qvector
 
 nvqppPrefix = '__nvqpp__mlirgen__'
 
@@ -27,9 +27,10 @@ globalKernelRegistry = {}
 # keyed on their name (without __nvqpp__mlirgen__ prefix)
 globalAstRegistry = {}
 
+
 # By default and to keep things easier,
 # we only deal with int==i64 and float=f64
-def mlirTypeFromPyType(argType, ctx, argInstance = None):
+def mlirTypeFromPyType(argType, ctx, argInstance=None):
     if argType == int:
         return IntegerType.get_signless(64, ctx)
     if argType == float:
@@ -43,5 +44,6 @@ def mlirTypeFromPyType(argType, ctx, argInstance = None):
     if isinstance(argInstance, Callable):
         return cc.CallableType.get(ctx, argInstance.argTypes)
 
-
-    raise RuntimeError("can not handle conversion of python type {} to mlir type.".format(argType))
+    raise RuntimeError(
+        "can not handle conversion of python type {} to mlir type.".format(
+            argType))

@@ -25,20 +25,24 @@ qvector = cudaq_runtime.qvector
 # We need static initializers to run in the CAPI ExecutionEngine,
 # so here we run a simple JIT compile at global scope
 with Context():
-    module = Module.parse(
-        r"""
+    module = Module.parse(r"""
 llvm.func @none() {
   llvm.return
 }""")
     ExecutionEngine(module)
 
 
-def __generalOperation(self, opName, parameters, controls, target, isAdj=False, context=None):
+def __generalOperation(self,
+                       opName,
+                       parameters,
+                       controls,
+                       target,
+                       isAdj=False,
+                       context=None):
     opCtor = getattr(quake, '{}Op'.format(opName.title()))
 
     if quake.RefType.isinstance(target.mlirValue.type):
-        opCtor([], parameters, controls,
-               [target.mlirValue], is_adj=isAdj)
+        opCtor([], parameters, controls, [target.mlirValue], is_adj=isAdj)
         return
 
     # Must be a veq, get the size
@@ -56,8 +60,11 @@ def __generalOperation(self, opName, parameters, controls, target, isAdj=False, 
 
 def __singleTargetOperation(self, opName, target, isAdj=False):
     with self.insertPoint, self.loc:
-        __generalOperation(self, opName, [], [], target,
-                           isAdj=isAdj, context=self.ctx)
+        __generalOperation(self,
+                           opName, [], [],
+                           target,
+                           isAdj=isAdj,
+                           context=self.ctx)
 
 
 def __singleTargetControlOperation(self, opName, controls, target, isAdj=False):
@@ -65,16 +72,26 @@ def __singleTargetControlOperation(self, opName, controls, target, isAdj=False):
         fwdControls = None
         if isinstance(controls, list):
             fwdControls = [c.mlirValue for c in controls]
-        elif quake.RefType.isinstance(controls.mlirValue.type) or quake.VeqType.isinstance(controls.mlirValue.type):
+        elif quake.RefType.isinstance(
+                controls.mlirValue.type) or quake.VeqType.isinstance(
+                    controls.mlirValue.type):
             fwdControls = [controls.mlirValue]
         else:
             raise RuntimeError("invalid controls type for {}.", opName)
 
-        __generalOperation(self, opName, [], fwdControls, target,
-                           isAdj=isAdj, context=self.ctx)
+        __generalOperation(self,
+                           opName, [],
+                           fwdControls,
+                           target,
+                           isAdj=isAdj,
+                           context=self.ctx)
 
 
-def __singleTargetSingleParameterOperation(self, opName, parameter, target, isAdj=False):
+def __singleTargetSingleParameterOperation(self,
+                                           opName,
+                                           parameter,
+                                           target,
+                                           isAdj=False):
     with self.insertPoint, self.loc:
         paramVal = None
         if isinstance(parameter, float):
@@ -82,16 +99,26 @@ def __singleTargetSingleParameterOperation(self, opName, parameter, target, isAd
             paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
         else:
             paramVal = parameter.mlirValue
-        __generalOperation(self, opName, [paramVal], [], target,
-                           isAdj=isAdj, context=self.ctx)
+        __generalOperation(self,
+                           opName, [paramVal], [],
+                           target,
+                           isAdj=isAdj,
+                           context=self.ctx)
 
 
-def __singleTargetSingleParameterControlOperation(self, opName, parameter, controls, target, isAdj=False):
+def __singleTargetSingleParameterControlOperation(self,
+                                                  opName,
+                                                  parameter,
+                                                  controls,
+                                                  target,
+                                                  isAdj=False):
     with self.insertPoint, self.loc:
         fwdControls = None
         if isinstance(controls, list):
             fwdControls = [c.mlirValue for c in controls]
-        elif quake.RefType.isinstance(controls.mlirValue.type) or quake.VeqType.isinstance(controls.mlirValue.type):
+        elif quake.RefType.isinstance(
+                controls.mlirValue.type) or quake.VeqType.isinstance(
+                    controls.mlirValue.type):
             fwdControls = [controls.mlirValue]
         else:
             raise RuntimeError("invalid controls type for {}.", opName)
@@ -101,8 +128,12 @@ def __singleTargetSingleParameterControlOperation(self, opName, parameter, contr
             fty = mlirTypeFromPyType(float, self.ctx)
             paramVal = arith.ConstantOp(fty, FloatAttr.get(fty, parameter))
 
-        __generalOperation(self, opName, [paramVal], fwdControls, target,
-                           isAdj=isAdj, context=self.ctx)
+        __generalOperation(self,
+                           opName, [paramVal],
+                           fwdControls,
+                           target,
+                           isAdj=isAdj,
+                           context=self.ctx)
 
 
 class PyKernel(object):
@@ -126,18 +157,24 @@ class PyKernel(object):
         quake.register_dialect(self.ctx)
         cc.register_dialect(self.ctx)
 
-        self.metadata = {'conditionalOnMeasure':False}
+        self.metadata = {'conditionalOnMeasure': False}
         self.regCounter = 0
         self.loc = Location.unknown(context=self.ctx)
         self.module = Module.create(loc=self.loc)
-        self.funcName = '{}__nvqppBuilderKernel_{}'.format(nvqppPrefix, ''.join(
-            random.choice(string.ascii_uppercase + string.digits) for _ in range(10)))
+        self.funcName = '{}__nvqppBuilderKernel_{}'.format(
+            nvqppPrefix, ''.join(
+                random.choice(string.ascii_uppercase + string.digits)
+                for _ in range(10)))
         self.name = self.funcName.removeprefix(nvqppPrefix)
         self.funcNameEntryPoint = self.funcName + '_entryPointRewrite'
-        attr = DictAttr.get({self.funcName: StringAttr.get(
-            self.funcNameEntryPoint, context=self.ctx)}, context=self.ctx)
-        self.module.operation.attributes.__setitem__(
-            'quake.mangled_name_map', attr)
+        attr = DictAttr.get(
+            {
+                self.funcName:
+                    StringAttr.get(self.funcNameEntryPoint, context=self.ctx)
+            },
+            context=self.ctx)
+        self.module.operation.attributes.__setitem__('quake.mangled_name_map',
+                                                     attr)
 
         with self.ctx, InsertionPoint(self.module.body), self.loc:
             self.mlirArgTypes = [
@@ -146,12 +183,10 @@ class PyKernel(object):
 
             self.funcOp = func.FuncOp(self.funcName, (self.mlirArgTypes, []),
                                       loc=self.loc)
-            self.funcOp.attributes.__setitem__(
-                'cudaq-entrypoint', UnitAttr.get())
+            self.funcOp.attributes.__setitem__('cudaq-entrypoint',
+                                               UnitAttr.get())
             e = self.funcOp.add_entry_block()
-            self.arguments = [
-                self.__createQuakeValue(b) for b in e.arguments
-            ]
+            self.arguments = [self.__createQuakeValue(b) for b in e.arguments]
             self.argument_count = len(self.arguments)
 
             with InsertionPoint(e):
@@ -222,6 +257,12 @@ class PyKernel(object):
         return QuakeValue(value, self)
 
     def __cloneOrGetFunction(self, name, currentModule, otherModule):
+        """
+        Get a the function with the given name. First look in the
+        current `ModuleOp` for this `kernel_builder`, if found return it as is. If
+        not found, find it in the other `kernel_builder` `ModuleOp` and return a
+        clone of it. Throw an exception if no kernel with the given name is found
+        """
         thisSymbolTable = SymbolTable(currentModule.operation)
         if name in thisSymbolTable:
             return thisSymbolTable[name]
@@ -235,37 +276,55 @@ class PyKernel(object):
 
         raise RuntimeError("could not find function with name {}".format(name))
 
-    def __addAllCalledFunctionsRecursively(self, otherFunc, currentModule, otherModule):
+    def __addAllCalledFunctionsRecursively(self, otherFunc, currentModule,
+                                           otherModule):
+        """
+        Search the given `FuncOp` for all `CallOps` recursively.
+        If found, see if the called function is in the current `ModuleOp`
+        for this `kernel_builder`, if so do nothing. If it is not found,
+        then find it in the other `ModuleOp`, clone it, and add it to this
+        `ModuleOp`.
+        """
 
-        def visitAllCallOps(op):
-            calleeName = ''
-            if isinstance(op, func.FuncOp):
-                calleeName = op.sym_name.value
-            elif isinstance(op, quake.ApplyOp):
-                # FIXME need to test this
-                calleeName = op.attributes['callee'].value
+        def walk(topLevel, functor):
+            if isinstance(topLevel, func.FuncOp):
+                for block in topLevel.body:
+                    for op in block:
+                        functor(op)
+                        walk(op, functor)
 
-            if len(calleeName) == 0:
-                return
+        def visitAllCallOps(funcOp):
 
-            currentST = SymbolTable(currentModule.operation)
-            if calleeName in currentST:
-                return
+            def functor(op):
+                calleeName = ''
+                if isinstance(op, func.CallOp or isinstance(op, quake.ApplyOp)):
+                    calleeName = FlatSymbolRefAttr(
+                        op.attributes['callee']).value
 
-            otherST = SymbolTable(otherModule.operation)
-            if calleeName not in otherST:
-                raise RuntimeError(
-                    "invalid called function, cannot find in ModuleOp {}".format(calleeName))
+                if len(calleeName) == 0:
+                    return
 
-            cloned = otherST[calleeName].operation.clone()
-            cloned.operation.attributes.__delitem__('cudaq-entrypoint')
-            currentModule.body.append(cloned)
+                currentST = SymbolTable(currentModule.operation)
+                if calleeName in currentST:
+                    return
 
-            visitAllCallOps(cloned)
+                otherST = SymbolTable(otherModule.operation)
+                if calleeName not in otherST:
+                    raise RuntimeError(
+                        "invalid called function, cannot find in ModuleOp {}".
+                        format(calleeName))
 
-            return
+                cloned = otherST[calleeName].operation.clone()
+                if 'cudaq-entrypoint' in cloned.operation.attributes:
+                    cloned.operation.attributes.__delitem__('cudaq-entrypoint')
+                currentModule.body.append(cloned)
+
+                visitAllCallOps(cloned)
+
+            walk(funcOp, functor)
 
         visitAllCallOps(otherFunc)
+        return
 
     def __applyControlOrAdjoint(self, target, isAdjoint, controls, *args):
         """
@@ -277,8 +336,8 @@ class PyKernel(object):
             otherModule = Module.parse(str(target.module), self.ctx)
             otherFuncCloned = self.__cloneOrGetFunction(
                 nvqppPrefix + target.name, self.module, otherModule)
-            self.__addAllCalledFunctionsRecursively(
-                otherFuncCloned, self.module, otherModule)
+            self.__addAllCalledFunctionsRecursively(otherFuncCloned,
+                                                    self.module, otherModule)
             otherFTy = otherFuncCloned.body.blocks[0].arguments
             mlirValues = []
             for i, v in enumerate(args):
@@ -286,16 +345,21 @@ class PyKernel(object):
                 value = v.mlirValue
                 inTy = value.type
 
-                if (quake.VeqType.isinstance(inTy) and quake.VeqType.isinstance(argTy)):
-                    if quake.VeqType.getSize(inTy) and not quake.VeqType.getSize(argTy):
+                if (quake.VeqType.isinstance(inTy) and
+                        quake.VeqType.isinstance(argTy)):
+                    if quake.VeqType.getSize(
+                            inTy) and not quake.VeqType.getSize(argTy):
                         value = quake.RelaxSizeOp(argTy, value).result
                 # elif inTy != argTy: FIXME check this
 
                 mlirValues.append(value)
             if isAdjoint or len(controls) > 0:
-                quake.ApplyOp([], [], controls,
+                quake.ApplyOp([], [],
+                              controls,
                               mlirValues,
-                              callee=FlatSymbolRefAttr.get(otherFuncCloned.name.value), is_adj=isAdjoint)
+                              callee=FlatSymbolRefAttr.get(
+                                  otherFuncCloned.name.value),
+                              is_adj=isAdjoint)
             else:
                 func.CallOp(otherFuncCloned, mlirValues)
 
@@ -304,9 +368,8 @@ class PyKernel(object):
         Return a string representation of this kernels MLIR Module.
         """
         if canonicalize:
-            pm = PassManager.parse(
-                "builtin.module(canonicalize,cse)",
-                context=self.ctx)
+            pm = PassManager.parse("builtin.module(canonicalize,cse)",
+                                   context=self.ctx)
             cloned = cudaq_runtime.cloneModuleOp(self.module)
             pm.run(cloned)
             return str(cloned)
@@ -354,13 +417,15 @@ class PyKernel(object):
             thetaVal = None
             if isinstance(theta, float):
                 fty = mlirTypeFromPyType(float, self.ctx)
-                thetaVal = arith.ConstantOp(
-                    fty, FloatAttr.get(fty, theta)).result
+                thetaVal = arith.ConstantOp(fty, FloatAttr.get(fty,
+                                                               theta)).result
             else:
                 thetaVal = theta.mlirValue
 
-            retTy = cc.PointerType.get(self.ctx, cc.ArrayType.get(self.ctx,
-                                                                  IntegerType.get_signless(8), int(len(pauliWord)+1)))
+            retTy = cc.PointerType.get(
+                self.ctx,
+                cc.ArrayType.get(self.ctx, IntegerType.get_signless(8),
+                                 int(len(pauliWord) + 1)))
             slVal = cc.CreateStringLiteralOp(retTy, pauliWord)
             quake.ExpPauliOp(thetaVal, qubits.mlirValue, slVal)
 
@@ -395,8 +460,8 @@ class PyKernel(object):
             size = quake.VeqType.getSize(target.mlirValue.type)
             if size:
                 for i in range(size):
-                    extracted = quake.ExtractRefOp(
-                        quake.RefType.get(self.ctx), target.mlirValue, i).result
+                    extracted = quake.ExtractRefOp(quake.RefType.get(self.ctx),
+                                                   target.mlirValue, i).result
                     quake.ResetOp([], extracted)
                 return
             else:
@@ -440,8 +505,10 @@ class PyKernel(object):
             if quake.VeqType.isinstance(target.mlirValue.type):
                 retTy = stdvecTy
 
-            res = quake.MzOp(retTy, [], [target.mlirValue], registerName=StringAttr.get(
-                regName, context=self.ctx) if regName is not None else '')
+            res = quake.MzOp(
+                retTy, [], [target.mlirValue],
+                registerName=StringAttr.get(regName, context=self.ctx)
+                if regName is not None else '')
             return self.__createQuakeValue(res.result)
 
     def mx(self, target, regName=None):
@@ -480,8 +547,9 @@ class PyKernel(object):
             stdvecTy = cc.StdvecType.get(self.ctx, i1Ty)
             if quake.VeqType.isinstance(target.mlirValue.type):
                 retTy = stdvecTy
-            res = quake.MxOp(retTy, [], [target.mlirValue], registerName=StrAttr.get(
-                regName, context=self.ctx) if regName is not None else '')
+            res = quake.MxOp(retTy, [], [target.mlirValue],
+                             registerName=StrAttr.get(regName, context=self.ctx)
+                             if regName is not None else '')
             return self.__createQuakeValue(res.result)
 
     def my(self, target, regName=None):
@@ -520,8 +588,9 @@ class PyKernel(object):
             stdvecTy = cc.StdvecType.get(self.ctx, i1Ty)
             if quake.VeqType.isinstance(target.mlirValue.type):
                 retTy = stdvecTy
-            res = quake.MyOp(retTy, [], [target.mlirValue], registerName=StrAttr.get(
-                regName, context=self.ctx) if regName is not None else '')
+            res = quake.MyOp(retTy, [], [target.mlirValue],
+                             registerName=StrAttr.get(regName, context=self.ctx)
+                             if regName is not None else '')
             return self.__createQuakeValue(res.result)
 
     def adjoint(self, otherKernel, *args):
@@ -660,7 +729,9 @@ class PyKernel(object):
                     conditional.owner.attributes['registerName']).value
                 if len(regName) == 0:
                     conditional.owner.attributes.__setitem__(
-                        'registerName', StringAttr.get('auto_register_{}'.format(self.regCounter)))
+                        'registerName',
+                        StringAttr.get('auto_register_{}'.format(
+                            self.regCounter)))
                     self.regCounter += 1
 
             if self.getIntegerType(1) != conditional.type:
@@ -720,22 +791,22 @@ class PyKernel(object):
             stepVal = None
 
             if isinstance(start, int):
-                startVal = arith.ConstantOp(
-                    iTy, IntegerAttr.get(iTy, start)).result
+                startVal = arith.ConstantOp(iTy, IntegerAttr.get(iTy,
+                                                                 start)).result
             elif isinstance(start, QuakeValue):
                 startVal = start.mlirValue
             else:
-                raise RuntimeError(
-                    "invalid start value passed to for_loop: ", start)
+                raise RuntimeError("invalid start value passed to for_loop: ",
+                                   start)
 
             if isinstance(stop, int):
-                endVal = arith.ConstantOp(
-                    iTy, IntegerAttr.get(iTy, stop)).result
+                endVal = arith.ConstantOp(iTy, IntegerAttr.get(iTy,
+                                                               stop)).result
             elif isinstance(stop, QuakeValue):
                 endVal = stop.mlirValue
             else:
-                raise RuntimeError(
-                    "invalid stop value passed to for_loop: ", stop)
+                raise RuntimeError("invalid stop value passed to for_loop: ",
+                                   stop)
 
             stepVal = arith.ConstantOp(iTy, IntegerAttr.get(iTy, 1)).result
             inputs = [startVal]
@@ -744,13 +815,11 @@ class PyKernel(object):
 
             whileBlock = Block.create_at_start(loop.whileRegion, [iTy])
             with InsertionPoint(whileBlock):
-                condPred = IntegerAttr.get(
-                    iTy, 2)
+                condPred = IntegerAttr.get(iTy, 2)
                 # if not isDecrementing else IntegerAttr.get(iTy, 4)
                 cc.ConditionOp(
-                    arith.CmpIOp(
-                        condPred, whileBlock.arguments[0], endVal).result,
-                    whileBlock.arguments)
+                    arith.CmpIOp(condPred, whileBlock.arguments[0],
+                                 endVal).result, whileBlock.arguments)
 
             bodyBlock = Block.create_at_start(loop.bodyRegion, [iTy])
             with InsertionPoint(bodyBlock):
@@ -791,8 +860,9 @@ class PyKernel(object):
         kernel(5, 3.14))
         """
         if len(args) != len(self.mlirArgTypes):
-            raise RuntimeError("invalid number of arguments passed to kernel {} (passed {} but requires {})".format(
-                self.funcName, len(args), len(self.mlirArgTypes)))
+            raise RuntimeError(
+                "invalid number of arguments passed to kernel {} (passed {} but requires {})"
+                .format(self.funcName, len(args), len(self.mlirArgTypes)))
 
         # validate the arg types
         processedArgs = []
@@ -817,10 +887,10 @@ setattr(PyKernel, 'y', partialmethod(__singleTargetOperation, 'y'))
 setattr(PyKernel, 'z', partialmethod(__singleTargetOperation, 'z'))
 setattr(PyKernel, 's', partialmethod(__singleTargetOperation, 's'))
 setattr(PyKernel, 't', partialmethod(__singleTargetOperation, 't'))
-setattr(PyKernel, 'sdg', partialmethod(
-    __singleTargetOperation, 's', isAdj=True))
-setattr(PyKernel, 'tdg', partialmethod(
-    __singleTargetOperation, 't', isAdj=True))
+setattr(PyKernel, 'sdg', partialmethod(__singleTargetOperation, 's',
+                                       isAdj=True))
+setattr(PyKernel, 'tdg', partialmethod(__singleTargetOperation, 't',
+                                       isAdj=True))
 
 setattr(PyKernel, 'ch', partialmethod(__singleTargetControlOperation, 'h'))
 setattr(PyKernel, 'cx', partialmethod(__singleTargetControlOperation, 'x'))
@@ -829,23 +899,23 @@ setattr(PyKernel, 'cz', partialmethod(__singleTargetControlOperation, 'z'))
 setattr(PyKernel, 'cs', partialmethod(__singleTargetControlOperation, 's'))
 setattr(PyKernel, 'ct', partialmethod(__singleTargetControlOperation, 't'))
 
-setattr(PyKernel, 'rx', partialmethod(
-    __singleTargetSingleParameterOperation, 'rx'))
-setattr(PyKernel, 'ry', partialmethod(
-    __singleTargetSingleParameterOperation, 'ry'))
-setattr(PyKernel, 'rz', partialmethod(
-    __singleTargetSingleParameterOperation, 'rz'))
-setattr(PyKernel, 'r1', partialmethod(
-    __singleTargetSingleParameterOperation, 'r1'))
+setattr(PyKernel, 'rx',
+        partialmethod(__singleTargetSingleParameterOperation, 'rx'))
+setattr(PyKernel, 'ry',
+        partialmethod(__singleTargetSingleParameterOperation, 'ry'))
+setattr(PyKernel, 'rz',
+        partialmethod(__singleTargetSingleParameterOperation, 'rz'))
+setattr(PyKernel, 'r1',
+        partialmethod(__singleTargetSingleParameterOperation, 'r1'))
 
-setattr(PyKernel, 'crx', partialmethod(
-    __singleTargetSingleParameterControlOperation, 'rx'))
-setattr(PyKernel, 'cry', partialmethod(
-    __singleTargetSingleParameterControlOperation, 'ry'))
-setattr(PyKernel, 'crz', partialmethod(
-    __singleTargetSingleParameterControlOperation, 'rz'))
-setattr(PyKernel, 'cr1', partialmethod(
-    __singleTargetSingleParameterControlOperation, 'r1'))
+setattr(PyKernel, 'crx',
+        partialmethod(__singleTargetSingleParameterControlOperation, 'rx'))
+setattr(PyKernel, 'cry',
+        partialmethod(__singleTargetSingleParameterControlOperation, 'ry'))
+setattr(PyKernel, 'crz',
+        partialmethod(__singleTargetSingleParameterControlOperation, 'rz'))
+setattr(PyKernel, 'cr1',
+        partialmethod(__singleTargetSingleParameterControlOperation, 'r1'))
 
 
 def make_kernel(*args):

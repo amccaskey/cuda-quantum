@@ -235,3 +235,4 @@ def test_dynamic_circuit():
     c0 = counts.get_register_counts('i')
     assert '0' in c0 and '1' in c0
     assert '00' in counts and '11' in counts
+    

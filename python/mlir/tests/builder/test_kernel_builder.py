@@ -249,6 +249,20 @@ def test_can_progressively_build():
     assert '11' in counts
     assert '00' in counts
 
+def test_recursive_calls():
+    kernel1, qubit1 = cudaq.make_kernel(cudaq.qubit)
+    # print(kernel1)
+    
+    kernel2, qubit2 = cudaq.make_kernel(cudaq.qubit)
+    kernel2.apply_call(kernel1, qubit2) 
+    # print(kernel2)
+
+    kernel3 = cudaq.make_kernel()
+    qreg3 = kernel3.qalloc(1)
+    qubit3 = qreg3[0]
+    kernel3.apply_call(kernel2, qubit3)
+
+    print(kernel3)
 
 # def test_from_state():
 #     cudaq.reset_target()

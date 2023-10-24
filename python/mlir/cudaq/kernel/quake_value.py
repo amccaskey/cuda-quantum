@@ -22,6 +22,7 @@ from .utils import mlirTypeFromPyType
 
 qvector = cudaq_runtime.qvector
 
+
 class QuakeValue(object):
 
     def __init__(self, mlirValue, pyKernel, size=None):
@@ -40,25 +41,36 @@ class QuakeValue(object):
             # See if we know the size of the veq
             # return stdvecsizeop or veqsizeop
             type = self.mlirValue.type
-            if not quake.VeqType.isinstance(type) and not cc.StdvecType.isinstance(type):
-                raise RuntimeError("QuakeValue.size only valid for veq and stdvec types.")
+            if not quake.VeqType.isinstance(
+                    type) and not cc.StdvecType.isinstance(type):
+                raise RuntimeError(
+                    "QuakeValue.size only valid for veq and stdvec types.")
 
             if quake.VeqType.isinstance(type):
                 size = quake.VeqType.getSize(type)
-                if size: return size 
-                return QuakeValue(quake.VeqSizeOp(self.intType, self.mlirValue).result, self.pyKernel)
-            
+                if size:
+                    return size
+                return QuakeValue(
+                    quake.VeqSizeOp(self.intType, self.mlirValue).result,
+                    self.pyKernel)
+
             # Must be a stdvec type
-            return QuakeValue(cc.StdvecSizeOp(self.intType, self.mlirValue).result, self.pyKernel)
+            return QuakeValue(
+                cc.StdvecSizeOp(self.intType, self.mlirValue).result,
+                self.pyKernel)
 
     def __intToFloat(self, intVal):
         return arith.SIToFPOp(self.floatType, intVal).result
 
     def __floatToVal(self, concreteFloat):
-        return arith.ConstantOp(self.floatType, FloatAttr.get(self.floatType, concreteFloat)).result
+        return arith.ConstantOp(self.floatType,
+                                FloatAttr.get(self.floatType,
+                                              concreteFloat)).result
 
     def __intToVal(self, concreteInt):
-        return arith.ConstantOp(self.intType, IntegerAttr.get(self.intType, concreteInt)).result
+        return arith.ConstantOp(self.intType,
+                                IntegerAttr.get(self.intType,
+                                                concreteInt)).result
 
     def __checkTypesAndCreateQuakeValue(self, other, opStr):
         thisVal = self.mlirValue
@@ -86,7 +98,8 @@ class QuakeValue(object):
             otherVal = other.mlirValue
             mulOpStr = '{}FOp'.format(opStr) if F64Type.isinstance(
                 thisVal.type) else '{}IOp'.format(opStr)
-            if mulOpStr == '{}FOp'.format(opStr) and IntegerType.isinstance(otherVal.type):
+            if mulOpStr == '{}FOp'.format(opStr) and IntegerType.isinstance(
+                    otherVal.type):
                 otherVal = arith.SIToFPOp(self.floatType, otherVal).result
 
         return thisVal, otherVal, mulOpStr
@@ -105,45 +118,53 @@ class QuakeValue(object):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
             thisVal, otherVal, opStr = self.__checkTypesAndCreateQuakeValue(
                 other, 'Mul')
-            return QuakeValue(getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
+            return QuakeValue(
+                getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
 
     def __rmul__(self, other):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
             thisVal, otherVal, opStr = self.__checkTypesAndCreateQuakeValue(
                 other, 'Mul')
-            return QuakeValue(getattr(arith, opStr)(otherVal, thisVal).result, self.pyKernel)
+            return QuakeValue(
+                getattr(arith, opStr)(otherVal, thisVal).result, self.pyKernel)
 
     def __truediv__(self, other):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
             thisVal, otherVal, opStr = self.__checkTypesAndCreateQuakeValue(
                 other, 'Div')
-            if opStr == 'DivIOp': opStr = 'DivSIOp'
+            if opStr == 'DivIOp':
+                opStr = 'DivSIOp'
 
-            return QuakeValue(getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
+            return QuakeValue(
+                getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
 
     def __add__(self, other):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
             thisVal, otherVal, opStr = self.__checkTypesAndCreateQuakeValue(
                 other, 'Add')
-            return QuakeValue(getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
+            return QuakeValue(
+                getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
 
     def __radd__(self, other):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
             thisVal, otherVal, opStr = self.__checkTypesAndCreateQuakeValue(
                 other, 'Add')
-            return QuakeValue(getattr(arith, opStr)(otherVal, thisVal).result, self.pyKernel)
+            return QuakeValue(
+                getattr(arith, opStr)(otherVal, thisVal).result, self.pyKernel)
 
     def __sub__(self, other):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
             thisVal, otherVal, opStr = self.__checkTypesAndCreateQuakeValue(
                 other, 'Sub')
-            return QuakeValue(getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
-        
+            return QuakeValue(
+                getattr(arith, opStr)(thisVal, otherVal).result, self.pyKernel)
+
     def __rsub__(self, other):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:
             thisVal, otherVal, opStr = self.__checkTypesAndCreateQuakeValue(
                 other, 'Sub')
-            return QuakeValue(getattr(arith, opStr)(otherVal, thisVal).result, self.pyKernel)
+            return QuakeValue(
+                getattr(arith, opStr)(otherVal, thisVal).result, self.pyKernel)
 
     def __getitem__(self, idx):
         with self.ctx, Location.unknown(), self.pyKernel.insertPoint:

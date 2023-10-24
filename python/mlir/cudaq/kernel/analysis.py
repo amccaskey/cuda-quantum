@@ -9,6 +9,7 @@
 import ast
 from .utils import globalAstRegistry, globalKernelRegistry
 
+
 class MidCircuitMeasurementAnalyzer(ast.NodeVisitor):
     """The `MidCircuitMeasurementAnalyzer` is a utility class searches for 
        common measurement - conditional patterns to indicate to the runtime 
@@ -56,6 +57,7 @@ class MidCircuitMeasurementAnalyzer(ast.NodeVisitor):
 
 
 class FindDepKernelsVisitor(ast.NodeVisitor):
+
     def __init__(self):
         self.depKernels = {}
 
@@ -71,8 +73,10 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
             annotation = arg.annotation
             if annotation == None:
                 raise RuntimeError(
-                    'cudaq.kernel functions must have argument type annotations.')
-            if isinstance(annotation, ast.Subscript) and annotation.value.id == 'Callable':
+                    'cudaq.kernel functions must have argument type annotations.'
+                )
+            if isinstance(annotation,
+                          ast.Subscript) and annotation.value.id == 'Callable':
                 if not hasattr(annotation, 'slice'):
                     raise RuntimeError(
                         'Callable type must have signature specified.')
@@ -90,9 +94,12 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
         kernels that are passed to control and adjoint.
         """
         if hasattr(node, 'func'):
-            if isinstance(node.func, ast.Name) and node.func.id in globalAstRegistry:
+            if isinstance(node.func,
+                          ast.Name) and node.func.id in globalAstRegistry:
                 self.depKernels[node.func.id] = globalAstRegistry[node.func.id]
             elif isinstance(node.func, ast.Attribute):
-                if node.func.value.id == 'cudaq' and node.func.attr in ['control', 'adjoint'] and node.args[0].id in globalAstRegistry:
-                    self.depKernels[node.args[0].id] = globalAstRegistry[node.args[0].id]
-
+                if node.func.value.id == 'cudaq' and node.func.attr in [
+                        'control', 'adjoint'
+                ] and node.args[0].id in globalAstRegistry:
+                    self.depKernels[node.args[0].id] = globalAstRegistry[
+                        node.args[0].id]

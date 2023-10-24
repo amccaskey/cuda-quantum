@@ -18,11 +18,11 @@ from .utils import mlirTypeFromPyType
 from .analysis import MidCircuitMeasurementAnalyzer
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
-# This file implements the decorator mechanism needed to 
-# JIT compile CUDA Quantum kernels. It exposes the cudaq.kernel() 
-# decorator which hooks us into the JIT compilation infrastructure 
-# which maps the AST representation to an MLIR representation and ultimately 
-# executable code. 
+# This file implements the decorator mechanism needed to
+# JIT compile CUDA Quantum kernels. It exposes the cudaq.kernel()
+# decorator which hooks us into the JIT compilation infrastructure
+# which maps the AST representation to an MLIR representation and ultimately
+# executable code.
 
 
 class PyKernelDecorator(object):
@@ -37,6 +37,7 @@ class PyKernelDecorator(object):
     This decorator exposes a call overload that executes the code via the 
     MLIR ExecutionEngine if not in library mode. 
     """
+
     def __init__(self,
                  function,
                  verbose=False,

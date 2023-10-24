@@ -231,13 +231,13 @@ class PyASTBridge(ast.NodeVisitor):
 
                 def bodyBuilder(iterVal):
                     q = quake.ExtractRefOp(self.getRefType(),
-                                            quantumValue,
-                                            -1,
-                                            index=iterVal).result
+                                           quantumValue,
+                                           -1,
+                                           index=iterVal).result
                     opCtor([], parameters, [], [q])
 
                 veqSize = quake.VeqSizeOp(self.getIntegerType(),
-                                            quantumValue).result
+                                          quantumValue).result
                 self.createInvariantForLoop(veqSize, bodyBuilder)
             elif quake.RefType.isinstance(quantumValue.type):
                 opCtor([], parameters, [], [quantumValue])
@@ -246,6 +246,7 @@ class PyASTBridge(ast.NodeVisitor):
                     'quantum operation on incorrect type {}.'.format(
                         qubit.type))
         return
+
     def generic_visit(self, node):
         for field, value in reversed(list(ast.iter_fields(node))):
             if isinstance(value, list):
@@ -683,12 +684,13 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.id in ["rx", "ry", "rz", "r1"]:
                 numValues = len(self.valueStack)
-                qubitTargets = [self.popValue() for _ in range(numValues-1)]
+                qubitTargets = [self.popValue() for _ in range(numValues - 1)]
                 qubitTargets.reverse()
                 param = self.popValue()
-                self.__applyQuantumOperation(node.func.id, [param], qubitTargets)
-                return 
-            
+                self.__applyQuantumOperation(node.func.id, [param],
+                                             qubitTargets)
+                return
+
             if node.func.id in ['mx', 'my', 'mz']:
                 qubit = self.popValue()
                 # FIXME Handle registerName
@@ -729,14 +731,15 @@ class PyASTBridge(ast.NodeVisitor):
                     func.CallIndirectOp([], callable, values)
                     return
             elif node.func.id == 'exp_pauli':
-                for v in self.valueStack: print(v)
+                for v in self.valueStack:
+                    print(v)
 
                 pauliWord = self.popValue()
                 qubits = self.popValue()
                 theta = self.popValue()
 
                 quake.ExpPauliOp(theta, qubits, pauliWord)
-                return 
+                return
 
             else:
                 raise RuntimeError("unhandled function call - {}".format(
@@ -1028,8 +1031,13 @@ class PyASTBridge(ast.NodeVisitor):
             self.pushValue(self.getConstantFloat(node.value))
             return
         elif isinstance(node.value, str):
-            strLitTy = cc.PointerType.get(self.ctx, cc.ArrayType.get(self.ctx, self.getIntegerType(8), len(node.value)+1))
-            self.pushValue(cc.CreateStringLiteralOp(strLitTy, StringAttr.get(node.value)).result)
+            strLitTy = cc.PointerType.get(
+                self.ctx,
+                cc.ArrayType.get(self.ctx, self.getIntegerType(8),
+                                 len(node.value) + 1))
+            self.pushValue(
+                cc.CreateStringLiteralOp(strLitTy,
+                                         StringAttr.get(node.value)).result)
             return
         else:
             raise RuntimeError("unhandled constant: {}".format(
@@ -1113,8 +1121,9 @@ class PyASTBridge(ast.NodeVisitor):
                     eleAddr = cc.ComputePtrOp(
                         elePtrTy, vecPtr, [idxVal],
                         DenseI32ArrayAttr.get([-2147483648],
-                                                context=self.ctx)).result
+                                              context=self.ctx)).result
                     return [cc.LoadOp(eleAddr).result]
+
                 extractFunctor = functor
 
             else:
@@ -1181,14 +1190,14 @@ class PyASTBridge(ast.NodeVisitor):
         Convert Python while statements into the equivalent CC LoopOp. 
         """
         if self.verbose:
-            print("[Visit While = {}]".format(ast.unparse(node)))        
-        
+            print("[Visit While = {}]".format(ast.unparse(node)))
+
         loop = cc.LoopOp([], [], BoolAttr.get(False))
         whileBlock = Block.create_at_start(loop.whileRegion, [])
         with InsertionPoint(whileBlock):
             # BUG you cannot print MLIR values while building the cc LoopOp while region.
             # verify will get called, no terminator yet, CCOps.cpp:520
-            v = self.verbose 
+            v = self.verbose
             self.verbose = False
             self.visit(node.test)
             condition = self.popValue()
@@ -1196,10 +1205,10 @@ class PyASTBridge(ast.NodeVisitor):
                 # not equal to 0, then compare with 1
                 condPred = IntegerAttr.get(self.getIntegerType(), 1)
                 condition = arith.CmpIOp(condPred, condition,
-                                        self.getConstantInt(0)).result
+                                         self.getConstantInt(0)).result
             cc.ConditionOp(condition, [])
             self.verbose = v
-            
+
         bodyBlock = Block.create_at_start(loop.bodyRegion, [])
         with InsertionPoint(bodyBlock):
             [self.visit(b) for b in node.body]
@@ -1216,11 +1225,11 @@ class PyASTBridge(ast.NodeVisitor):
         assert len(values) > 1, "boolean operation must have more than 1 value."
 
         if isinstance(node.op, ast.And):
-            res = arith.AndIOp(values[0], values[1]).result 
+            res = arith.AndIOp(values[0], values[1]).result
             for v in values[2:]:
                 res = arith.AndIOp(res, v).result
             self.pushValue(res)
-            return 
+            return
 
     def visit_Compare(self, node):
         """
@@ -1229,52 +1238,70 @@ class PyASTBridge(ast.NodeVisitor):
         here we limit ourselves to just a single comparator. 
         """
 
-        if len(node.ops) > 1: raise RuntimeError("only single comparators are supported.")
-        
+        if len(node.ops) > 1:
+            raise RuntimeError("only single comparators are supported.")
+
         iTy = self.getIntegerType()
 
         if isinstance(node.left, ast.Name):
             if node.left.id not in self.symbolTable:
-                raise RuntimeError("{} was not initialized before use in compare expression.".format(node.left.id))
-            
+                raise RuntimeError(
+                    "{} was not initialized before use in compare expression.".
+                    format(node.left.id))
+
         self.visit(node.left)
         left = self.popValue()
         self.visit(node.comparators[0])
         comparator = self.popValue()
         op = node.ops[0]
         if isinstance(op, ast.Gt):
-            self.pushValue(arith.CmpIOp(self.getIntegerAttr(iTy, 4), left, comparator).result)
-            return 
-        
+            self.pushValue(
+                arith.CmpIOp(self.getIntegerAttr(iTy, 4), left,
+                             comparator).result)
+            return
+
         if isinstance(op, ast.GtE):
-            self.pushValue(arith.CmpIOp(self.getIntegerAttr(iTy, 5), left, comparator).result)
-            return 
-        
+            self.pushValue(
+                arith.CmpIOp(self.getIntegerAttr(iTy, 5), left,
+                             comparator).result)
+            return
+
         if isinstance(op, ast.Lt):
-            self.pushValue(arith.CmpIOp(self.getIntegerAttr(iTy, 2), left, comparator).result)
-            return 
-        
+            self.pushValue(
+                arith.CmpIOp(self.getIntegerAttr(iTy, 2), left,
+                             comparator).result)
+            return
+
         if isinstance(op, ast.LtE):
-            self.pushValue(arith.CmpIOp(self.getIntegerAttr(iTy, 7), left, comparator).result)
-            return 
-        
+            self.pushValue(
+                arith.CmpIOp(self.getIntegerAttr(iTy, 7), left,
+                             comparator).result)
+            return
+
         if isinstance(op, ast.NotEq):
-            self.pushValue(arith.CmpIOp(self.getIntegerAttr(iTy, 1), left, comparator).result)
-            return 
-        
+            self.pushValue(
+                arith.CmpIOp(self.getIntegerAttr(iTy, 1), left,
+                             comparator).result)
+            return
+
         if isinstance(op, ast.Eq):
-            self.pushValue(arith.CmpIOp(self.getIntegerAttr(iTy, 0), left, comparator).result)
-            return 
-        
+            self.pushValue(
+                arith.CmpIOp(self.getIntegerAttr(iTy, 0), left,
+                             comparator).result)
+            return
+
     def visit_AugAssign(self, node):
         """
         Visit augment-assign operations (e.g. +=). 
         """
         target = None
-        if isinstance(node.target, ast.Name) and node.target.id in self.symbolTable:
+        if isinstance(node.target,
+                      ast.Name) and node.target.id in self.symbolTable:
             target = self.symbolTable[node.target.id]
         else:
-            raise RuntimeError("unable to get augment-assign target variable from symbol table.")
+            raise RuntimeError(
+                "unable to get augment-assign target variable from symbol table."
+            )
 
         self.visit(node.value)
         value = self.popValue()
@@ -1289,7 +1316,7 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 raise RuntimeError("unhandled AugAssign.Sub types: {}".format(
                     ast.unparse(node)))
-        
+
         if isinstance(node.op, ast.Add):
             # i += 1 -> i = i + 1
             if IntegerType.isinstance(loaded.type):
@@ -1299,7 +1326,7 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 raise RuntimeError("unhandled AugAssign.Add types: {}".format(
                     ast.unparse(node)))
-        
+
         if isinstance(node.op, ast.Mult):
             # i *= 3 -> i = i * 3
             if IntegerType.isinstance(loaded.type):
@@ -1309,9 +1336,9 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 raise RuntimeError("unhandled AugAssign.Mult types: {}".format(
                     ast.unparse(node)))
-        
-        raise RuntimeError("unhandled aug-assign operation: {}".format(ast.unparse(node)))
 
+        raise RuntimeError("unhandled aug-assign operation: {}".format(
+            ast.unparse(node)))
 
     def visit_If(self, node):
         """
@@ -1458,7 +1485,8 @@ class PyASTBridge(ast.NodeVisitor):
                 loaded = cc.LoadOp(value).result
                 self.pushValue(loaded)
             # FIXME need to handle this one better
-            elif cc.CallableType.isinstance(value.type) and not BlockArgument.isinstance(value):
+            elif cc.CallableType.isinstance(
+                    value.type) and not BlockArgument.isinstance(value):
                 return
             else:
                 self.pushValue(self.symbolTable[node.id])

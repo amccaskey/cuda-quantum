@@ -13,10 +13,12 @@
 from abc import abstractmethod, ABCMeta
 import inspect
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
+
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
 qubit = cudaq_runtime.qubit
 SpinOperator = cudaq_runtime.SpinOperator
+
 
 def processQubitIds(opName, *args):
     """
@@ -67,8 +69,10 @@ class quantum_operation(object):
         opName = cls.get_name()
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
-        [cudaq_runtime.applyQuantumOperation(opName, parameters, [], [
-                                             q]) for q in processQubitIds(opName, *quantumArguments)]
+        [
+            cudaq_runtime.applyQuantumOperation(opName, parameters, [], [q])
+            for q in processQubitIds(opName, *quantumArguments)
+        ]
 
     @classmethod
     def ctrl(cls, *args):
@@ -81,8 +85,9 @@ class quantum_operation(object):
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         qubitIds = processQubitIds(opName, *quantumArguments)
-        cudaq_runtime.applyQuantumOperation(
-            opName, parameters, qubitIds[:len(qubitIds)-1], [qubitIds[-1]])
+        cudaq_runtime.applyQuantumOperation(opName, parameters,
+                                            qubitIds[:len(qubitIds) - 1],
+                                            [qubitIds[-1]])
 
     @classmethod
     def adj(cls, *args):
@@ -94,8 +99,12 @@ class quantum_operation(object):
         opName = cls.get_name()
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
-        [cudaq_runtime.applyQuantumOperation(opName, [-1 * p for p in parameters], [], [
-                                             q]) for q in processQubitIds(opName, *quantumArguments)]
+        [
+            cudaq_runtime.applyQuantumOperation(opName,
+                                                [-1 * p
+                                                 for p in parameters], [], [q])
+            for q in processQubitIds(opName, *quantumArguments)
+        ]
 
 
 # Define our quantum operatations
@@ -106,20 +115,33 @@ z = type('z', (quantum_operation,), {'get_name': staticmethod(lambda: 'z')})
 s = type('s', (quantum_operation,), {'get_name': staticmethod(lambda: 's')})
 t = type('t', (quantum_operation,), {'get_name': staticmethod(lambda: 't')})
 
-rx = type('rx', (quantum_operation,), {'get_name': staticmethod(
-    lambda: 'rx'), 'get_num_parameters': staticmethod(lambda: 1)})
-ry = type('ry', (quantum_operation,), {'get_name': staticmethod(
-    lambda: 'ry'), 'get_num_parameters': staticmethod(lambda: 1)})
-rz = type('rz', (quantum_operation,), {'get_name': staticmethod(
-    lambda: 'rz'), 'get_num_parameters': staticmethod(lambda: 1)})
-r1 = type('r1', (quantum_operation,), {'get_name': staticmethod(
-    lambda: 'r1'), 'get_num_parameters': staticmethod(lambda: 1)})
+rx = type(
+    'rx', (quantum_operation,), {
+        'get_name': staticmethod(lambda: 'rx'),
+        'get_num_parameters': staticmethod(lambda: 1)
+    })
+ry = type(
+    'ry', (quantum_operation,), {
+        'get_name': staticmethod(lambda: 'ry'),
+        'get_num_parameters': staticmethod(lambda: 1)
+    })
+rz = type(
+    'rz', (quantum_operation,), {
+        'get_name': staticmethod(lambda: 'rz'),
+        'get_num_parameters': staticmethod(lambda: 1)
+    })
+r1 = type(
+    'r1', (quantum_operation,), {
+        'get_name': staticmethod(lambda: 'r1'),
+        'get_num_parameters': staticmethod(lambda: 1)
+    })
 
 
 class swap(object):
     """
     The swap operation. Can be controlled on any number of qubits via the `ctrl` method.
     """
+
     @staticmethod
     def __call__(first, second):
         cudaq_runtime.applyQuantumOperation(
@@ -128,14 +150,19 @@ class swap(object):
     @staticmethod
     def ctrl(*args):
         qubitIds = processQubitIds(__class__.__name__, *args)
-        cudaq_runtime.applyQuantumOperation(
-            __class__.__name__, [], qubitIds[:len(qubitIds)-2], [qubitIds[-2], qubitIds[-1]])
+        cudaq_runtime.applyQuantumOperation(__class__.__name__, [],
+                                            qubitIds[:len(qubitIds) - 2],
+                                            [qubitIds[-2], qubitIds[-1]])
+
 
 def exp_pauli(theta, qubits, pauliWord):
     """
     Apply a general Pauli tensor product rotation, `exp(i theta P)`,
     """
-    cudaq_runtime.applyQuantumOperation('exp_pauli', [theta], [], [q.id() for q in qubits], False, SpinOperator.from_word(pauliWord))
+    cudaq_runtime.applyQuantumOperation('exp_pauli', [theta], [],
+                                        [q.id() for q in qubits], False,
+                                        SpinOperator.from_word(pauliWord))
+
 
 def mz(*args, register_name=''):
     """Measure the qubit along the z-axis."""
