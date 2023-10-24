@@ -35,9 +35,6 @@
 
 namespace py = pybind11;
 
-// This is a custom LinkedLibraryHolder that does not
-// automatically load the Remote REST QPU, we will
-// need a different Remote REST QPU to avoid the LLVM startup issues
 static std::unique_ptr<cudaq::LinkedLibraryHolder> holder;
 
 PYBIND11_MODULE(_quakeDialects, m) {
@@ -47,7 +44,6 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindRegisterDialects(m);
 
   auto cudaqRuntime = m.def_submodule("cudaq_runtime");
-
   cudaq::bindRuntimeTarget(cudaqRuntime, *holder.get());
   cudaq::bindMeasureCounts(cudaqRuntime);
   cudaq::bindObserveResult(cudaqRuntime);
@@ -66,7 +62,4 @@ PYBIND11_MODULE(_quakeDialects, m) {
                    "Provide the seed for backend quantum kernel simulation.");
   cudaqRuntime.def("set_noise", &cudaq::set_noise, "");
   cudaqRuntime.def("unset_noise", &cudaq::unset_noise, "");
-
-  cudaqRuntime.def("cloneModuleOp",
-                   [](MlirModule mod) { return wrap(unwrap(mod).clone()); });
 }

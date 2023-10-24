@@ -10,6 +10,8 @@ import random
 import string
 from .quake_value import QuakeValue
 from .utils import mlirTypeFromPyType, nvqppPrefix
+from .common.givens import givens_builder
+from .common.fermionic_swap import fermionic_swap_builder
 
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
@@ -39,6 +41,10 @@ def __generalOperation(self,
                        target,
                        isAdj=False,
                        context=None):
+    """
+    This is a utility function that applies a general quantum 
+    operation to the internal PyKernel MLIR ModuleOp.
+    """
     opCtor = getattr(quake, '{}Op'.format(opName.title()))
 
     if quake.RefType.isinstance(target.mlirValue.type):
@@ -59,6 +65,10 @@ def __generalOperation(self,
 
 
 def __singleTargetOperation(self, opName, target, isAdj=False):
+    """
+    Utility function for adding a single target quantum operation to the 
+    MLIR representation for the PyKernel.
+    """
     with self.insertPoint, self.loc:
         __generalOperation(self,
                            opName, [], [],
@@ -68,6 +78,10 @@ def __singleTargetOperation(self, opName, target, isAdj=False):
 
 
 def __singleTargetControlOperation(self, opName, controls, target, isAdj=False):
+    """
+    Utility function for adding a single target controlled quantum operation to the 
+    MLIR representation for the PyKernel.
+    """
     with self.insertPoint, self.loc:
         fwdControls = None
         if isinstance(controls, list):
@@ -92,6 +106,10 @@ def __singleTargetSingleParameterOperation(self,
                                            parameter,
                                            target,
                                            isAdj=False):
+    """
+    Utility function for adding a single target, one parameter quantum operation to the 
+    MLIR representation for the PyKernel.
+    """
     with self.insertPoint, self.loc:
         paramVal = None
         if isinstance(parameter, float):
@@ -112,6 +130,10 @@ def __singleTargetSingleParameterControlOperation(self,
                                                   controls,
                                                   target,
                                                   isAdj=False):
+    """
+    Utility function for adding a single target, one parameter, controlled quantum operation to the 
+    MLIR representation for the PyKernel.
+    """
     with self.insertPoint, self.loc:
         fwdControls = None
         if isinstance(controls, list):
@@ -370,7 +392,7 @@ class PyKernel(object):
         if canonicalize:
             pm = PassManager.parse("builtin.module(canonicalize,cse)",
                                    context=self.ctx)
-            cloned = cudaq_runtime.cloneModuleOp(self.module)
+            cloned = self.module.operation.clone()
             pm.run(cloned)
             return str(cloned)
         return str(self.module)
@@ -405,15 +427,31 @@ class PyKernel(object):
                     veqTy = quake.VeqType.get(self.ctx, size)
                     return self.__createQuakeValue(quake.AllocaOp(veqTy).result)
 
-    def exp_pauli(self, theta, qubits, pauliWord):
+    def exp_pauli(self, theta, *args):
         """
         Apply a general Pauli tensor product rotation, `exp(i theta P)`, on 
         the specified qubit register. The Pauli tensor product is provided 
         as a string, e.g. `XXYX` for a 4-qubit term. The angle parameter 
         can be provided as a concrete float or a `QuakeValue`.
         """
-        # FIXME implement for variadic qubits...
         with self.insertPoint, self.loc:
+            quantumVal = None
+            qubitsList = []
+            pauliWordVal = None
+            for arg in args:
+                if isinstance(arg, str):
+                    retTy = cc.PointerType.get(
+                        self.ctx,
+                        cc.ArrayType.get(self.ctx, IntegerType.get_signless(8),
+                                         int(len(arg) + 1)))
+                    pauliWordVal = cc.CreateStringLiteralOp(retTy, arg)
+                elif isinstance(arg, QuakeValue) and quake.VeqType.isinstance(
+                        arg.mlirValue.type):
+                    quantumVal = arg.mlirValue
+                elif isinstance(arg, QuakeValue) and quake.RefType.isinstance(
+                        arg.mlirValue.type):
+                    qubitsList.append(arg.mlirValue)
+
             thetaVal = None
             if isinstance(theta, float):
                 fty = mlirTypeFromPyType(float, self.ctx)
@@ -422,12 +460,48 @@ class PyKernel(object):
             else:
                 thetaVal = theta.mlirValue
 
-            retTy = cc.PointerType.get(
-                self.ctx,
-                cc.ArrayType.get(self.ctx, IntegerType.get_signless(8),
-                                 int(len(pauliWord) + 1)))
-            slVal = cc.CreateStringLiteralOp(retTy, pauliWord)
-            quake.ExpPauliOp(thetaVal, qubits.mlirValue, slVal)
+            if len(qubitsList) > 0:
+                quantumVal = quake.ConcatOp(quake.VeqType.get(
+                    self.ctx), [quantumVal] if quantumVal is not None else [] +
+                                            qubitsList).result
+            quake.ExpPauliOp(thetaVal, quantumVal, pauliWordVal)
+
+    def givens_rotation(self, angle, qubitA, qubitB):
+        """
+        Add Givens rotation kernel (theta angle as a QuakeValue) to the
+        kernel builder object
+        """
+        givens_builder(self, angle, qubitA, qubitB)
+
+    def fermionic_swap(self, angle, qubitA, qubitB):
+        """
+        Add Fermionic SWAP rotation kernel (phi angle as a QuakeValue) to the
+        kernel builder object
+        """
+        fermionic_swap_builder(self, angle, qubitA, qubitB)
+
+    def from_state(self, qubits, state):
+        raise RuntimeError("from_state not yet implemented.")
+    
+    def cswap(self, controls, qubitA, qubitB):
+        """
+        Controlled swap of the states of the provided qubits. 
+        The controls parameter is expected to be a list of QuakeValue.
+
+        .. code-block:: python
+
+            # Example:
+            kernel = cudaq.make_kernel()
+            # Allocate qubit/s to the `kernel`.
+            qubits = kernel.qalloc(2)
+            # Place the 0th qubit in the 1-state.
+            kernel.x(qubits[0])
+            # Swap their states.
+            kernel.swap(qubits[0], qubits[1]))
+        """
+        with self.insertPoint, self.loc:
+            quake.SwapOp([], [], [c.mlirValue for c in controls],
+                         [qubitA.mlirValue, qubitB.mlirValue])
 
     def swap(self, qubitA, qubitB):
         """
