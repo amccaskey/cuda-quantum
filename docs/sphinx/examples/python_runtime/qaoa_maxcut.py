@@ -26,7 +26,7 @@ layer_count: int = 2
 parameter_count: int = 2 * layer_count
 
 
-@cudaq.kernel
+@cudaq.kernel(jit=True)
 def kernel_qaoa(qubit_count: int, layer_count: int, thetas: list):
     """QAOA ansatz for Max-Cut"""
     qreg = cudaq.qvector(qubit_count)

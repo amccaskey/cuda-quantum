@@ -58,7 +58,7 @@ def test_simple_sampling_qpe():
     def xGate(qubit: cudaq.qubit):
         x(qubit)
 
-    @cudaq.kernel(jit=True)
+    @cudaq.kernel(jit=True, verbose=True)
     def qpe(nC: int, nQ: int, statePrep: Callable[[cudaq.qubit], None], oracle: Callable[[cudaq.qubit], None]):
         q = cudaq.qvector(nC+nQ)
         countingQubits = q.front(nC)

@@ -392,7 +392,7 @@ class PyKernel(object):
         if canonicalize:
             pm = PassManager.parse("builtin.module(canonicalize,cse)",
                                    context=self.ctx)
-            cloned = self.module.operation.clone()
+            cloned = cudaq_runtime.cloneModule(self.module)
             pm.run(cloned)
             return str(cloned)
         return str(self.module)

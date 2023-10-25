@@ -753,7 +753,7 @@ class PyASTBridge(ast.NodeVisitor):
                     numVals = len(self.valueStack)
                     values = [self.popValue() for _ in range(numVals)]
                     # FIXME check value types match callable type signature
-                    callableTy = cc.Callable.getFunctionType(val.type)
+                    callableTy = cc.CallableType.getFunctionType(val.type)
                     # if len(callableTy.inputs) != len(values):
                     # raise RuntimeError("invalid number of arguments passed to callable {}".format(node.func.id))
                     callable = cc.CallableFuncOp(callableTy, val).result
@@ -1053,46 +1053,46 @@ class PyASTBridge(ast.NodeVisitor):
             print('[Visit List] {}', ast.unparse(node))
         self.generic_visit(node)
 
+        listElementValues = [self.popValue() for _ in range(len(node.elts))]
+        listElementValues.reverse()
         valueTys = [
             quake.VeqType.isinstance(v.type) or quake.RefType.isinstance(v.type)
-            for v in self.valueStack
+            for v in listElementValues
         ]
         if False not in valueTys:
             # this is a list of quantum types,
             # concat them into a veq
-            if len(self.valueStack) == 1:
-                self.pushValue(self.popValue())
+            if len(listElementValues) == 1:
+                self.pushValue(listElementValues[0])
             else:
                 # FIXME, may need to reverse the list here, order matters
                 self.pushValue(
                     quake.ConcatOp(self.getVeqType(),
-                                   [self.popValue() for _ in valueTys]).result)
+                                   listElementValues).result)
             return
 
         # not a list of quantum types
-        values = [self.popValue() for _ in valueTys]
-        values.reverse()
-        firstTy = values[0].type
-        for v in values:
+        firstTy = listElementValues[0].type
+        for v in listElementValues:
             if firstTy != v.type:
                 raise RuntimeError(
-                    "non-homogenous list not allowed - must all be same type.")
+                    "non-homogenous list not allowed - must all be same type: {}".format([v.type for v in values]))
 
         arrSize = self.getConstantInt(len(node.elts))
-        arrTy = cc.ArrayType.get(self.ctx, values[0].type)
+        arrTy = cc.ArrayType.get(self.ctx, listElementValues[0].type)
         alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, arrTy),
-                             TypeAttr.get(values[0].type),
+                             TypeAttr.get(listElementValues[0].type),
                              seqSize=arrSize).result
 
-        for i, v in enumerate(values):
+        for i, v in enumerate(listElementValues):
             eleAddr = cc.ComputePtrOp(
-                cc.PointerType.get(self.ctx, values[0].type), alloca,
+                cc.PointerType.get(self.ctx, listElementValues[0].type), alloca,
                 [self.getConstantInt(i)],
                 DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
             cc.StoreOp(v, eleAddr)
 
         self.pushValue(
-            cc.StdvecInitOp(cc.StdvecType.get(self.ctx, values[0].type), alloca,
+            cc.StdvecInitOp(cc.StdvecType.get(self.ctx, listElementValues[0].type), alloca,
                             arrSize).result)
 
     def visit_Constant(self, node):
@@ -1100,7 +1100,7 @@ class PyASTBridge(ast.NodeVisitor):
         Convert constant values in the code to constant values in the MLIR. 
         """
         if self.verbose:
-            print("[Visit Constant {}]".format(node.value.strip()))
+            print("[Visit Constant {}]".format(node.value))
         if isinstance(node.value, int):
             self.pushValue(self.getConstantInt(node.value))
             return
@@ -1178,7 +1178,7 @@ class PyASTBridge(ast.NodeVisitor):
         # in which case we know we have for var in iterable,
         # but we could also have another value on the stack,
         # the total size of the iterable, produced by range() / enumerate()
-        if len(self.valueStack) == 0:
+        if len(self.valueStack) == 1:
             # Get the iterable from the stack
             iterable = self.popValue()
             # for single iterables, we currently handle Veq and Stdvec types

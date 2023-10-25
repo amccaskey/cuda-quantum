@@ -12,8 +12,7 @@ import pytest
 import numpy as np
 
 import cudaq
-from cudaq import spin, x, z, h, ry, t, swap, r1, mz, rx, s
-
+from cudaq import spin 
 
 def test_simple_observe():
     """Test that we can create parameterized kernels and call observe."""
@@ -150,11 +149,12 @@ def test_observe_list():
     hamiltonianList = [-2.1433 * spin.x(0) * spin.x(1), -2.1433 * spin.y(
         0) * spin.y(1),  .21829 * spin.z(0), - 6.125 * spin.z(1)]
 
-    circuit, theta = cudaq.make_kernel(float)
-    q = circuit.qalloc(2)
-    circuit.x(q[0])
-    circuit.ry(theta, q[1])
-    circuit.cx(q[1], q[0])
+    @cudaq.kernel
+    def circuit(theta:float):
+        q = cudaq.qvector(2)
+        x(q[0])
+        ry(theta, q[1])
+        x.ctrl(q[1], q[0]) # can use cx or
 
     results = cudaq.observe(circuit, hamiltonianList, .59)
 

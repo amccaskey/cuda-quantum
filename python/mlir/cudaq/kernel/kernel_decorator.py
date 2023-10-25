@@ -15,6 +15,7 @@ from mlir_cudaq.execution_engine import *
 from mlir_cudaq.dialects import quake, cc
 from .ast_bridge import compile_to_mlir
 from .utils import mlirTypeFromPyType
+from .qubit_qis import h, x, y, z, s, t, rx, ry, rz, r1, swap, exp_pauli, mx, my, mz, adjoint, control, compute_action
 from .analysis import MidCircuitMeasurementAnalyzer
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
@@ -38,6 +39,10 @@ class PyKernelDecorator(object):
     MLIR ExecutionEngine if not in library mode. 
     """
 
+    # Enable one to use JIT exclusively and not have to 
+    # specify it every time
+    globalJIT = False
+
     def __init__(self,
                  function,
                  verbose=False,
@@ -50,6 +55,11 @@ class PyKernelDecorator(object):
         self.executionEngine = None
         self.verbose = verbose
         self.name = kernelName if kernelName != None else self.kernelFunction.__name__
+
+        # check if the user requested JIT be used exclusively
+        if self.globalJIT: 
+            jit = True 
+            library_mode = False
 
         # Library Mode
         self.library_mode = library_mode
@@ -81,7 +91,22 @@ class PyKernelDecorator(object):
                 # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop)
                 self.module, self.argTypes = compile_to_mlir(
                     self.astModule, verbose=self.verbose)
-
+            else:
+                self.kernelFunction.__globals__['h'] = h()
+                self.kernelFunction.__globals__['x'] = x()
+                self.kernelFunction.__globals__['y'] = y()
+                self.kernelFunction.__globals__['z'] = z()
+                self.kernelFunction.__globals__['s'] = s()
+                self.kernelFunction.__globals__['t'] = t()
+                self.kernelFunction.__globals__['rx'] = rx()
+                self.kernelFunction.__globals__['ry'] = ry()
+                self.kernelFunction.__globals__['rz'] = rz()
+                self.kernelFunction.__globals__['r1'] = r1()
+                self.kernelFunction.__globals__['mx'] = mx
+                self.kernelFunction.__globals__['my'] = my
+                self.kernelFunction.__globals__['mz'] = mz
+                self.kernelFunction.__globals__['swap'] = swap()
+                self.kernelFunction.__globals__['exp_pauli'] = exp_pauli
             return
 
     def __str__(self):

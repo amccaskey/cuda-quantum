@@ -1,8 +1,6 @@
 import cudaq 
 import random 
 
-cudaq.enable_jit() 
-
 def random_bitstring(length: int):
     bitstring = []
     for _ in range(length):
@@ -33,7 +31,7 @@ qubit_count = 5  # set to around 30 qubits for `nvidia` target
 # as to be able to return it for verification.
 hidden_bitstring = random_bitstring(qubit_count)
 
-@cudaq.kernel # or can pass (jit=True)
+@cudaq.kernel
 def oracle(register: cudaq.qview,
            auxillary_qubit: cudaq.qubit, hidden_bitstring: list[int]):
     for index, bit in enumerate(hidden_bitstring):
@@ -43,7 +41,7 @@ def oracle(register: cudaq.qview,
             x.ctrl(register[index], auxillary_qubit)
 
 
-@cudaq.kernel 
+@cudaq.kernel
 def bernstein_vazirani(hidden_bitstring: list[int]):
     # Allocate the specified number of qubits - this
     # corresponds to the length of the hidden bitstring.
@@ -68,7 +66,7 @@ def bernstein_vazirani(hidden_bitstring: list[int]):
     # (excludes the auxillary qubit).
     mz(qubits)
 
-print(bernstein_vazirani)
+
 result = cudaq.sample(bernstein_vazirani, hidden_bitstring)
 
 print(f"encoded bitstring = {hidden_bitstring}")

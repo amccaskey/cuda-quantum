@@ -17,7 +17,7 @@ import cudaq
 
 def test_list_int():
     
-    @cudaq.kernel(jit=True, verbose=True)
+    @cudaq.kernel(jit=True)
     def oracle(register: cudaq.qview,
             auxillary_qubit: cudaq.qubit, hidden_bitstring: list[int]):
         # Also test out len() here, should convert to stdvec_size

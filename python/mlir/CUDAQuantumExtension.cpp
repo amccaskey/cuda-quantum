@@ -62,4 +62,5 @@ PYBIND11_MODULE(_quakeDialects, m) {
                    "Provide the seed for backend quantum kernel simulation.");
   cudaqRuntime.def("set_noise", &cudaq::set_noise, "");
   cudaqRuntime.def("unset_noise", &cudaq::unset_noise, "");
+  cudaqRuntime.def("cloneModule", [](MlirModule mod) {return wrap(unwrap(mod).clone());});
 }

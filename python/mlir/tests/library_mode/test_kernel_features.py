@@ -12,8 +12,6 @@ import pytest
 import numpy as np
 
 import cudaq
-from cudaq import spin, x, z, h, ry, t, swap, r1, mz, rx, s
-
 
 def test_adjoint():
     """Test that adjoint can be called on kernels and operations."""

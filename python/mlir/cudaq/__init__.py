@@ -16,6 +16,8 @@ from .runtime.observe import observe
 from .runtime.state import get_state
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
+global globalJIT 
+
 # Primitive Types
 spin = cudaq_runtime.spin
 qubit = cudaq_runtime.qubit
@@ -59,19 +61,17 @@ def __clearKernelRegistries():
     globalKernelRegistry.clear()
     globalAstRegistry.clear()
 
-# Quantum Instruction Set
-h = h()
-x = x()
-y = y()
-z = z()
-s = s()
-t = t()
-rx = rx()
-ry = ry()
-rz = rz()
-r1 = r1()
-swap = swap()
+def enable_jit():
+    """
+    Enable JIT compilation to MLIR for all cudaq.kernel functions
+    """
+    PyKernelDecorator.globalJIT = True
 
+def disable_jit():
+    """
+    Disable JIT compilation to MLIR for all cudaq.kernel functions
+    """
+    PyKernelDecorator.globalJIT = False
 
 if not "CUDAQ_DYNLIBS" in os.environ:
     try:
