@@ -181,6 +181,17 @@ void registerCCDialectAndTypes(py::module &m) {
       ccMod, "StdvecType",
       [](MlirType type) { return unwrap(type).isa<cudaq::cc::StdvecType>(); })
       .def_classmethod(
+          "getElementType",
+          [](py::object cls, MlirType type) {
+            auto ty = unwrap(type);
+            auto casted = ty.dyn_cast<cudaq::cc::StdvecType>();
+            if (!casted)
+              throw std::runtime_error(
+                  "invalid type passed to StdvecType.getElementType(), must "
+                  "be cc.array type.");
+            return wrap(casted.getElementType());
+          })
+      .def_classmethod(
           "get", [](py::object cls, MlirContext ctx, MlirType elementType) {
             return wrap(
                 cudaq::cc::StdvecType::get(unwrap(ctx), unwrap(elementType)));

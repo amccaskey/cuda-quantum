@@ -96,6 +96,11 @@ class PyKernelDecorator(object):
             self.kernelFunction(*args)
             return
 
+        if len(args) != len(self.argTypes):
+            raise RuntimeError(
+                "Incorrect number of runtime arguments provided to kernel {} ({} required, {} provided)"
+                .format(self.name, len(self.argTypes), len(args)))
+
         # validate the arg types
         processedArgs = []
         callableNames = []

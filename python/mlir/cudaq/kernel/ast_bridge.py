@@ -175,6 +175,15 @@ class PyASTBridge(ast.NodeVisitor):
             ]
             return cc.CallableType.get(self.ctx, argTypes)
 
+        if isinstance(annotation,
+                      ast.Subscript) and annotation.value.id == 'list':
+            if not hasattr(annotation, 'slice'):
+                raise RuntimeError('list subscript missing slice node.')
+
+            # expected that slice is a Name node
+            listEleTy = self.mlirTypeFromAnnotation(annotation.slice)
+            return cc.StdvecType.get(self.ctx, listEleTy)
+
         if annotation.id == 'int':
             return self.getIntegerType(64)
         elif annotation.id == 'float':
@@ -290,6 +299,9 @@ class PyASTBridge(ast.NodeVisitor):
             return
 
         with self.ctx, InsertionPoint(self.module.body), self.loc:
+
+            # Get the potential docstring
+            self.docstring = ast.get_docstring(node)
 
             # Get the arg types and arg names
             # this will throw an error if the types aren't annotated
@@ -508,6 +520,13 @@ class PyASTBridge(ast.NodeVisitor):
         if isinstance(node.func, ast.Name):
             # Just visit the args, we know the name
             [self.visit(arg) for arg in node.args]
+            if node.func.id == "len":
+                listVal = self.popValue()
+                assert cc.StdvecType.isinstance(listVal.type)
+                self.pushValue(
+                    cc.StdvecSizeOp(self.getIntegerType(), listVal).result)
+                return
+
             if node.func.id == "range":
                 iTy = self.getIntegerType(64)
                 zero = arith.ConstantOp(iTy, IntegerAttr.get(iTy, 0))
@@ -587,7 +606,7 @@ class PyASTBridge(ast.NodeVisitor):
                 iterEleTy = None
                 extractFunctor = None
                 if len(self.valueStack) == 1:
-                    # qreg-like thing
+                    # qreg-like or stdvec=like thing thing
                     iterable = self.popValue()
                     # Create a new iterable, alloca cc.struct<i64, T>
                     totalSize = None
@@ -602,7 +621,7 @@ class PyASTBridge(ast.NodeVisitor):
                                                       -1,
                                                       index=idxVal).result
                     elif cc.StdvecType.isinstance(iterable.type):
-                        iterEleTy = self.getFloatType()
+                        iterEleTy = cc.StdvecType.getElementType(iterable.type)
                         totalSize = cc.StdvecSizeOp(self.getIntegerType(),
                                                     iterable).result
 
@@ -716,28 +735,35 @@ class PyASTBridge(ast.NodeVisitor):
                 # If in globalKernelRegistry, it has to be in this Module
                 otherKernel = SymbolTable(
                     self.module.operation)['__nvqpp__mlirgen__' + node.func.id]
+                fType = otherKernel.type
+                if len(fType.inputs) != len(node.args):
+                    raise RuntimeError(
+                        "invalid number of arguments passed to callable {} ({} vs required {})"
+                        .format(node.func.id, len(node.args),
+                                len(fType.inputs)))
+
                 values = [self.popValue() for _ in node.args]
-                op = func.CallOp(otherKernel, values)
+                values.reverse()
+                func.CallOp(otherKernel, values)
+                return
 
             elif node.func.id in self.symbolTable:
                 val = self.symbolTable[node.func.id]
                 if cc.CallableType.isinstance(val.type):
-                    # callable = cc.InstantiateCallableOp(val.type, val, []).result
                     numVals = len(self.valueStack)
                     values = [self.popValue() for _ in range(numVals)]
                     # FIXME check value types match callable type signature
-                    callable = cc.CallableFuncOp(
-                        cc.CallableType.getFunctionType(val.type), val).result
+                    callableTy = cc.Callable.getFunctionType(val.type)
+                    # if len(callableTy.inputs) != len(values):
+                    # raise RuntimeError("invalid number of arguments passed to callable {}".format(node.func.id))
+                    callable = cc.CallableFuncOp(callableTy, val).result
                     func.CallIndirectOp([], callable, values)
                     return
-            elif node.func.id == 'exp_pauli':
-                for v in self.valueStack:
-                    print(v)
 
+            elif node.func.id == 'exp_pauli':
                 pauliWord = self.popValue()
                 qubits = self.popValue()
                 theta = self.popValue()
-
                 quake.ExpPauliOp(theta, qubits, pauliWord)
                 return
 
@@ -1074,7 +1100,7 @@ class PyASTBridge(ast.NodeVisitor):
         Convert constant values in the code to constant values in the MLIR. 
         """
         if self.verbose:
-            print("[Visit Constant {}]".format(node.value))
+            print("[Visit Constant {}]".format(node.value.strip()))
         if isinstance(node.value, int):
             self.pushValue(self.getConstantInt(node.value))
             return
@@ -1082,6 +1108,11 @@ class PyASTBridge(ast.NodeVisitor):
             self.pushValue(self.getConstantFloat(node.value))
             return
         elif isinstance(node.value, str):
+            # Do not process the function doc string
+            if self.docstring != None:
+                if node.value.strip() == self.docstring.strip():
+                    return
+
             strLitTy = cc.PointerType.get(
                 self.ctx,
                 cc.ArrayType.get(self.ctx, self.getIntegerType(8),
@@ -1142,8 +1173,15 @@ class PyASTBridge(ast.NodeVisitor):
         totalSize = None
         iterable = None
         extractFunctor = None
-        if len(self.valueStack) == 1:
+
+        # It could be that its the only value we have,
+        # in which case we know we have for var in iterable,
+        # but we could also have another value on the stack,
+        # the total size of the iterable, produced by range() / enumerate()
+        if len(self.valueStack) == 0:
+            # Get the iterable from the stack
             iterable = self.popValue()
+            # for single iterables, we currently handle Veq and Stdvec types
             if quake.VeqType.isinstance(iterable.type):
                 size = quake.VeqType.getSize(iterable.type)
                 if size:
@@ -1182,8 +1220,11 @@ class PyASTBridge(ast.NodeVisitor):
                     iterable.type))
 
         else:
-            # and now the iterable on the stack is a pointer to a cc.array
+            # In this case, we are coming from range() or enumerate(),
+            # and the iterable is a cc.array and the total size of the
+            # array is on the stack, pop it here
             totalSize = self.popValue()
+            # Get the iterable from the stack
             iterable = self.popValue()
 
             # Double check our types are right
@@ -1214,7 +1255,8 @@ class PyASTBridge(ast.NodeVisitor):
 
             extractFunctor = functor
 
-        # Get the name of the variable, VAR in for VAR in range(...)
+        # Get the name of the variable, VAR in for VAR in range(...),
+        # could be a tuple of names too
         varNames = []
         if isinstance(node.target, ast.Name):
             varNames.append(node.target.id)
@@ -1229,6 +1271,7 @@ class PyASTBridge(ast.NodeVisitor):
         one = arith.ConstantOp(iTy, IntegerAttr.get(iTy, 1))
 
         def bodyBuilder(iterVar):
+            # we set the extract functor above, use it here
             values = extractFunctor(iterable, iterVar)
             for i, v in enumerate(values):
                 self.symbolTable[varNames[i]] = v

@@ -15,6 +15,9 @@ import cudaq
 from cudaq import spin
 from typing import Callable 
 
+# This file is a hodgepodge of tests that I've used for 
+# understanding the AST and mapping to MLIR
+
 @pytest.fixture(autouse=True)
 def do_something():
     cudaq.__clearKernelRegistries()

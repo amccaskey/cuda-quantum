@@ -233,14 +233,26 @@ packArgs(OpaqueArguments &argData, py::args args,
       continue;
     } else if (py::isinstance<py::list>(arg)) {
       auto casted = py::cast<py::list>(arg);
-      std::vector<double> *ourAllocatedArg =
-          new std::vector<double>(casted.size());
-      for (std::size_t counter = 0; auto el : casted) {
-        (*ourAllocatedArg)[counter++] = PyFloat_AsDouble(el.ptr());
+      auto firstElement = casted[0];
+      if (py::isinstance<py::int_>(firstElement)) {
+        std::vector<std::size_t> *ourAllocatedArg =
+            new std::vector<std::size_t>(casted.size());
+        for (std::size_t counter = 0; auto el : casted) {
+          (*ourAllocatedArg)[counter++] = PyLong_AsLong(el.ptr());
+        }
+        argData.emplace_back(ourAllocatedArg, [](void *ptr) {
+          delete static_cast<std::vector<std::size_t> *>(ptr);
+        });
+      } else {
+        std::vector<double> *ourAllocatedArg =
+            new std::vector<double>(casted.size());
+        for (std::size_t counter = 0; auto el : casted) {
+          (*ourAllocatedArg)[counter++] = PyFloat_AsDouble(el.ptr());
+        }
+        argData.emplace_back(ourAllocatedArg, [](void *ptr) {
+          delete static_cast<std::vector<double> *>(ptr);
+        });
       }
-      argData.emplace_back(ourAllocatedArg, [](void *ptr) {
-        delete static_cast<std::vector<double> *>(ptr);
-      });
       continue;
     }
 

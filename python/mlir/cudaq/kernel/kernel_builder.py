@@ -77,21 +77,21 @@ def __singleTargetOperation(self, opName, target, isAdj=False):
                            context=self.ctx)
 
 
-def __singleTargetControlOperation(self, opName, controls, target, isAdj=False):
+def __singleTargetControlOperation(self, opName, control, target, isAdj=False):
     """
     Utility function for adding a single target controlled quantum operation to the 
     MLIR representation for the PyKernel.
     """
     with self.insertPoint, self.loc:
         fwdControls = None
-        if isinstance(controls, list):
-            fwdControls = [c.mlirValue for c in controls]
+        if isinstance(control, list):
+            fwdControls = [c.mlirValue for c in control]
         elif quake.RefType.isinstance(
-                controls.mlirValue.type) or quake.VeqType.isinstance(
-                    controls.mlirValue.type):
-            fwdControls = [controls.mlirValue]
+                control.mlirValue.type) or quake.VeqType.isinstance(
+                    control.mlirValue.type):
+            fwdControls = [control.mlirValue]
         else:
-            raise RuntimeError("invalid controls type for {}.", opName)
+            raise RuntimeError("invalid control type for {}.", opName)
 
         __generalOperation(self,
                            opName, [],

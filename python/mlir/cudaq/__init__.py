@@ -8,7 +8,7 @@
 
 from ._packages import *
 from .kernel.kernel_decorator import kernel, PyKernelDecorator
-from .kernel.kernel_builder import make_kernel, QuakeValue
+from .kernel.kernel_builder import make_kernel, QuakeValue, PyKernel
 from .kernel.ast_bridge import globalAstRegistry, globalKernelRegistry
 from .kernel.qubit_qis import h, x, y, z, s, t, rx, ry, rz, r1, swap, exp_pauli, mx, my, mz, adjoint, control, compute_action
 from .runtime.sample import sample
@@ -23,6 +23,8 @@ qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
 SpinOperator = cudaq_runtime.SpinOperator
 Pauli = cudaq_runtime.Pauli
+Kernel = PyKernel
+
 # to be deprecated
 qreg = cudaq_runtime.qvector
 
