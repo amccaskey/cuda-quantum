@@ -35,7 +35,8 @@ def mlirTypeFromPyType(argType, ctx, argInstance=None):
         return IntegerType.get_signless(64, ctx)
     if argType == float:
         return F64Type.get(ctx)
-    if argType == list and argInstance is not None and type(argInstance[0]) == int:
+    if argType == list and argInstance is not None and type(
+            argInstance[0]) == int:
         return cc.StdvecType.get(ctx, mlirTypeFromPyType(int, ctx))
     if argType == list or argType == np.ndarray:
         return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))

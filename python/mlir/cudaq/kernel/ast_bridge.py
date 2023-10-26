@@ -16,6 +16,7 @@ from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith, math
+from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 # This file implements the CUDA Quantum Python AST to MLIR conversion.
 # It provides a PyASTBridge class that implements the ast.NodeVisitor type
@@ -55,6 +56,8 @@ class PyASTBridge(ast.NodeVisitor):
         self.symbolTable = {}
         self.increment = 0
         self.buildingEntryPoint = False
+        self.inForBodyStack = deque()
+        self.inIfStmtBlockStack = deque()
         self.verbose = 'verbose' in kwargs and kwargs['verbose']
 
     def getVeqType(self, size=None):
@@ -143,6 +146,30 @@ class PyASTBridge(ast.NodeVisitor):
             print('{}pop {}'.format(self.increment * ' ', val))
         return val
 
+    def pushForBodyStack(self, bodyBlockArgs):
+        self.inForBodyStack.append(bodyBlockArgs)
+
+    def popForBodyStack(self):
+        self.inForBodyStack.pop()
+
+    def pushIfStmtBlockStack(self):
+        self.inIfStmtBlockStack.append(0)
+
+    def popIfStmtBlockStack(self):
+        self.inIfStmtBlockStack.pop()
+
+    def isInForBody(self):
+        return len(self.inForBodyStack) > 0
+
+    def isInIfStmtBlock(self):
+        return len(self.inIfStmtBlockStack) > 0
+
+    def hasTerminator(self, block):
+        if len(block.operations) > 0:
+            return cudaq_runtime.isTerminator(
+                block.operations[len(block.operations) - 1])
+        return False
+
     def mlirTypeFromAnnotation(self, annotation):
         """
         Return the MLIR Type corresponding to the given kernel function argument type annotation.
@@ -222,8 +249,11 @@ class PyASTBridge(ast.NodeVisitor):
 
         bodyBlock = Block.create_at_start(loop.bodyRegion, [iTy])
         with InsertionPoint(bodyBlock):
+            self.pushForBodyStack(bodyBlock.arguments)
             bodyBuilder(bodyBlock.arguments[0])
-            cc.ContinueOp(bodyBlock.arguments)
+            if not self.hasTerminator(bodyBlock):
+                cc.ContinueOp(bodyBlock.arguments)
+            self.popForBodyStack()
 
         stepBlock = Block.create_at_start(loop.stepRegion, [iTy])
         with InsertionPoint(stepBlock):
@@ -253,9 +283,18 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 raise Exception(
                     'quantum operation on incorrect type {}.'.format(
-                        qubit.type))
+                        quantumValue.type))
         return
 
+    def needsStackSlot(self, type):
+        """
+        Return true if this is a type that has been "passed by value" and 
+        needs a stack slot created (i.e. a cc.alloca) for use throughout the 
+        function. 
+        """
+        # FIXME add more as we need them
+        return F64Type.isinstance(type) or IntegerType.isinstance(type)
+    
     def generic_visit(self, node):
         for field, value in reversed(list(ast.iter_fields(node))):
             if isinstance(value, list):
@@ -332,14 +371,21 @@ class PyASTBridge(ast.NodeVisitor):
             # Create the entry block
             self.entry = f.add_entry_block()
 
-            # Add the block args to the symbol table
-            blockArgs = self.entry.arguments
-            for i, b in enumerate(blockArgs):
-                self.symbolTable[argNames[i]] = b
-
             # Set the insertion point to the start of the entry block
             with InsertionPoint(self.entry):
                 self.buildingEntryPoint = True
+                # Add the block args to the symbol table, 
+                # create a stack slot for value arguments
+                blockArgs = self.entry.arguments
+                for i, b in enumerate(blockArgs):
+                    if self.needsStackSlot(b.type):
+                        stackSlot = cc.AllocaOp(cc.PointerType.get(self.ctx, b.type),
+                                        TypeAttr.get(b.type)).result
+                        cc.StoreOp(b, stackSlot)
+                        self.symbolTable[argNames[i]] = stackSlot
+                    else:
+                        self.symbolTable[argNames[i]] = b
+
                 # Visit the function
                 [self.visit(n) for n in node.body]
                 # Add the return operation
@@ -420,10 +466,10 @@ class PyASTBridge(ast.NodeVisitor):
         # Retain the variable name for potential children (like mz(q, registerName=...))
         if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
             self.currentAssignVariableName = str(node.targets[0].id)
-            self.generic_visit(node)
+            self.visit(node.value)
             self.currentAssignVariableName = None
         else:
-            self.generic_visit(node)
+            self.visit(node.value)
 
         varNames = []
         varValues = []
@@ -445,6 +491,8 @@ class PyASTBridge(ast.NodeVisitor):
             if self.isQuantumType(value.type) or self.isMeasureResultType(
                     value.type) or cc.CallableType.isinstance(value.type):
                 self.symbolTable[varNames[i]] = value
+            elif varNames[i] in self.symbolTable:
+                cc.StoreOp(value, self.symbolTable[varNames[i]])
             else:
                 # We should allocate and store
                 alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, value.type),
@@ -1067,8 +1115,7 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 # FIXME, may need to reverse the list here, order matters
                 self.pushValue(
-                    quake.ConcatOp(self.getVeqType(),
-                                   listElementValues).result)
+                    quake.ConcatOp(self.getVeqType(), listElementValues).result)
             return
 
         # not a list of quantum types
@@ -1076,7 +1123,8 @@ class PyASTBridge(ast.NodeVisitor):
         for v in listElementValues:
             if firstTy != v.type:
                 raise RuntimeError(
-                    "non-homogenous list not allowed - must all be same type: {}".format([v.type for v in values]))
+                    "non-homogenous list not allowed - must all be same type: {}"
+                    .format([v.type for v in values]))
 
         arrSize = self.getConstantInt(len(node.elts))
         arrTy = cc.ArrayType.get(self.ctx, listElementValues[0].type)
@@ -1092,8 +1140,9 @@ class PyASTBridge(ast.NodeVisitor):
             cc.StoreOp(v, eleAddr)
 
         self.pushValue(
-            cc.StdvecInitOp(cc.StdvecType.get(self.ctx, listElementValues[0].type), alloca,
-                            arrSize).result)
+            cc.StdvecInitOp(
+                cc.StdvecType.get(self.ctx, listElementValues[0].type), alloca,
+                arrSize).result)
 
     def visit_Constant(self, node):
         """
@@ -1144,7 +1193,7 @@ class PyASTBridge(ast.NodeVisitor):
             self.pushValue(
                 quake.ExtractRefOp(qrefTy, var, -1, index=idx).result)
         elif cc.StdvecType.isinstance(var.type):
-            eleTy = F64Type.get()
+            eleTy = cc.StdvecType.getElementType(var.type)
             elePtrTy = cc.PointerType.get(self.ctx, eleTy)
             vecPtr = cc.StdvecDataOp(elePtrTy, var).result
             eleAddr = cc.ComputePtrOp(
@@ -1200,7 +1249,7 @@ class PyASTBridge(ast.NodeVisitor):
 
                 extractFunctor = functor
             elif cc.StdvecType.isinstance(iterable.type):
-                iterEleTy = self.getFloatType()
+                iterEleTy = cc.StdvecType.getElementType(iterable.type)
                 totalSize = cc.StdvecSizeOp(self.getIntegerType(),
                                             iterable).result
 
@@ -1305,8 +1354,11 @@ class PyASTBridge(ast.NodeVisitor):
 
         bodyBlock = Block.create_at_start(loop.bodyRegion, [])
         with InsertionPoint(bodyBlock):
+            self.pushForBodyStack([])
             [self.visit(b) for b in node.body]
-            cc.ContinueOp([])
+            if not self.hasTerminator(bodyBlock):
+                cc.ContinueOp([])
+            self.popForBodyStack()
 
     def visit_BoolOp(self, node):
         """
@@ -1348,10 +1400,24 @@ class PyASTBridge(ast.NodeVisitor):
         self.visit(node.comparators[0])
         comparator = self.popValue()
         op = node.ops[0]
+
         if isinstance(op, ast.Gt):
-            self.pushValue(
-                arith.CmpIOp(self.getIntegerAttr(iTy, 4), left,
-                             comparator).result)
+            if IntegerType.isinstance(left.type):
+                if F64Type.isinstance(comparator.type):
+                    raise RuntimeError(
+                        "invalid rhs for comparison (f64 type and not i64 type)."
+                    )
+
+                self.pushValue(
+                    arith.CmpIOp(self.getIntegerAttr(iTy, 4), left,
+                                 comparator).result)
+            elif F64Type.isinstance(left.type):
+                if IntegerType.isinstance(comparator.type):
+                    comparator = arith.SIToFPOp(self.getFloatType(),
+                                                comparator).result
+                self.pushValue(
+                    arith.CmpFOp(self.getIntegerAttr(iTy, 2), left,
+                                 comparator).result)
             return
 
         if isinstance(op, ast.GtE):
@@ -1443,6 +1509,7 @@ class PyASTBridge(ast.NodeVisitor):
 
         self.visit(node.test)
         condition = self.popValue()
+
         if self.getIntegerType(1) != condition.type:
             # not equal to 0, then compare with 1
             condPred = IntegerAttr.get(self.getIntegerType(), 1)
@@ -1452,14 +1519,20 @@ class PyASTBridge(ast.NodeVisitor):
         ifOp = cc.IfOp([], condition)
         thenBlock = Block.create_at_start(ifOp.thenRegion, [])
         with InsertionPoint(thenBlock):
+            self.pushIfStmtBlockStack()
             [self.visit(b) for b in node.body]
-            cc.ContinueOp([])
+            if not self.hasTerminator(thenBlock):
+                cc.ContinueOp([])
+            self.popIfStmtBlockStack()
 
         if len(node.orelse) > 0:
             elseBlock = Block.create_at_start(ifOp.elseRegion, [])
             with InsertionPoint(elseBlock):
+                self.pushIfStmtBlockStack()
                 [self.visit(b) for b in node.orelse]
-                cc.ContinueOp([])
+                if not self.hasTerminator(elseBlock):
+                    cc.ContinueOp([])
+                self.popIfStmtBlockStack()
 
     def visit_UnaryOp(self, node):
         """
@@ -1480,6 +1553,34 @@ class PyASTBridge(ast.NodeVisitor):
 
         raise RuntimeError("unhandled UnaryOp: {}".format(ast.unparse(node)))
 
+    def visit_Break(self, node):
+        if self.verbose:
+            print("[Visit Break]")
+
+        if not self.isInForBody():
+            raise RuntimeError("break statement outside of for loop body.")
+
+        if self.isInIfStmtBlock():
+            inArgs = [b for b in self.inForBodyStack[0]]
+            cc.UnwindBreakOp(inArgs)
+        else:
+            cc.BreakOp([])
+
+        return
+
+    def visit_Continue(self, node):
+        if self.verbose:
+            print("[Visit Continue]")
+
+        if not self.isInForBody():
+            raise RuntimeError("continue statement outside of for loop body.")
+
+        if self.isInIfStmtBlock():
+            inArgs = [b for b in self.inForBodyStack[0]]
+            cc.UnwindContinueOp(inArgs)
+        else:
+            cc.ContinueOp([])
+
     def visit_BinOp(self, node):
         """
         Visit binary operation nodes in the AST and map them to equivalents in the 
@@ -1488,16 +1589,22 @@ class PyASTBridge(ast.NodeVisitor):
 
         if self.verbose:
             print("[Visit BinaryOp = {}]".format(ast.unparse(node)))
-        self.generic_visit(node)
-
+        
         # Get the left and right parts of this expression
+        self.visit(node.left)
         left = self.popValue()
+        self.visit(node.right)
         right = self.popValue()
 
         # Basedon the op type and the leaf types, create the MLIR operator
         if isinstance(node.op, ast.Add):
             if IntegerType.isinstance(left.type):
                 self.pushValue(arith.AddIOp(left, right).result)
+                return
+            elif F64Type.isinstance(left.type):
+                if IntegerType.isinstance(right.type):
+                    right = arith.SIToFPOp(left.type, right).result
+                self.pushValue(arith.AddFOp(left, right).result)
                 return
             else:
                 raise RuntimeError("unhandled BinOp.Add types: {}".format(
@@ -1508,7 +1615,7 @@ class PyASTBridge(ast.NodeVisitor):
                 self.pushValue(arith.SubIOp(left, right).result)
                 return
             else:
-                raise RuntimeError("unhandled BinOp.Add types: {}".format(
+                raise RuntimeError("unhandled BinOp.Sub types: {}".format(
                     ast.unparse(node)))
         if isinstance(node.op, ast.FloorDiv):
             if IntegerType.isinstance(left.type):

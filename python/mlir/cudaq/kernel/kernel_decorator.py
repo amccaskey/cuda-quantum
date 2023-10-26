@@ -39,7 +39,7 @@ class PyKernelDecorator(object):
     MLIR ExecutionEngine if not in library mode. 
     """
 
-    # Enable one to use JIT exclusively and not have to 
+    # Enable one to use JIT exclusively and not have to
     # specify it every time
     globalJIT = False
 
@@ -57,8 +57,8 @@ class PyKernelDecorator(object):
         self.name = kernelName if kernelName != None else self.kernelFunction.__name__
 
         # check if the user requested JIT be used exclusively
-        if self.globalJIT: 
-            jit = True 
+        if self.globalJIT:
+            jit = True
             library_mode = False
 
         # Library Mode
@@ -107,6 +107,7 @@ class PyKernelDecorator(object):
                 self.kernelFunction.__globals__['mz'] = mz
                 self.kernelFunction.__globals__['swap'] = swap()
                 self.kernelFunction.__globals__['exp_pauli'] = exp_pauli
+
             return
 
     def __str__(self):

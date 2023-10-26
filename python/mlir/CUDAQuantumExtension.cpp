@@ -63,4 +63,7 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaqRuntime.def("set_noise", &cudaq::set_noise, "");
   cudaqRuntime.def("unset_noise", &cudaq::unset_noise, "");
   cudaqRuntime.def("cloneModule", [](MlirModule mod) {return wrap(unwrap(mod).clone());});
+  cudaqRuntime.def("isTerminator", [](MlirOperation op) {
+    return unwrap(op)->hasTrait<OpTrait::IsTerminator>();
+  });
 }
