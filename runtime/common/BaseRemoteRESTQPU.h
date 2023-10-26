@@ -157,12 +157,12 @@ public:
   /// @brief Return true if the current backend is a simulator
   /// @return
   bool isSimulator() override { return emulate; }
-  
+
   /// @brief Return true if the current backend supports conditional feedback
   bool supportsConditionalFeedback() override {
     return codegenTranslation == "qir-adaptive";
   }
-  
+
   /// Provide the number of shots
   void setShots(int _nShots) override {
     nShots = _nShots;
@@ -439,7 +439,8 @@ public:
       // and use that for execution
       for (auto &[name, module] : modules) {
         auto clonedModule = module.clone();
-        jitEngines.emplace_back(cudaq::createQIRJITEngine(clonedModule));
+        jitEngines.emplace_back(
+            cudaq::createQIRJITEngine(clonedModule, codegenTranslation));
       }
     }
 
