@@ -99,7 +99,7 @@ def test_exp_pauli():
         exp_pauli(theta, q, 'XXXY')
 
     print(kernel)
-    want_exp = cudaq.observe(kernel, h, .11).expectation_z()
+    want_exp = cudaq.observe(kernel, h, .11).expectation()
     assert np.isclose(want_exp, -1.13, atol=1e-2)
 
 

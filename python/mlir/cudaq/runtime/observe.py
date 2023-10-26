@@ -61,7 +61,7 @@ def observe(kernel, spin_operator, *args, shots_count=0, noise_model=None):
         results = []
         for op in spin_operator:
             results.append(cudaq_runtime.ObserveResult(
-                observeResult.expectation_z(op), op, observeResult.counts(op)))
+                observeResult.expectation(op), op, observeResult.counts(op)))
 
     if noise_model != None:
         cudaq_runtime.unset_noise()

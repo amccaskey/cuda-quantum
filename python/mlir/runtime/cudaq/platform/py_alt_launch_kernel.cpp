@@ -143,6 +143,7 @@ MlirModule synthesizeKernel(const std::string &name, MlirModule module,
   auto [jit, rawArgs, size] = jitAndCreateArgs(name, module, runtimeArgs, {});
   auto cloned = unwrap(module).clone();
   auto context = cloned.getContext();
+  registerLLVMDialectTranslation(*context);
 
   PassManager pm(context);
   pm.addPass(createCanonicalizerPass());
@@ -166,11 +167,13 @@ std::string getQIRLL(const std::string &name, MlirModule module,
   auto [jit, rawArgs, size] = jitAndCreateArgs(name, module, runtimeArgs, {});
   auto cloned = unwrap(module).clone();
   auto context = cloned.getContext();
+  registerLLVMDialectTranslation(*context);
+
   PassManager pm(context);
   if (profile.empty())
     cudaq::opt::addPipelineToQIR<>(pm);
-  else if (profile == "base")
-    cudaq::opt::addPipelineToQIR<true>(pm);
+  else
+    cudaq::opt::addPipelineToQIR<true>(pm, profile);
   if (failed(pm.run(cloned)))
     throw std::runtime_error(
         "cudaq::builder failed to JIT compile the Quake representation.");

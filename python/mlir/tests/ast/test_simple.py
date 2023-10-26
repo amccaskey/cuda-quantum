@@ -231,7 +231,7 @@ def test_synth_and_qir():
     ghz_synth = cudaq.synthesize(ghz, 5)
     print(ghz_synth)
     print(cudaq.to_qir(ghz_synth))
-    print(cudaq.to_qir(ghz_synth, profile='base'))
+    print(cudaq.to_qir(ghz_synth, profile='qir-base'))
 
 from typing import Callable
 def test_callCallable():

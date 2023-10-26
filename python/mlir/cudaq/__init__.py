@@ -16,7 +16,7 @@ from .runtime.observe import observe
 from .runtime.state import get_state
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
-global globalJIT 
+global globalJIT
 
 # Primitive Types
 spin = cudaq_runtime.spin
@@ -53,13 +53,18 @@ observe_async = cudaq_runtime.observe_async
 
 to_qir = cudaq_runtime.get_qir
 
+
 def synthesize(kernel, *args):
-    return PyKernelDecorator(None, module=cudaq_runtime.synthesize(kernel, *args), kernelName=kernel.name)
+    return PyKernelDecorator(None,
+                             module=cudaq_runtime.synthesize(kernel, *args),
+                             kernelName=kernel.name)
+
 
 def __clearKernelRegistries():
     global globalKernelRegistry, globalAstRegistry
     globalKernelRegistry.clear()
     globalAstRegistry.clear()
+
 
 def enable_jit():
     """
@@ -67,11 +72,13 @@ def enable_jit():
     """
     PyKernelDecorator.globalJIT = True
 
+
 def disable_jit():
     """
     Disable JIT compilation to MLIR for all cudaq.kernel functions
     """
     PyKernelDecorator.globalJIT = False
+
 
 if not "CUDAQ_DYNLIBS" in os.environ:
     try:
@@ -79,8 +86,7 @@ if not "CUDAQ_DYNLIBS" in os.environ:
         custatevec_path = os.path.join(custatevec_libs, "libcustatevec.so.1")
 
         cutensornet_libs = get_library_path("cutensornet-cu11")
-        cutensornet_path = os.path.join(
-            cutensornet_libs, "libcutensornet.so.2")
+        cutensornet_path = os.path.join(cutensornet_libs, "libcutensornet.so.2")
 
         os.environ["CUDAQ_DYNLIBS"] = f"{custatevec_path}:{cutensornet_path}"
     except:

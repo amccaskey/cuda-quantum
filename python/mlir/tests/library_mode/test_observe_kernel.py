@@ -27,8 +27,8 @@ def test_simple_observe():
         0) * spin.y(1) + .21829 * spin.z(0) - 6.125 * spin.z(1)
 
     result = cudaq.observe(ansatz, hamiltonian, .59)
-    print(result.expectation_z())
-    assert np.isclose(result.expectation_z(), -1.74, atol=1e-2)
+    print(result.expectation())
+    assert np.isclose(result.expectation(), -1.74, atol=1e-2)
 
 
 def test_optimization():
@@ -46,7 +46,7 @@ def test_optimization():
     cudaq.observe(ansatz, hamiltonian, .59)
 
     def objectiveFunction(x):
-        return cudaq.observe(ansatz, hamiltonian, x[0]).expectation_z()
+        return cudaq.observe(ansatz, hamiltonian, x[0]).expectation()
 
     optimizer = cudaq.optimizers.COBYLA()
     optimizer.max_iterations = 50
@@ -73,7 +73,7 @@ def test_broadcast():
         x.ctrl(q[1], q[0])
 
     results = cudaq.observe(ansatz, hamiltonian, angles)
-    energies = np.array([r.expectation_z() for r in results])
+    energies = np.array([r.expectation() for r in results])
     print(energies)
     expected = np.array([
         12.250289999999993, 12.746369918061657, 13.130147571153335,
@@ -119,7 +119,7 @@ def test_broadcast():
 
     results = cudaq.observe(kernel, hamiltonian, runtimeAngles[:, 0],
                             runtimeAngles[:, 1])
-    energies = np.array([r.expectation_z() for r in results])
+    energies = np.array([r.expectation() for r in results])
     print(energies)
     assert len(energies) == 50
 
@@ -139,7 +139,7 @@ def test_broadcast():
     print(runtimeAngles)
 
     results = cudaq.observe(kernel, hamiltonian, runtimeAngles)
-    energies = np.array([r.expectation_z() for r in results])
+    energies = np.array([r.expectation() for r in results])
     print(energies)
     assert len(energies) == 50
 
@@ -160,7 +160,7 @@ def test_observe_list():
 
     sum = 5.907
     for r in results:
-        sum += r.expectation_z() * np.real(r.get_spin().get_coefficient())
+        sum += r.expectation() * np.real(r.get_spin().get_coefficient())
     print(sum)
     want_expectation_value = -1.7487948611472093
     assert np.isclose(want_expectation_value, sum, atol=1e-2)

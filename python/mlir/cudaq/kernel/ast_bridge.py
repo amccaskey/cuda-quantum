@@ -294,7 +294,7 @@ class PyASTBridge(ast.NodeVisitor):
         """
         # FIXME add more as we need them
         return F64Type.isinstance(type) or IntegerType.isinstance(type)
-    
+
     def generic_visit(self, node):
         for field, value in reversed(list(ast.iter_fields(node))):
             if isinstance(value, list):
@@ -374,13 +374,14 @@ class PyASTBridge(ast.NodeVisitor):
             # Set the insertion point to the start of the entry block
             with InsertionPoint(self.entry):
                 self.buildingEntryPoint = True
-                # Add the block args to the symbol table, 
+                # Add the block args to the symbol table,
                 # create a stack slot for value arguments
                 blockArgs = self.entry.arguments
                 for i, b in enumerate(blockArgs):
                     if self.needsStackSlot(b.type):
-                        stackSlot = cc.AllocaOp(cc.PointerType.get(self.ctx, b.type),
-                                        TypeAttr.get(b.type)).result
+                        stackSlot = cc.AllocaOp(
+                            cc.PointerType.get(self.ctx, b.type),
+                            TypeAttr.get(b.type)).result
                         cc.StoreOp(b, stackSlot)
                         self.symbolTable[argNames[i]] = stackSlot
                     else:
@@ -1589,7 +1590,7 @@ class PyASTBridge(ast.NodeVisitor):
 
         if self.verbose:
             print("[Visit BinaryOp = {}]".format(ast.unparse(node)))
-        
+
         # Get the left and right parts of this expression
         self.visit(node.left)
         left = self.popValue()
