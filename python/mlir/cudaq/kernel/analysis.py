@@ -56,6 +56,50 @@ class MidCircuitMeasurementAnalyzer(ast.NodeVisitor):
                     break
 
 
+class RewriteMeasures(ast.NodeTransformer):
+    """
+    This NodeTransformer will analyze the AST for measurement 
+    nodes that do not provide a `register_name=` keyword. If found 
+    it will replace that node with one that sets the register_name to 
+    the variable name in the assignment. 
+    """
+    def visit_FunctionDef(self, node):
+        node.decorator_list.clear()
+        self.generic_visit(node)
+        return node 
+    
+    def visit_Assign(self, node):
+        # We only care about nodes with a Name target (mz,my,mx)
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            # The value has to be a Call node 
+            if isinstance(node.value, ast.Call):
+                # The function we are calling should be Named
+                if not isinstance(node.value.func, ast.Name):
+                    return node
+        
+                # Make sure we are only seeing measurements
+                if node.value.func.id not in ['mx', 'my', 'mz']:
+                    return node
+                
+                # If we already have a register_name keyword 
+                # then we don't have to do anything
+                if len(node.value.keywords):
+                    for keyword in node.value.keywords:
+                        if keyword.arg == 'register_name':
+                            return node
+
+                # If here, we have a measurement with no register name
+                # We'll add one here        
+                newConstant = ast.Constant(value=node.targets[0].id)
+                newCall = ast.Call(func=node.value.func, value=node.targets[0].id, args=node.value.args, keywords=[ast.keyword(arg='register_name', value=newConstant)])
+                ast.copy_location(newCall, node.value)
+                ast.copy_location(newConstant, node.value)
+                ast.fix_missing_locations(newCall)
+                node.value = newCall 
+                return node 
+        
+        return node
+    
 class FindDepKernelsVisitor(ast.NodeVisitor):
 
     def __init__(self):

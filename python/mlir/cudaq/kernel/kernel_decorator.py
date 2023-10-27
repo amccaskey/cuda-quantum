@@ -11,12 +11,11 @@ import inspect
 from typing import Callable
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
-from mlir_cudaq.execution_engine import *
 from mlir_cudaq.dialects import quake, cc
 from .ast_bridge import compile_to_mlir
 from .utils import mlirTypeFromPyType
 from .qubit_qis import h, x, y, z, s, t, rx, ry, rz, r1, swap, exp_pauli, mx, my, mz, adjoint, control, compute_action
-from .analysis import MidCircuitMeasurementAnalyzer
+from .analysis import MidCircuitMeasurementAnalyzer, RewriteMeasures
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 # This file implements the decorator mechanism needed to
@@ -24,7 +23,6 @@ from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 # decorator which hooks us into the JIT compilation infrastructure
 # which maps the AST representation to an MLIR representation and ultimately
 # executable code.
-
 
 class PyKernelDecorator(object):
     """
@@ -52,7 +50,6 @@ class PyKernelDecorator(object):
                  kernelName=None):
         self.kernelFunction = function
         self.module = None if module == None else module
-        self.executionEngine = None
         self.verbose = verbose
         self.name = kernelName if kernelName != None else self.kernelFunction.__name__
 
@@ -66,48 +63,67 @@ class PyKernelDecorator(object):
         if jit == True:
             self.library_mode = False
 
-        if self.kernelFunction is not None:
-            src = inspect.getsource(self.kernelFunction)
-            leadingSpaces = len(src) - len(src.lstrip())
-            self.funcSrc = '\n'.join(
-                [line[leadingSpaces:] for line in src.split('\n')])
-            self.astModule = ast.parse(self.funcSrc)
-            if verbose and importlib.util.find_spec('astpretty') is not None:
-                import astpretty
-                astpretty.pprint(self.astModule.body[0])
-
-            # Need to build up the arg types here
-            self.signature = inspect.getfullargspec(
-                self.kernelFunction).annotations
-
-            # Run analyzers and attach metadata (only have 1 right now)
-            analyzer = MidCircuitMeasurementAnalyzer()
-            analyzer.visit(self.astModule)
-            self.metadata = {
-                'conditionalOnMeasure': analyzer.hasMidCircuitMeasures
-            }
-
-            if not self.library_mode:
-                # FIXME Run any Python AST Canonicalizers (e.g. list comprehension to for loop)
-                self.module, self.argTypes = compile_to_mlir(
-                    self.astModule, verbose=self.verbose)
+        if self.kernelFunction is None:
+            if self.module is not None:
+                # Could be that we don't have a function 
+                # but someone has provided an external Module
+                return 
             else:
-                self.kernelFunction.__globals__['h'] = h()
-                self.kernelFunction.__globals__['x'] = x()
-                self.kernelFunction.__globals__['y'] = y()
-                self.kernelFunction.__globals__['z'] = z()
-                self.kernelFunction.__globals__['s'] = s()
-                self.kernelFunction.__globals__['t'] = t()
-                self.kernelFunction.__globals__['rx'] = rx()
-                self.kernelFunction.__globals__['ry'] = ry()
-                self.kernelFunction.__globals__['rz'] = rz()
-                self.kernelFunction.__globals__['r1'] = r1()
-                self.kernelFunction.__globals__['mx'] = mx
-                self.kernelFunction.__globals__['my'] = my
-                self.kernelFunction.__globals__['mz'] = mz
-                self.kernelFunction.__globals__['swap'] = swap()
-                self.kernelFunction.__globals__['exp_pauli'] = exp_pauli
+                raise RuntimeError("invalid kernel decorator. module and function are both None.")
+    
+        # Get the function source
+        src = inspect.getsource(self.kernelFunction)
 
+        # Strip off the extra tabs
+        leadingSpaces = len(src) - len(src.lstrip())
+        self.funcSrc = '\n'.join(
+            [line[leadingSpaces:] for line in src.split('\n')])
+        
+        # Create the AST
+        self.astModule = ast.parse(self.funcSrc)
+        if verbose and importlib.util.find_spec('astpretty') is not None:
+            import astpretty
+            astpretty.pprint(self.astModule.body[0])
+
+        # Assign the signature for use later
+        self.signature = inspect.getfullargspec(
+            self.kernelFunction).annotations
+
+        # Run analyzers and attach metadata (only have 1 right now)
+        analyzer = MidCircuitMeasurementAnalyzer()
+        analyzer.visit(self.astModule)
+        self.metadata = {
+            'conditionalOnMeasure': analyzer.hasMidCircuitMeasures
+        }
+
+        if not self.library_mode:
+            # If not eager mode, JIT compile to MLIR
+            self.module, self.argTypes = compile_to_mlir(
+                self.astModule, verbose=self.verbose)
+        else:
+            # If eager mode, implicitly load the quantum operations
+            self.kernelFunction.__globals__['h'] = h()
+            self.kernelFunction.__globals__['x'] = x()
+            self.kernelFunction.__globals__['y'] = y()
+            self.kernelFunction.__globals__['z'] = z()
+            self.kernelFunction.__globals__['s'] = s()
+            self.kernelFunction.__globals__['t'] = t()
+            self.kernelFunction.__globals__['rx'] = rx()
+            self.kernelFunction.__globals__['ry'] = ry()
+            self.kernelFunction.__globals__['rz'] = rz()
+            self.kernelFunction.__globals__['r1'] = r1()
+            self.kernelFunction.__globals__['mx'] = mx
+            self.kernelFunction.__globals__['my'] = my
+            self.kernelFunction.__globals__['mz'] = mz
+            self.kernelFunction.__globals__['swap'] = swap()
+            self.kernelFunction.__globals__['exp_pauli'] = exp_pauli
+            
+            # Rewrite the function if necessary to convert 
+            # r = mz(q) to r = mz(q, register_name='r')
+            vis = RewriteMeasures()
+            res = self.kernelFunction.__globals__
+            exec(compile(ast.fix_missing_locations(vis.visit(self.astModule)), filename='<ast>', mode='exec'), res)
+            self.kernelFunction = res[self.name]
             return
 
     def __str__(self):
