@@ -61,16 +61,24 @@ class quantum_operation(object):
         return 0
 
     @classmethod
+    def get_unitary(cls):
+        return None
+
+    @classmethod
     def __call__(cls, *args):
         """
         Invoke the quantum operation. The args can contain float parameters (of the
         correct number according to get_num_parameters) and quantum types (qubit, qvector, qview).
         """
         opName = cls.get_name()
+        unitary = cls.get_unitary()
+        if unitary is not None:
+            unitary = list(unitary.flat)  # FIXME assumes numpy array
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         [
-            cudaq_runtime.applyQuantumOperation(opName, parameters, [], [q])
+            cudaq_runtime.applyQuantumOperation(opName, parameters, [], [q],
+                                                False, SpinOperator(), unitary)
             for q in processQubitIds(opName, *quantumArguments)
         ]
 
@@ -82,12 +90,16 @@ class quantum_operation(object):
         to get_num_parameters) and quantum types (qubit, qvector, qview).
         """
         opName = cls.get_name()
+        unitary = cls.get_unitary()
+        if unitary is not None:
+            unitary = list(unitary.flat)  # FIXME assumes numpy array
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         qubitIds = processQubitIds(opName, *quantumArguments)
         cudaq_runtime.applyQuantumOperation(opName, parameters,
                                             qubitIds[:len(qubitIds) - 1],
-                                            [qubitIds[-1]])
+                                            [qubitIds[-1]], False,
+                                            SpinOperator(), unitary)
 
     @classmethod
     def adj(cls, *args):
@@ -97,12 +109,16 @@ class quantum_operation(object):
         to get_num_parameters) and quantum types (qubit, qvector, qview).
         """
         opName = cls.get_name()
+        unitary = cls.get_unitary()
+        if unitary is not None:
+            unitary = list(unitary.flat)  # FIXME assumes numpy array
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         [
             cudaq_runtime.applyQuantumOperation(opName,
                                                 [-1 * p
-                                                 for p in parameters], [], [q])
+                                                 for p in parameters], [], [q],
+                                                False, SpinOperator(), unitary)
             for q in processQubitIds(opName, *quantumArguments)
         ]
 
@@ -165,7 +181,9 @@ def exp_pauli(theta, qubits, pauliWord):
 
 
 def mz(*args, register_name=''):
-    """Measure the qubit along the z-axis."""
+    """
+    Measure the qubit along the z-axis.
+    """
     qubitIds = processQubitIds('mz', *args)
     res = [cudaq_runtime.measure(q, register_name) for q in qubitIds]
     if len(res) == 1:
@@ -175,34 +193,82 @@ def mz(*args, register_name=''):
 
 
 def my(*args, register_name=''):
-    """Measure the qubit along the y-axis."""
+    """
+    Measure the qubit along the y-axis.
+    """
     s.adj(*args)
     h()(*args)
     return mz(*args, register_name)
 
 
 def mx(*args, register_name=''):
-    """Measure the qubit along the x-axis."""
+    """
+    Measure the qubit along the x-axis.
+    """
     h()(*args)
     return mz(*args, register_name)
 
 
 def adjoint(kernel, *args):
-    """Apply the adjoint of the given kernel at the provided runtime arguments."""
+    """
+    Apply the adjoint of the given kernel at the provided runtime arguments.
+    """
     cudaq_runtime.startAdjointRegion()
     kernel(*args)
     cudaq_runtime.endAdjointRegion()
 
 
 def control(kernel, controls, *args):
-    """Apply the general control version of the given kernel at the provided runtime arguments."""
+    """
+    Apply the general control version of the given kernel at the provided runtime arguments.
+    """
     cudaq_runtime.startCtrlRegion([c.id() for c in controls])
     kernel(*args)
     cudaq_runtime.endCtrlRegion(len(controls))
 
 
 def compute_action(compute, action):
-    """Apply the U V U^dag given U and V unitaries."""
+    """
+    Apply the U V U^dag given U and V unitaries.
+    """
     compute()
     action()
     adjoint(compute)
+
+
+def register_operation(unitary, operation_name=None):
+    """
+    Register a new quantum operation at runtime. Users must 
+    provide the unitary matrix as a 2D NumPy array. The operation 
+    name is inferred from the name of the assigned variable. 
+
+    .. code:: python 
+    
+        myOp = cudaq.register_operation(unitary)
+
+        @cudaq.kernel
+        def kernel():
+            ...
+            myOp(...)
+            ...
+ 
+    """
+    if operation_name == None:
+        lastFrame = inspect.currentframe().f_back
+        frameInfo = inspect.getframeinfo(lastFrame)
+        codeContext = frameInfo.code_context[0]
+        if not '=' in codeContext:
+            raise RuntimeError("[register_operation] operation_name not given and variable name not set.")
+        operation_name = codeContext.split('=')[0].strip()
+    
+    # register a new function for kernels of the given
+    # name, have it apply the unitary data
+    registeredOp = type(
+        operation_name, (quantum_operation,), {
+            'get_name': staticmethod(lambda: operation_name),
+            'get_unitary': staticmethod(lambda: unitary)
+        })
+    
+    # Register the operation name so JIT AST can 
+    # get it.
+    return registeredOp()

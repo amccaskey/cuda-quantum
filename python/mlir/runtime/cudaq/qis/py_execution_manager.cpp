@@ -8,6 +8,7 @@
 
 #include "cudaq/qis/execution_manager.h"
 #include <fmt/core.h>
+#include <pybind11/complex.h>
 #include <pybind11/stl.h>
 
 namespace py = pybind11;
@@ -20,17 +21,20 @@ void bindExecutionManager(py::module &mod) {
       "applyQuantumOperation",
       [](const std::string &name, std::vector<double> &params,
          std::vector<std::size_t> &controls, std::vector<std::size_t> &targets,
-         bool isAdjoint, cudaq::spin_op &op) {
+         bool isAdjoint, cudaq::spin_op &op,
+         std::vector<std::complex<double>> &unitary) {
         std::vector<cudaq::QuditInfo> c, t;
         std::transform(controls.begin(), controls.end(), std::back_inserter(c),
                        [](auto &&el) { return cudaq::QuditInfo(2, el); });
         std::transform(targets.begin(), targets.end(), std::back_inserter(t),
                        [](auto &&el) { return cudaq::QuditInfo(2, el); });
-        cudaq::getExecutionManager()->apply(name, params, c, t, isAdjoint, op);
+        cudaq::getExecutionManager()->apply(name, params, c, t, isAdjoint, op,
+                                            unitary);
       },
       py::arg("name"), py::arg("params"), py::arg("controls"),
       py::arg("targets"), py::arg("isAdjoint") = false,
-      py::arg("op") = cudaq::spin_op());
+      py::arg("op") = cudaq::spin_op(),
+      py::arg("unitary") = std::vector<std::complex<double>>{});
 
   mod.def("startAdjointRegion",
           []() { cudaq::getExecutionManager()->startAdjointRegion(); });

@@ -24,6 +24,7 @@ from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 # which maps the AST representation to an MLIR representation and ultimately
 # executable code.
 
+
 class PyKernelDecorator(object):
     """
     The PyKernelDecorator serves as a standard Python decorator that 
@@ -65,12 +66,14 @@ class PyKernelDecorator(object):
 
         if self.kernelFunction is None:
             if self.module is not None:
-                # Could be that we don't have a function 
+                # Could be that we don't have a function
                 # but someone has provided an external Module
-                return 
+                return
             else:
-                raise RuntimeError("invalid kernel decorator. module and function are both None.")
-    
+                raise RuntimeError(
+                    "invalid kernel decorator. module and function are both None."
+                )
+
         # Get the function source
         src = inspect.getsource(self.kernelFunction)
 
@@ -78,7 +81,7 @@ class PyKernelDecorator(object):
         leadingSpaces = len(src) - len(src.lstrip())
         self.funcSrc = '\n'.join(
             [line[leadingSpaces:] for line in src.split('\n')])
-        
+
         # Create the AST
         self.astModule = ast.parse(self.funcSrc)
         if verbose and importlib.util.find_spec('astpretty') is not None:
@@ -86,20 +89,17 @@ class PyKernelDecorator(object):
             astpretty.pprint(self.astModule.body[0])
 
         # Assign the signature for use later
-        self.signature = inspect.getfullargspec(
-            self.kernelFunction).annotations
+        self.signature = inspect.getfullargspec(self.kernelFunction).annotations
 
         # Run analyzers and attach metadata (only have 1 right now)
         analyzer = MidCircuitMeasurementAnalyzer()
         analyzer.visit(self.astModule)
-        self.metadata = {
-            'conditionalOnMeasure': analyzer.hasMidCircuitMeasures
-        }
+        self.metadata = {'conditionalOnMeasure': analyzer.hasMidCircuitMeasures}
 
         if not self.library_mode:
             # If not eager mode, JIT compile to MLIR
-            self.module, self.argTypes = compile_to_mlir(
-                self.astModule, verbose=self.verbose)
+            self.module, self.argTypes = compile_to_mlir(self.astModule,
+                                                         verbose=self.verbose)
         else:
             # If eager mode, implicitly load the quantum operations
             self.kernelFunction.__globals__['h'] = h()
@@ -117,12 +117,15 @@ class PyKernelDecorator(object):
             self.kernelFunction.__globals__['mz'] = mz
             self.kernelFunction.__globals__['swap'] = swap()
             self.kernelFunction.__globals__['exp_pauli'] = exp_pauli
-            
-            # Rewrite the function if necessary to convert 
+
+            # Rewrite the function if necessary to convert
             # r = mz(q) to r = mz(q, register_name='r')
             vis = RewriteMeasures()
             res = self.kernelFunction.__globals__
-            exec(compile(ast.fix_missing_locations(vis.visit(self.astModule)), filename='<ast>', mode='exec'), res)
+            exec(
+                compile(ast.fix_missing_locations(vis.visit(self.astModule)),
+                        filename='<ast>',
+                        mode='exec'), res)
             self.kernelFunction = res[self.name]
             return
 

@@ -1191,7 +1191,7 @@ class PyASTBridge(ast.NodeVisitor):
         """
         if self.verbose:
             print("[Visit Subscript]")
-        
+
         # handle complex slice, VAR[lower:upper]
         if isinstance(node.slice, ast.Slice):
 
@@ -1210,21 +1210,24 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 if quake.VeqType.isinstance(var.type):
                     upperVal = quake.VeqSizeOp(self.getIntegerType(64),
-                                                var).result
+                                               var).result
                 elif cc.StdvecType.isinstance(var.type):
                     upperVal = cc.StdvecSizeOp(self.getIntegerType(),
-                                            var).result
+                                               var).result
                 else:
-                    raise RuntimeError("unhandled upper slice == None, can't handle type {}".format(var.type))
-                
+                    raise RuntimeError(
+                        "unhandled upper slice == None, can't handle type {}".
+                        format(var.type))
+
             if node.slice.step is not None:
                 raise RuntimeError("step value in slice is not supported.")
-            
+
             if quake.VeqType.isinstance(var.type):
                 # Upper bound is exclusive
-                upperVal = arith.SubIOp(upperVal, self.getConstantInt(1)).result   
-                self.pushValue(quake.SubVeqOp(self.getVeqType(), var, lowerVal,
-                                                   upperVal).result)
+                upperVal = arith.SubIOp(upperVal, self.getConstantInt(1)).result
+                self.pushValue(
+                    quake.SubVeqOp(self.getVeqType(), var, lowerVal,
+                                   upperVal).result)
             elif cc.StdvecType.isinstance(var.type):
                 eleTy = cc.StdvecType.getElementType(var.type)
                 ptrTy = cc.PointerType.get(self.ctx, eleTy)
@@ -1234,15 +1237,19 @@ class PyASTBridge(ast.NodeVisitor):
                 vecPtr = cc.StdvecDataOp(ptrTy, var).result
                 ptr = cc.ComputePtrOp(
                     ptrTy, vecPtr, [lowerVal],
-                    DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
-                self.pushValue(cc.StdvecInitOp(var.type, ptr, nElementsVal).result)
+                    DenseI32ArrayAttr.get([-2147483648],
+                                          context=self.ctx)).result
+                self.pushValue(
+                    cc.StdvecInitOp(var.type, ptr, nElementsVal).result)
             else:
-                raise RuntimeError("unhandled slice operation, cannot handle type {}".format(var.type))
+                raise RuntimeError(
+                    "unhandled slice operation, cannot handle type {}".format(
+                        var.type))
 
-            return 
+            return
 
         self.generic_visit(node)
-        
+
         assert len(self.valueStack) > 1
 
         # get the last name, should be name of var being subscripted
@@ -1250,25 +1257,26 @@ class PyASTBridge(ast.NodeVisitor):
         idx = self.popValue()
 
         # Support VAR[-1] -> last element, for veq VAR
-        if quake.VeqType.isinstance(var.type) and isinstance(idx.owner.opview, arith.ConstantOp):
+        if quake.VeqType.isinstance(var.type) and isinstance(
+                idx.owner.opview, arith.ConstantOp):
             if 'value' in idx.owner.attributes:
                 try:
                     concreteIntAttr = IntegerAttr(idx.owner.attributes['value'])
-                    idxConcrete = concreteIntAttr.value 
+                    idxConcrete = concreteIntAttr.value
                     if idxConcrete == -1:
                         qrSize = quake.VeqSizeOp(self.getIntegerType(),
                                                  var).result
                         one = self.getConstantInt(1)
                         endOff = arith.SubIOp(qrSize, one)
                         self.pushValue(
-                                quake.ExtractRefOp(self.getRefType(),
-                                                   var,
-                                                   -1,
-                                                   index=endOff).result)
-                        return 
+                            quake.ExtractRefOp(self.getRefType(),
+                                               var,
+                                               -1,
+                                               index=endOff).result)
+                        return
                 except ValueError as e:
                     pass
-        
+
         # Made it here, general VAR[idx], handle veq and stdvec
         if quake.VeqType.isinstance(var.type):
             qrefTy = self.getRefType()
@@ -1627,10 +1635,11 @@ class PyASTBridge(ast.NodeVisitor):
         operand = self.popValue()
         if isinstance(node.op, ast.USub):
             # Make our lives easier for -1 used in variable subscript extraction
-            if isinstance(node.operand, ast.Constant) and node.operand.value == 1:
+            if isinstance(node.operand,
+                          ast.Constant) and node.operand.value == 1:
                 self.pushValue(self.getConstantInt(-1))
-                return 
-            
+                return
+
             if F64Type.isinstance(operand.type):
                 self.pushValue(arith.NegFOp(operand).result)
             else:

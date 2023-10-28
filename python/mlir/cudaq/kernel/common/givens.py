@@ -6,7 +6,7 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
+
 def givens_builder(builder, theta, qubitA, qubitB):
     builder.exp_pauli(-.5 * theta, 'YX', qubitA, qubitB)
     builder.exp_pauli(.5 * theta, 'XY', qubitA, qubitB)
-

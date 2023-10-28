@@ -13,6 +13,7 @@ import numpy as np
 
 import cudaq
 
+
 def test_adjoint():
     """Test that adjoint can be called on kernels and operations."""
     @cudaq.kernel
@@ -77,7 +78,7 @@ def test_control():
     def toffoli():
         q = cudaq.qvector(3)
         ctrl = q.front()
-        # without a control, apply x to all 
+        # without a control, apply x to all
         x(ctrl, q[2])
         cudaq.control(fancyCnot, [ctrl], q[1], q[2])
 
@@ -101,12 +102,8 @@ def test_grover():
     def reflect(qubits):
         ctrls = qubits.front(qubits.size()-1)
         last = qubits.back()
-
-        def compute():
-            h(qubits)
-            x(qubits)
-
-        cudaq.compute_action(compute, lambda: z.ctrl(ctrls, last))
+        cudaq.compute_action(lambda: (h(qubits), x(qubits)),
+                             lambda: z.ctrl(ctrls, last))
 
     @cudaq.kernel
     def grover(N, M, oracle):
@@ -146,6 +143,7 @@ def test_dynamic_circuit():
     assert '0' in c0 and '1' in c0
     assert '00' in counts and '11' in counts
 
+
 def test_teleport():
     @cudaq.kernel
     def teleport():
@@ -163,15 +161,15 @@ def test_teleport():
 
         if b1:
             x(q[2])
-        
+
         if b0:
             z(q[2])
-        
+
         mz(q[2])
 
     counts = cudaq.sample(teleport, shots_count=100)
     counts.dump()
-    # Note this is testing that we can provide 
-    # the register name automatically 
+    # Note this is testing that we can provide
+    # the register name automatically
     b0 = counts.get_register_counts('b0')
     assert '0' in b0 and '1' in b0

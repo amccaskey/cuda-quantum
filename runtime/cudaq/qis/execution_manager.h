@@ -34,6 +34,16 @@ struct QuditInfo {
   }
 };
 
+struct QuantumOperation {
+  const std::string &opName;
+  const std::vector<double> &params;
+  const std::vector<QuditInfo> &controls;
+  const std::vector<QuditInfo> &targets;
+  bool isAdjoint = false;
+  const spin_op op = spin_op();
+  const std::vector<std::complex<double>> unitary;
+};
+
 bool __nvqpp__MeasureResultBoolConversion(int);
 
 #ifdef CUDAQ_LIBRARY_MODE
@@ -114,7 +124,8 @@ public:
                      const std::vector<double> &params,
                      const std::vector<QuditInfo> &controls,
                      const std::vector<QuditInfo> &targets,
-                     bool isAdjoint = false, const spin_op op = spin_op()) = 0;
+                     bool isAdjoint = false, const spin_op op = spin_op(),
+                     const std::vector<std::complex<double>> unitary = {}) = 0;
 
   /// Reset the qubit to the |0> state
   virtual void reset(const QuditInfo &target) = 0;

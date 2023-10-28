@@ -10,7 +10,8 @@ from ..kernel.kernel_builder import PyKernel
 from ..kernel.kernel_decorator import PyKernelDecorator
 from mlir_cudaq.dialects import quake, cc
 
-import numpy as np 
+import numpy as np
+
 
 def __isBroadcast(kernel, *args):
     # kernel could be a PyKernel or PyKernelDecorator
@@ -33,16 +34,18 @@ def __isBroadcast(kernel, *args):
                 return True
 
         return False
-    
-    elif isinstance(kernel, PyKernelDecorator): 
-        argTypes = kernel.signature 
-        if len(argTypes) == 0 or len(args) == 0: return False 
+
+    elif isinstance(kernel, PyKernelDecorator):
+        argTypes = kernel.signature
+        if len(argTypes) == 0 or len(args) == 0:
+            return False
         firstArg = args[0]
         firstArgType = next(iter(argTypes))
-        firstArgTypeIsStdvec = argTypes[firstArgType] == list or argTypes[firstArgType] == list[int] or argTypes[firstArgType] == np.ndarray 
+        firstArgTypeIsStdvec = argTypes[firstArgType] == list or argTypes[
+            firstArgType] == list[int] or argTypes[firstArgType] == np.ndarray
         if isinstance(firstArg, list) and not firstArgTypeIsStdvec:
             return True
-        
+
         if hasattr(firstArg, "shape"):
             shape = firstArg.shape
             if len(shape) == 1 and not firstArgTypeIsStdvec:
@@ -50,8 +53,9 @@ def __isBroadcast(kernel, *args):
 
             if len(shape) == 2:
                 return True
-        
+
         return False
+
 
 def __createArgumentSet(*args):
     nArgSets = len(args[0])
@@ -62,13 +66,13 @@ def __createArgumentSet(*args):
 
             if isinstance(arg, list):
                 currentArgs[i] = arg[j]
-            
+
             if hasattr(arg, "tolist"):
-                shape = arg.shape 
+                shape = arg.shape
                 if len(shape) == 2:
                     currentArgs[i] = arg[j].tolist()
                 else:
                     currentArgs[i] = arg.tolist()[j]
-        
+
         argSet.append(tuple(currentArgs))
-    return argSet 
+    return argSet

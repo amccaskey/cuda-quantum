@@ -7,6 +7,7 @@
 # ============================================================================ #
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
+
 def get_state(kernel, *args):
     import numpy as np
     ctx = cudaq_runtime.ExecutionContext("extract-state")

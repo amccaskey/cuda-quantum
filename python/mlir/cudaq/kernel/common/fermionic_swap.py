@@ -7,6 +7,7 @@
 # ============================================================================ #
 import numpy as np
 
+
 def fermionic_swap_builder(kernel, phi, q0, q1):
     kernel.h(q0)
     kernel.h(q1)
@@ -18,15 +19,15 @@ def fermionic_swap_builder(kernel, phi, q0, q1):
     kernel.h(q0)
     kernel.h(q1)
 
-    kernel.rx(np.pi/2., q0)
-    kernel.rx(np.pi/2., q1)
+    kernel.rx(np.pi / 2., q0)
+    kernel.rx(np.pi / 2., q1)
 
     kernel.cx(q0, q1)
     kernel.rz(phi / 2.0, q1)
     kernel.cx(q0, q1)
 
-    kernel.rx(-np.pi/2., q0)
-    kernel.rx(-np.pi/2., q1)
+    kernel.rx(-np.pi / 2., q0)
+    kernel.rx(-np.pi / 2., q1)
     kernel.rz(phi / 2.0, q0)
     kernel.rz(phi / 2.0, q1)
 
