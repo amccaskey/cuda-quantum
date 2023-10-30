@@ -28,6 +28,16 @@ void bindExecutionManager(py::module &mod) {
                        [](auto &&el) { return cudaq::QuditInfo(2, el); });
         std::transform(targets.begin(), targets.end(), std::back_inserter(t),
                        [](auto &&el) { return cudaq::QuditInfo(2, el); });
+        if (!unitary.empty()) {
+          auto numQubits = targets.size();
+          auto raisedNumQubits = (1UL << numQubits);
+          if (raisedNumQubits * raisedNumQubits != unitary.size())
+            throw std::runtime_error(
+                "Invalid number of unitary matrix elements (numQubits = " +
+                std::to_string(numQubits) +
+                " and num unitary elements = " + std::to_string(unitary.size()) + ")");
+        }
+
         cudaq::getExecutionManager()->apply(name, params, c, t, isAdjoint, op,
                                             unitary);
       },

@@ -12,6 +12,7 @@
 
 from abc import abstractmethod, ABCMeta
 import inspect
+import numpy as np
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 qvector = cudaq_runtime.qvector
@@ -62,7 +63,25 @@ class quantum_operation(object):
 
     @classmethod
     def get_unitary(cls):
-        return None
+        return []
+
+    @classmethod
+    def __validateAndProcessUnitary(cls, unitary):
+        if not hasattr(unitary, 'shape'):
+            raise RuntimeError('custom unitary must be a numpy array.')
+
+        shape = unitary.shape
+        if len(unitary.shape) != 2:
+            raise RuntimeError("custom unitary must be a 2D numpy array.")
+
+        if shape[0] != shape[1]:
+            raise RuntimeError("custom unitary must be square matrix.")
+
+        numTargets = np.log2(shape[0])
+
+        # Flatten the array
+        unitary = list(unitary.flat)
+        return unitary, numTargets
 
     @classmethod
     def __call__(cls, *args):
@@ -72,14 +91,29 @@ class quantum_operation(object):
         """
         opName = cls.get_name()
         unitary = cls.get_unitary()
-        if unitary is not None:
-            unitary = list(unitary.flat)  # FIXME assumes numpy array
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
+        qubitIds = [q for q in processQubitIds(opName, *quantumArguments)]
+
+        if len(unitary) > 0:
+            unitary, numTargets = quantum_operation.__validateAndProcessUnitary(
+                unitary)
+            # Disable operation broadcasting for custom unitaries
+            if numTargets != len(qubitIds):
+                raise RuntimeError(
+                    "incorrect number of target qubits provided.")
+
+            cudaq_runtime.applyQuantumOperation(opName, parameters,
+                                                [], qubitIds, False,
+                                                SpinOperator(), unitary)
+            return
+
+        # Not a custom unitary, handle basic quantum operation,
+        # with optional broadcasting
         [
             cudaq_runtime.applyQuantumOperation(opName, parameters, [], [q],
-                                                False, SpinOperator(), unitary)
-            for q in processQubitIds(opName, *quantumArguments)
+                                                False, SpinOperator())
+            for q in qubitIds
         ]
 
     @classmethod
@@ -91,14 +125,23 @@ class quantum_operation(object):
         """
         opName = cls.get_name()
         unitary = cls.get_unitary()
-        if unitary is not None:
-            unitary = list(unitary.flat)  # FIXME assumes numpy array
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         qubitIds = processQubitIds(opName, *quantumArguments)
+        controls = qubitIds[:len(qubitIds) - 1]
+        targets = [qubitIds[-1]]
+        if len(unitary) > 0:
+            unitary, numTargets = quantum_operation.__validateAndProcessUnitary(
+                unitary)
+            controls = qubitIds[:len(qubitIds) - int(numTargets)]
+            targets = qubitIds[-int(numTargets):]
+            # Disable operation broadcasting for custom unitaries
+            if numTargets != len(targets):
+                raise RuntimeError(
+                    "incorrect number of target qubits provided.")
+
         cudaq_runtime.applyQuantumOperation(opName, parameters,
-                                            qubitIds[:len(qubitIds) - 1],
-                                            [qubitIds[-1]], False,
+                                            controls, targets, False,
                                             SpinOperator(), unitary)
 
     @classmethod
@@ -110,16 +153,32 @@ class quantum_operation(object):
         """
         opName = cls.get_name()
         unitary = cls.get_unitary()
-        if unitary is not None:
-            unitary = list(unitary.flat)  # FIXME assumes numpy array
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
+        qubitIds = [q for q in processQubitIds(opName, *quantumArguments)]
+
+        if len(unitary) > 0:
+            unitary, numTargets = quantum_operation.__validateAndProcessUnitary(
+                unitary)
+            # Disable operation broadcasting for custom unitaries
+            if numTargets != len(qubitIds):
+                raise RuntimeError(
+                    "incorrect number of target qubits provided.")
+
+            cudaq_runtime.applyQuantumOperation(opName,
+                                                [-1 * p for p in parameters],
+                                                [], qubitIds, False,
+                                                SpinOperator(), unitary)
+            return
+
+        # Not a custom unitary, handle basic quantum operation,
+        # with optional broadcasting
         [
             cudaq_runtime.applyQuantumOperation(opName,
                                                 [-1 * p
                                                  for p in parameters], [], [q],
-                                                False, SpinOperator(), unitary)
-            for q in processQubitIds(opName, *quantumArguments)
+                                                False, SpinOperator())
+            for q in qubitIds
         ]
 
 
@@ -243,7 +302,7 @@ def register_operation(unitary, operation_name=None):
     name is inferred from the name of the assigned variable. 
 
     .. code:: python 
-    
+
         myOp = cudaq.register_operation(unitary)
 
         @cudaq.kernel
@@ -251,16 +310,18 @@ def register_operation(unitary, operation_name=None):
             ...
             myOp(...)
             ...
- 
+
     """
     if operation_name == None:
         lastFrame = inspect.currentframe().f_back
         frameInfo = inspect.getframeinfo(lastFrame)
         codeContext = frameInfo.code_context[0]
         if not '=' in codeContext:
-            raise RuntimeError("[register_operation] operation_name not given and variable name not set.")
+            raise RuntimeError(
+                "[register_operation] operation_name not given and variable name not set."
+            )
         operation_name = codeContext.split('=')[0].strip()
-    
+
     # register a new function for kernels of the given
     # name, have it apply the unitary data
     registeredOp = type(
@@ -268,7 +329,7 @@ def register_operation(unitary, operation_name=None):
             'get_name': staticmethod(lambda: operation_name),
             'get_unitary': staticmethod(lambda: unitary)
         })
-    
-    # Register the operation name so JIT AST can 
+
+    # Register the operation name so JIT AST can
     # get it.
     return registeredOp()
