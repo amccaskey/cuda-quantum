@@ -147,24 +147,48 @@ class PyASTBridge(ast.NodeVisitor):
         return val
 
     def pushForBodyStack(self, bodyBlockArgs):
+        """
+        Indicate that we are entering a for loop body block. 
+        """
         self.inForBodyStack.append(bodyBlockArgs)
 
     def popForBodyStack(self):
+        """
+        Indicate that we have left a for loop body block.
+        """
         self.inForBodyStack.pop()
 
     def pushIfStmtBlockStack(self):
+        """
+        Indicate that we are entering an if statement then or else block.
+        """
         self.inIfStmtBlockStack.append(0)
 
     def popIfStmtBlockStack(self):
+        """
+        Indicate that we have just left an if statement then 
+        or else block.
+        """
         self.inIfStmtBlockStack.pop()
 
     def isInForBody(self):
+        """
+        Return True if the current insertion point is within 
+        a for body block. 
+        """
         return len(self.inForBodyStack) > 0
 
     def isInIfStmtBlock(self):
+        """
+        Return True if the current insertion point is within 
+        an if statement then or else block.
+        """
         return len(self.inIfStmtBlockStack) > 0
 
     def hasTerminator(self, block):
+        """
+        Return True if the given Block has a Terminator operation.
+        """
         if len(block.operations) > 0:
             return cudaq_runtime.isTerminator(
                 block.operations[len(block.operations) - 1])
@@ -217,6 +241,8 @@ class PyASTBridge(ast.NodeVisitor):
             return F64Type.get()
         elif annotation.id == 'list':
             return cc.StdvecType.get(self.ctx, F64Type.get())
+        elif annotation.id == 'bool':
+            return self.getIntegerType(1)
         else:
             raise RuntimeError('{} is not a supported type yet.'.format(
                 annotation.id))
@@ -786,6 +812,8 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.id in globalRegisteredUnitaries:
                 unitary = globalRegisteredUnitaries[node.func.id]
+                # how many targets should there be? 
+                numTargets = int(np.log2(unitary.shape[0]))
                 # flatten the matrix
                 unitary = list(unitary.flat)
                 # Need to map to an ArrayAttr<ArrayAttr> where each element 
@@ -794,7 +822,7 @@ class PyASTBridge(ast.NodeVisitor):
                 for el in unitary: 
                     arrayAttrList.append(DenseF32ArrayAttr.get([np.real(el), np.imag(el)]))
                 unitary = ArrayAttr.get(arrayAttrList)
-                quake.UnitaryOp(StringAttr.get(node.func.id), [], [self.popValue()], unitary)
+                quake.UnitaryOp(StringAttr.get(node.func.id), [], [self.popValue() for _ in range(numTargets)], unitary)
                 return 
             
             if node.func.id in globalKernelRegistry:
@@ -1008,6 +1036,25 @@ class PyASTBridge(ast.NodeVisitor):
                 opCtor([], [], controls, [target])
                 return
 
+            if node.func.value.id in globalRegisteredUnitaries and node.func.attr == 'ctrl':
+                unitary = globalRegisteredUnitaries[node.func.value.id]
+                # how many targets should there be? 
+                numTargets = int(np.log2(unitary.shape[0]))
+                # flatten the matrix
+                unitary = list(unitary.flat)
+                # Need to map to an ArrayAttr<ArrayAttr> where each element 
+                # is a pair (represented as an array) -> (real, imag)
+                arrayAttrList = []
+                for el in unitary: 
+                    arrayAttrList.append(DenseF32ArrayAttr.get([np.real(el), np.imag(el)]))
+                unitary = ArrayAttr.get(arrayAttrList)
+                targets = [self.popValue() for _ in range(numTargets)]
+                controls = [
+                    self.popValue() for i in range(len(self.valueStack))
+                ]
+                quake.UnitaryOp(StringAttr.get(node.func.value.id), controls, targets, unitary)
+                return 
+            
             # We have a func name . ctrl
             if node.func.value.id == 'swap' and node.func.attr == 'ctrl':
                 targetB = self.popValue()

@@ -27,6 +27,8 @@ globalKernelRegistry = {}
 # keyed on their name (without __nvqpp__mlirgen__ prefix)
 globalAstRegistry = {}
 
+# Keep a global registry of all registered custom 
+# unitary operations. 
 globalRegisteredUnitaries = {}
 
 # By default and to keep things easier,
@@ -36,6 +38,8 @@ def mlirTypeFromPyType(argType, ctx, argInstance=None):
         return IntegerType.get_signless(64, ctx)
     if argType == float:
         return F64Type.get(ctx)
+    if argType == bool:
+        return IntegerType.get_signless(1, ctx)
     if argType == list and argInstance is not None and type(
             argInstance[0]) == int:
         return cc.StdvecType.get(ctx, mlirTypeFromPyType(int, ctx))

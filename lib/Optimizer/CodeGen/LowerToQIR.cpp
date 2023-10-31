@@ -879,6 +879,7 @@ public:
   }
 };
 
+/// Convert quake.unitary to a call to __quantum__qis__unitary(real, imag, controls, targets)
 class UnitaryOpRewrite : public OpConversionPattern<quake::UnitaryOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
@@ -890,16 +891,7 @@ public:
                                     std::string &operationName,
                                     ArrayRef<double> data) const {
     auto f64Ty = rewriter.getF64Type();
-    auto i8Ptr = LLVM::LLVMPointerType::get(rewriter.getI8Type());
-
-    auto irBuilder = cudaq::IRBuilder::atBlockEnd(parentModule.getBody());
-    if (failed(irBuilder.loadIntrinsic(parentModule,
-                                       cudaq::llvmMemCopyIntrinsic))) {
-      // Return nothing to indicate failure
-      return {};
-    }
-
-    SmallVector<std::int64_t> shape{numUnitaryElements};
+      SmallVector<std::int64_t> shape{numUnitaryElements};
     auto tensorTy = VectorType::get(shape, f64Ty);
     auto insertPoint = rewriter.saveInsertionPoint();
     rewriter.setInsertionPointToStart(parentModule.getBody());
@@ -919,28 +911,10 @@ public:
     Value realPartAddr = rewriter.create<LLVM::AddressOfOp>(
         loc, cudaq::opt::factory::getPointerType(realGlobalOp.getType()),
         realGlobalOp.getSymName());
-    Value realPartAddrCasted =
-        rewriter.create<LLVM::BitcastOp>(loc, i8Ptr, realPartAddr);
-
-    Value numElements = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getI64Type(), numUnitaryElements);
-    Value realPartVal = rewriter.create<LLVM::AllocaOp>(
-        loc, LLVM::LLVMPointerType::get(f64Ty), f64Ty, numElements);
-    Value realPartValCasted =
-        rewriter.create<LLVM::BitcastOp>(loc, i8Ptr, realPartVal);
-    Value constantFalse =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getIntegerType(1), 0);
     Value zero =
         rewriter.create<LLVM::ConstantOp>(loc, rewriter.getIntegerType(64), 0);
-    Value numBytesVal = rewriter.create<LLVM::ConstantOp>(
-        loc, rewriter.getIntegerType(64), 8 * numUnitaryElements);
-    rewriter.create<func::CallOp>(loc, TypeRange{}, cudaq::llvmMemCopyIntrinsic,
-                                  ValueRange{realPartValCasted,
-                                             realPartAddrCasted, numBytesVal,
-                                             constantFalse});
-
     return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(f64Ty),
-                                        realPartVal, ValueRange{zero});
+                                        realPartAddr, ValueRange{zero, zero});
   }
 
   LogicalResult
@@ -1007,6 +981,7 @@ public:
           loc, cudaq::opt::factory::getPointerType(i8PtrTy), call.getResult());
       auto cast = rewriter.create<LLVM::BitcastOp>(loc, i8PtrTy, target);
       rewriter.create<LLVM::StoreOp>(loc, cast, pointer);
+      i++;
     }
 
     // Create (qubit...) -> Array* control array
@@ -1022,6 +997,7 @@ public:
           loc, cudaq::opt::factory::getPointerType(i8PtrTy), call.getResult());
       auto cast = rewriter.create<LLVM::BitcastOp>(loc, i8PtrTy, control);
       rewriter.create<LLVM::StoreOp>(loc, cast, pointer);
+      i++;
     }
 
     auto unitarySymbolRef = cudaq::opt::factory::createLLVMFunctionSymbol(

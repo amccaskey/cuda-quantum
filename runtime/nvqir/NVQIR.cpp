@@ -328,12 +328,10 @@ void __quantum__qis__unitary(double *realPart, double *imagPart,
   auto targetIds = arrayToVectorSizeT(targets);
   auto numElements = (1ULL << targetIds.size()) * (1ULL << targetIds.size());
   std::vector<std::complex<double>> matrix(numElements);
-  for (std::size_t i = 0; i < numElements; i++) 
+  for (std::size_t i = 0; i < numElements; i++)
     matrix[i] = {realPart[i], imagPart[i]};
 
-  std::vector<std::size_t> controlIds;
-  if (controls)
-    controlIds = arrayToVectorSizeT(controls);
+  auto controlIds = arrayToVectorSizeT(controls);
 
   nvqir::getCircuitSimulatorInternal()->applyCustomOperation(matrix, controlIds,
                                                              targetIds);
