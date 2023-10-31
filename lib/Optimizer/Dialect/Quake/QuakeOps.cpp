@@ -584,6 +584,43 @@ void quake::WrapOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 }
 
 //===----------------------------------------------------------------------===//
+// UnitaryOp
+//===----------------------------------------------------------------------===//
+
+/// @brief Verify we have correct Attribute structure for
+/// unitary matrix elements.
+LogicalResult quake::UnitaryOp::verify() {
+
+  auto op = getOperation();
+  auto targets = getTargets();
+  auto unitary = getUnitary();
+  for (auto element : unitary) {
+    auto arrAttr = dyn_cast<DenseF32ArrayAttr>(element);
+    if (!arrAttr)
+      return op->emitOpError(
+          "quake.unitary must be an ArrayAttr containing "
+          "DenseF32ArrayAttr elements, where each element is the real "
+          "and imaginary part of the matrix element.");
+    if (arrAttr.size() != 2)
+      return op->emitOpError(
+          "unitary elements must be of size 2, the real and imaginary parts.");
+  }
+
+  // verify correct number of unitary elements
+  auto expectedNumElements =
+      (1ULL << targets.size()) * (1ULL << targets.size());
+
+  if (expectedNumElements != unitary.size())
+    return op->emitOpError(
+        "invalid number of unitary matrix elements. For " +
+        std::to_string(targets.size()) + " qubits, there should be " +
+        std::to_string(expectedNumElements) + " elements. (" +
+        std::to_string(unitary.size()) + " provided)");
+
+        return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Measurements (MxOp, MyOp, MzOp)
 //===----------------------------------------------------------------------===//
 

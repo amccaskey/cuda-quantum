@@ -15,6 +15,8 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
+#include "mlir/Dialect/Complex/IR/Complex.h"
+
 #define DEBUG_TYPE "lower-ast-expr"
 
 using namespace mlir;

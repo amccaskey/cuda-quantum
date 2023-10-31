@@ -25,6 +25,8 @@ include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.td"
 include "cudaq/Optimizer/Dialect/Quake/QuakeInterfaces.td"
 include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.td"
 
+include "mlir/Dialect/Complex/IR/ComplexAttributes.td"
+
 //===----------------------------------------------------------------------===//
 // Base operation definition.
 //===----------------------------------------------------------------------===//
@@ -829,6 +831,28 @@ def ExpPauliOp : QuakeOp<"exp_pauli"> {
   let assemblyFormat = [{
     `(` $parameter `)` $qubits `,` $pauli `:` functional-type(operands, results) attr-dict
   }];
+}
+
+def UnitaryOp : QuakeOp<"unitary", [AttrSizedOperandSegments]> {
+  let summary = "General unitary operation specified by constant unitary matrix data";
+  let description = [{
+    This operation affects a general user-specified unitary operation, where 
+    the unitary is specified at compile-time via its matrix representation.
+    }];
+
+  let arguments = (ins StrAttr:$opName, 
+                       Variadic<AnyQType>:$controls, 
+                       Variadic<RefType>:$targets, 
+                       ArrayAttr:$unitary);
+  let results = (outs );
+
+  let assemblyFormat = [{
+    (`[` $controls^ `]`)?
+    $targets `:` functional-type(operands, results) attr-dict
+  }];
+
+  let hasVerifier = 1;
+
 }
 
 def HOp : OneTargetOp<"h", [Hermitian]> {

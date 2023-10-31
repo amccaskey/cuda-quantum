@@ -11,11 +11,11 @@ from typing import Callable
 from collections import deque
 import numpy as np
 from .analysis import FindDepKernelsVisitor
-from .utils import globalAstRegistry, globalKernelRegistry, nvqppPrefix
+from .utils import globalAstRegistry, globalKernelRegistry, nvqppPrefix, globalRegisteredUnitaries
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
-from mlir_cudaq.dialects import builtin, func, arith, math
+from mlir_cudaq.dialects import builtin, func, arith, math, complex
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 # This file implements the CUDA Quantum Python AST to MLIR conversion.
@@ -557,6 +557,8 @@ class PyASTBridge(ast.NodeVisitor):
         Finally, general operation modifiers are supported, specifically OPERATION.adj and OPERATION.ctrl 
         for adjoint and control synthesis of the operation.  
         """
+        global globalRegisteredUnitaries
+
         if self.verbose:
             print("[Visit Call] {}".format(ast.unparse(node)))
 
@@ -782,6 +784,19 @@ class PyASTBridge(ast.NodeVisitor):
                 opCtor([], [], [], [qubitA, qubitB])
                 return
 
+            if node.func.id in globalRegisteredUnitaries:
+                unitary = globalRegisteredUnitaries[node.func.id]
+                # flatten the matrix
+                unitary = list(unitary.flat)
+                # Need to map to an ArrayAttr<ArrayAttr> where each element 
+                # is a pair (represented as an array) -> (real, imag)
+                arrayAttrList = []
+                for el in unitary: 
+                    arrayAttrList.append(DenseF32ArrayAttr.get([np.real(el), np.imag(el)]))
+                unitary = ArrayAttr.get(arrayAttrList)
+                quake.UnitaryOp(StringAttr.get(node.func.id), [], [self.popValue()], unitary)
+                return 
+            
             if node.func.id in globalKernelRegistry:
                 # If in globalKernelRegistry, it has to be in this Module
                 otherKernel = SymbolTable(

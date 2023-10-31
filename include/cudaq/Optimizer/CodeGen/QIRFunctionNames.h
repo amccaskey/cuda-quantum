@@ -20,6 +20,7 @@ constexpr static const char QIRMeasure[] = "__quantum__qis__mz";
 constexpr static const char QIRMeasureToRegister[] =
     "__quantum__qis__mz__to__register";
 
+constexpr static const char QIRUnitary[] = "__quantum__qis__unitary";
 constexpr static const char QIRCnot[] = "__quantum__qis__cnot";
 constexpr static const char QIRCphase[] = "__quantum__qis__cphase";
 constexpr static const char QIRReadResultBody[] =

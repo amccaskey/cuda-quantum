@@ -1,0 +1,8 @@
+
+module {
+  func.func @adder_n4() {
+    %0 = quake.alloca !quake.ref
+    quake.unitary %0 : (!quake.ref) -> () { opName = "custom_h", unitary = [array<f32: 0.707106769, .000000e+00>, array<f32: 0.707106769, 0.000000e+00>, array<f32: 0.707106769, 0.000000e+00>, array<f32: -0.707106769, 0.000000e+00>]}
+    return 
+  }
+}

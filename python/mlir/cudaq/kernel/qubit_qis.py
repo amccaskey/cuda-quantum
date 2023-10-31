@@ -14,12 +14,12 @@ from abc import abstractmethod, ABCMeta
 import inspect
 import numpy as np
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
+from .utils import globalRegisteredUnitaries 
 
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
 qubit = cudaq_runtime.qubit
 SpinOperator = cudaq_runtime.SpinOperator
-
 
 def processQubitIds(opName, *args):
     """
@@ -296,6 +296,7 @@ def compute_action(compute, action):
 
 
 def register_operation(unitary, operation_name=None):
+    global globalRegisteredUnitaries
     """
     Register a new quantum operation at runtime. Users must 
     provide the unitary matrix as a 2D NumPy array. The operation 
@@ -332,4 +333,5 @@ def register_operation(unitary, operation_name=None):
 
     # Register the operation name so JIT AST can
     # get it.
+    globalRegisteredUnitaries[operation_name] = unitary
     return registeredOp()
