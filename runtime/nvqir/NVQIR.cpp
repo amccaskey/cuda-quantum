@@ -329,11 +329,26 @@ struct MyComplexT {
 };
 
 struct SupportedCVectorComplex {
-  MyComplexT * data;
+  MyComplexT *data;
   std::size_t size;
 };
 
-void __quantum__qis__unitary(SupportedCVectorComplex data, Array * controls, Array* targets) {
+void __quantum__qis__initialize_state(Array *targets,
+                                      SupportedCVectorComplex data) {
+  auto targetIds = arrayToVectorSizeT(targets);
+  auto numElements = (1UL << targetIds.size());
+  if (data.size != numElements)
+    throw std::runtime_error("invalid number of state vector elements vs "
+                             "number of qubits in initialize_state.");
+  std::vector<std::complex<double>> vector(numElements);
+  for (std::size_t i = 0; i < numElements; i++)
+    vector[i] = {data.data[i].real, data.data[i].imag};
+
+  nvqir::getCircuitSimulatorInternal()->initializeState(targetIds, vector);
+}
+
+void __quantum__qis__unitary(SupportedCVectorComplex data, Array *controls,
+                             Array *targets) {
 
   auto targetIds = arrayToVectorSizeT(targets);
   auto numElements = (1ULL << targetIds.size()) * (1ULL << targetIds.size());
@@ -348,7 +363,7 @@ void __quantum__qis__unitary(SupportedCVectorComplex data, Array * controls, Arr
 }
 
 void __quantum__qis__constant_unitary(double *realPart, double *imagPart,
-                             Array *controls, Array *targets) {
+                                      Array *controls, Array *targets) {
   auto targetIds = arrayToVectorSizeT(targets);
   auto numElements = (1ULL << targetIds.size()) * (1ULL << targetIds.size());
   std::vector<std::complex<double>> matrix(numElements);

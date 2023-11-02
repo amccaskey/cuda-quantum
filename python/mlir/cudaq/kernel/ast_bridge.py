@@ -919,7 +919,7 @@ class PyASTBridge(ast.NodeVisitor):
             if node.func.id in globalKernelRegistry:
                 # If in globalKernelRegistry, it has to be in this Module
                 otherKernel = SymbolTable(
-                    self.module.operation)['__nvqpp__mlirgen__' + node.func.id]
+                    self.module.operation)[nvqppPrefix + node.func.id]
                 fType = otherKernel.type
                 if len(fType.inputs) != len(node.args):
                     raise RuntimeError(
@@ -975,33 +975,70 @@ class PyASTBridge(ast.NodeVisitor):
                     return
                 if node.func.attr == 'sin':
                     value = self.popValue()
-                    if F64Type.isinstance(value.type):
-                        value = complex.CreateOp(
-                            ComplexType.get(value.type), value,
-                            self.getConstantFloat(0.0)).result
+                    if IntegerType.isinstance(value.type):
+                        value = arith.SIToFPOp(self.getFloatType(), value).result
+
+                    value = complex.CreateOp(
+                        ComplexType.get(value.type), value,
+                        self.getConstantFloat(0.0)).result
 
                     self.pushValue(complex.SinOp(value).result)
                     return
+                if node.func.attr == 'sqrt':
+                    value = self.popValue()
+                    if IntegerType.isinstance(value.type):
+                        value = arith.SIToFPOp(self.getFloatType(), value).result 
+                    
+                    value = complex.CreateOp(
+                        ComplexType.get(value.type), value,
+                        self.getConstantFloat(0.0)).result
+                    self.pushValue(complex.SqrtOp(value).result)
+                    return
+
                 raise RuntimeError(
                     "numpy calls are not yet supported ({})".format(
                         node.func.attr))
 
             if node.func.value.id == 'cudaq':
                 if node.func.attr == 'qvector':
-                    # Handle cudaq.qvector(N)
-                    size = self.popValue()
-                    if hasattr(size, "literal_value"):
-                        ty = self.getVeqType(size.literal_value)
-                        qubits = quake.AllocaOp(ty)
+                    if IntegerType.isinstance(self.valueStack[0].type):
+                        # Handle cudaq.qvector(N)
+                        size = self.popValue()
+                        if hasattr(size, "literal_value"):
+                            ty = self.getVeqType(size.literal_value)
+                            qubits = quake.AllocaOp(ty)
+                        else:
+                            ty = self.getVeqType()
+                            qubits = quake.AllocaOp(ty, size=size)
+                        self.pushValue(qubits.results[0])
+                    elif cc.StdvecType.isinstance(self.valueStack[0].type):
+                        initialStateVal = self.popValue()
+                        # get the size of the vector. then allocate the qvector, 
+                        # then pass the vector to InitState
+                        size = cc.StdvecSizeOp(self.getIntegerType(), initialStateVal).result
+                        size = arith.SIToFPOp(self.getFloatType(), size).result
+                        numQubits = math.Log2Op(size).result 
+                        numQubits = arith.FPToSIOp(self.getIntegerType(), numQubits).result
+                        qubits = quake.AllocaOp(self.getVeqType(), size=numQubits).results[0]
+                        quake.InitializeStateOp(qubits, initialStateVal)
+                        self.pushValue(qubits)
                     else:
-                        ty = self.getVeqType()
-                        qubits = quake.AllocaOp(ty, size=size)
-                    self.pushValue(qubits.results[0])
+                        raise RuntimeError("invalid argument passed to cudaq.qvector().")
+                    
                     return
-                elif node.func.attr == "qubit":
+                
+                # FIXME these can probably just be ifs
+                if node.func.attr == "qubit":
                     self.pushValue(quake.AllocaOp(self.getRefType()).result)
                     return
-                elif node.func.attr == 'adjoint':
+                
+                if node.func.attr == 'initialize_state':
+                    state = self.popValue()
+                    qubits = self.popValue()
+                    quake.InitializeStateOp(qubits, state)
+                    return                
+                
+                if node.func.attr == 'adjoint':
                     # Handle cudaq.adjoint(kernel, ...)
                     otherFuncName = node.args[0].id
                     if otherFuncName in self.symbolTable:
@@ -1033,7 +1070,7 @@ class PyASTBridge(ast.NodeVisitor):
                                   is_adj=True)
                     return
 
-                elif node.func.attr == 'control':
+                if node.func.attr == 'control':
                     # Handle cudaq.control(kernel, ...)
                     otherFuncName = node.args[0].id
                     if otherFuncName in self.symbolTable:
@@ -1067,7 +1104,8 @@ class PyASTBridge(ast.NodeVisitor):
                                   callee=FlatSymbolRefAttr.get(nvqppPrefix +
                                                                otherFuncName))
                     return
-                elif node.func.attr == 'compute_action':
+                
+                if node.func.attr == 'compute_action':
                     # There can only be 2 args here.
                     action = None
                     compute = None
@@ -1989,6 +2027,21 @@ class PyASTBridge(ast.NodeVisitor):
                 raise RuntimeError("unhandled BinOp.FloorDiv types: {}".format(
                     ast.unparse(node)))
         if isinstance(node.op, ast.Div):
+            if ComplexType.isinstance(left.type):
+                if not ComplexType.isinstance(right.type):
+                    right = complex.CreateOp(
+                            ComplexType.get(self.getFloatType()), right,
+                            self.getConstantFloat(0.0)).result
+                self.pushValue(complex.DivOp(left, right).result)
+                return 
+            if ComplexType.isinstance(right.type):
+                if not ComplexType.isinstance(left.type):
+                    left = complex.CreateOp(
+                            ComplexType.get(self.getFloatType()), left,
+                            self.getConstantFloat(0.0)).result
+                self.pushValue(complex.DivOp(left, right).result)
+                return
+            
             if IntegerType.isinstance(left.type):
                 left = arith.SIToFPOp(self.getFloatType(), left).result
             if IntegerType.isinstance(right.type):
@@ -2102,7 +2155,12 @@ def compile_to_mlir(astModule, **kwargs):
     # Canonicalize the code
     pm = PassManager.parse("builtin.module(canonicalize,cse)",
                            context=bridge.ctx)
-    pm.run(bridge.module)
+    
+    try:
+        pm.run(bridge.module)
+    except:
+        print(bridge.module)
+        raise RuntimeError("could not canonicalize code.")
 
     globalAstRegistry[bridge.name] = astModule
 

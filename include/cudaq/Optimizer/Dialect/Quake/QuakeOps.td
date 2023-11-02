@@ -25,8 +25,6 @@ include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.td"
 include "cudaq/Optimizer/Dialect/Quake/QuakeInterfaces.td"
 include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.td"
 
-include "mlir/Dialect/Complex/IR/ComplexAttributes.td"
-
 //===----------------------------------------------------------------------===//
 // Base operation definition.
 //===----------------------------------------------------------------------===//
@@ -833,11 +831,26 @@ def ExpPauliOp : QuakeOp<"exp_pauli"> {
   }];
 }
 
+def InitializeStateOp : QuakeOp<"init_state"> {
+  let summary = "Initialize the quantum state to a specific complex vector.";
+  let description = [{
+    }];
+
+  let arguments = (ins VeqType:$targets, 
+                       cc_StdVectorType:$vector);
+  let results = (outs );
+
+  let assemblyFormat = [{
+    `(` $vector `,` $targets `)` `:` functional-type(operands, results) attr-dict
+  }];
+
+}
+
 def UnitaryOp : QuakeOp<"unitary", [AttrSizedOperandSegments]> {
   let summary = "General unitary operation specified by constant unitary matrix data";
   let description = [{
     This operation affects a general user-specified unitary operation, where 
-    the unitary is specified at compile-time via its matrix representation.
+    the unitary can be specified at compile-time or at runtime via its matrix representation.
     }];
 
   let arguments = (ins StrAttr:$opName, 

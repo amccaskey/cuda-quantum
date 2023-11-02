@@ -881,8 +881,34 @@ public:
   }
 };
 
-/// Convert quake.unitary to a call to __quantum__qis__unitary(real, imag,
-/// controls, targets)
+class InitialStateOpRewrite
+    : public OpConversionPattern<quake::InitializeStateOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(quake::InitializeStateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto ctx = op.getContext();
+    auto parentModule = op->getParentOfType<ModuleOp>();
+    auto qubits = adaptor.getTargets();
+    auto state = adaptor.getVector();
+    auto qirArrayTy = cudaq::opt::getArrayType(ctx);
+
+    auto symbolRef = cudaq::opt::factory::createLLVMFunctionSymbol(
+        cudaq::opt::QIRInitializeState, LLVM::LLVMVoidType::get(ctx),
+        {qirArrayTy, state.getType()}, parentModule);
+
+    SmallVector<Value> funcArgs{qubits, state};
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, TypeRange{}, symbolRef,
+                                              funcArgs);
+    return success();
+  }
+};
+
+/// Convert quake.unitary to a call to __quantum__qis__unitary(data,
+/// controls, targets) or __quantum__qis__constant_unitary(real, imag, controls,
+/// targets)
 class UnitaryOpRewrite : public OpConversionPattern<quake::UnitaryOp> {
 public:
   using OpConversionPattern::OpConversionPattern;
@@ -1033,7 +1059,7 @@ public:
                                 targetsArr};
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, TypeRange{}, unitarySymbolRef,
                                               funcArgs);
-
+    // FIXME need to release the arrays
     return success();
   }
 };
@@ -1681,7 +1707,8 @@ public:
     populateFuncToLLVMConversionPatterns(typeConverter, patterns);
 
     patterns.insert<GetVeqSizeOpRewrite, RemoveRelaxSizeRewrite, MxToMz, MyToMz,
-                    UnitaryOpRewrite, ReturnBitRewrite>(context);
+                    UnitaryOpRewrite, InitialStateOpRewrite, ReturnBitRewrite>(
+        context);
     patterns.insert<
         AllocaOpRewrite, AllocaOpPattern, CallableClosureOpPattern,
         CallableFuncOpPattern, CallCallableOpPattern, CastOpPattern,
