@@ -14,13 +14,14 @@ from abc import abstractmethod, ABCMeta
 import inspect
 import numpy as np
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
-from .utils import globalRegisteredUnitaries 
+from .utils import globalRegisteredUnitaries
 from typing import Callable
 
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
 qubit = cudaq_runtime.qubit
 SpinOperator = cudaq_runtime.SpinOperator
+
 
 def processQubitIds(opName, *args):
     """
@@ -95,7 +96,7 @@ class quantum_operation(object):
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         qubitIds = [q for q in processQubitIds(opName, *quantumArguments)]
-        
+
         # If the unitary is callable, evaluate it
         if isinstance(unitary, Callable):
             unitary = unitary(*parameters)
@@ -165,7 +166,7 @@ class quantum_operation(object):
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         qubitIds = [q for q in processQubitIds(opName, *quantumArguments)]
-        
+
         # If the unitary is callable, evaluate it
         if isinstance(unitary, Callable):
             unitary = unitary(*parameters)
@@ -339,7 +340,7 @@ def register_operation(unitary, operation_name=None):
     numParameters = 0
     if isinstance(unitary, Callable):
         numParameters = len(inspect.getfullargspec(unitary).args)
-    
+
     # register a new function for kernels of the given
     # name, have it apply the unitary data
     registeredOp = type(

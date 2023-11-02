@@ -109,30 +109,34 @@ class RewriteMeasures(ast.NodeTransformer):
 
 
 class MatrixToRowMajorList(ast.NodeTransformer):
+    """
+    Convert 2D np.array([[row0],[row1], ... ]) to a row-major 
+    single list, np.array([row0 row1 row2 ...]) in order to make it 
+    easier to convert the data to a stdvec in our MLIR model.
+    """
 
     def visit_Call(self, node):
 
         self.generic_visit(node)
 
         if not isinstance(node.func, ast.Attribute):
-            return node 
-        
+            return node
+
         # is an attribute
-        if not node.func.value.id in ['numpy','np']:
-            return node 
-        
+        if not node.func.value.id in ['numpy', 'np']:
+            return node
+
         if not node.func.attr == 'array':
-            return node 
-        
+            return node
+
         # this is an np.array
         args = node.args
 
         if len(args) != 1 and not isinstance(args[0], ast.List):
-            return node 
-        
+            return node
 
         # [[this], [this], [this], [this], ...]
-        subLists = args[0].elts 
+        subLists = args[0].elts
         # convert to [this, this, this, this, ...]
         newElts = []
         for l in subLists:
@@ -145,18 +149,49 @@ class MatrixToRowMajorList(ast.NodeTransformer):
         ast.fix_missing_locations(newCall)
         return newCall
 
+
 class LambdaOrLambdaAssignToFunctionDef(ast.NodeTransformer):
+    """
+    Convert a parameterized lambda returning a NumPy array to a standard 
+    Python function definition.
+    """
+
     def visit_Assign(self, node):
         if isinstance(node.value, ast.Call):
             if isinstance(node.value.args[0], ast.Lambda):
-                n = ast.FunctionDef(name=node.targets[0].id, args=node.value.args[0].args, body=[ast.Return(value=node.value.args[0].body)], decorator_list=[])
+                n = ast.FunctionDef(
+                    name=node.targets[0].id,
+                    args=node.value.args[0].args,
+                    body=[ast.Return(value=node.value.args[0].body)],
+                    decorator_list=[])
                 ast.copy_location(n, node.value)
                 ast.fix_missing_locations(n)
                 for a in n.args.args:
                     a.annotation = ast.Name(id='float')
                 return n
 
-def preprocessCustomOperationLambda(unitaryCallable):
+
+class CheckAndCorrectFunctionName(ast.NodeTransformer):
+    """
+    It may be the case that the custom unitary has a specified function name 
+    that is not equal to the desired operation name. Fix that here.
+    """
+
+    def __init__(self, desiredName):
+        self.desiredName = desiredName
+
+    def visit_FunctionDef(self, node):
+        if node.name != self.desiredName:
+            node.name = self.desiredName
+        return node
+
+
+def preprocessCustomOperationLambda(unitaryCallable, desiredName):
+    """
+    Given a callable custom unitary operation (cudaq.register_operation(lambda param : np.array(...))), 
+    convert the matrix to a list within the NumPy array and raise the lambda 
+    to a function. Return the AST Module for parsing and visitation.
+    """
     unitarySrc = inspect.getsource(unitaryCallable)
     leadingSpaces = len(unitarySrc) - len(unitarySrc.lstrip())
     unitarySrc = '\n'.join(
@@ -164,7 +199,9 @@ def preprocessCustomOperationLambda(unitaryCallable):
     unitaryModule = ast.parse(unitarySrc)
     MatrixToRowMajorList().visit(unitaryModule)
     LambdaOrLambdaAssignToFunctionDef().visit(unitaryModule)
-    return unitaryModule 
+    CheckAndCorrectFunctionName(desiredName).visit(unitaryModule)
+    return unitaryModule
+
 
 class FindDepKernelsVisitor(ast.NodeVisitor):
 

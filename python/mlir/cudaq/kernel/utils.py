@@ -27,9 +27,10 @@ globalKernelRegistry = {}
 # keyed on their name (without __nvqpp__mlirgen__ prefix)
 globalAstRegistry = {}
 
-# Keep a global registry of all registered custom 
-# unitary operations. 
+# Keep a global registry of all registered custom
+# unitary operations.
 globalRegisteredUnitaries = {}
+
 
 # By default and to keep things easier,
 # we only deal with int==i64 and float=f64
