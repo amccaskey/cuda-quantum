@@ -203,6 +203,39 @@ class PyASTBridge(ast.NodeVisitor):
                 block.operations[len(block.operations) - 1])
         return False
 
+    def isArithmeticType(self, type):
+        """
+        Return True if the given type is an integer, float, or complex type. 
+        """
+        return IntegerType.isinstance(type) or F64Type.isinstance(type) or ComplexType.isinstance(type)
+
+    def convertArithmeticToSuperiorType(self, values, type):
+        """
+        Assuming all values provided are arithmetic, convert each one to the 
+        provided superior type. Float is superior to integer and complex is 
+        superior to float (superior implies the inferior type can can be converted to the 
+        superior type)
+        """
+        retValues = []
+        for v in values:
+            if IntegerType.isinstance(v.type):
+                if F64Type.isinstance(type):
+                    retValues.append(arith.SIToFPOp(type, v).result)
+                elif ComplexType.isinstance(type):
+                    # cast integer to float, pass to real part
+                    retValues.append(complex.CreateOp(type, arith.SIToFPOp(ComplexType(type).element_type, v).result, self.getConstantFloat(0)).result)
+                else:
+                    retValues.append(v)
+            if F64Type.isinstance(v.type):
+                if ComplexType.isinstance(type):
+                    retValues.append(complex.CreateOp(type, v, self.getConstantFloat(0)).result)
+                else:
+                    retValues.append(v)
+            if ComplexType.isinstance(v.type):
+                retValues.append(v)
+            
+        return retValues
+    
     def mlirTypeFromAnnotation(self, annotation):
         """
         Return the MLIR Type corresponding to the given kernel function argument type annotation.
@@ -841,10 +874,11 @@ class PyASTBridge(ast.NodeVisitor):
                     numParams = len(funcOp.arguments)
                     numVals = len(self.valueStack)
                     operands = [self.popValue() for _ in range(numVals)]
-                    param = operands[-numParams]
-                    qubits = operands[:numVals-numParams]
+                    operands.reverse()
+                    params = operands[:numParams]
+                    qubits = operands[numParams:] #numVals-numParams]
                     res = func.CallOp([resTy], 
-                                    node.func.id, [param]).result
+                                    node.func.id, params).result
                     quake.UnitaryOp(StringAttr.get(node.func.id), [], qubits, unitary=res)
                     return
 
@@ -1224,7 +1258,8 @@ class PyASTBridge(ast.NodeVisitor):
         forNode.body = [node.elt]
         self.visit_For(forNode)
         return
-
+    
+    
     def visit_List(self, node):
         """
         This method will visit the ast.List node and represent lists of 
@@ -1254,13 +1289,40 @@ class PyASTBridge(ast.NodeVisitor):
             return
 
         # not a list of quantum types
+        # Get the first element
         firstTy = listElementValues[0].type
-        for v in listElementValues:
-            if firstTy != v.type:
-                raise RuntimeError(
-                    "non-homogenous list not allowed - must all be same type: {}"
-                    .format([v.type for v in listElementValues]))
+        # Is this a list of homogenous types?
+        isHomogeneous = False not in [firstTy == v.type for v in listElementValues]
+        
+        # If not, see if the types are arithmetic and if so, find 
+        # the superior type and convert all to it.
+        if not isHomogeneous:
+            # this list does not contain all the same types of elements
+            # check if they are at least all arithmetic
+            isArithmetic = False not in [self.isArithmeticType(v.type) for v in listElementValues]
+            if isArithmetic:
+                # Find the "superior type" (int < float < complex)
+                superiorType = self.getIntegerType()
+                for t in [v.type for v in listElementValues]:
+                    if F64Type.isinstance(t):
+                        superiorType = t
+                    if ComplexType.isinstance(t):
+                        superiorType = t
+                        break # can do no better
+                
+                # Convert the values to the superior arithmetic type
+                listElementValues = self.convertArithmeticToSuperiorType(listElementValues, superiorType)
 
+                # The list is now homogeneous
+                isHomogeneous = True
+
+        # If we are still not homogoenous
+        if not isHomogeneous:
+            raise RuntimeError(
+                "non-homogenous list not allowed - must all be same type: {}"
+                .format([v.type for v in listElementValues]))
+
+        # Turn this List into a StdVec<T>
         arrSize = self.getConstantInt(len(node.elts))
         arrTy = cc.ArrayType.get(self.ctx, listElementValues[0].type)
         alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, arrTy),
@@ -1810,6 +1872,14 @@ class PyASTBridge(ast.NodeVisitor):
             else:
                 negOne = self.getConstantInt(-1)
                 self.pushValue(arith.MulIOp(negOne, operand).result)
+            return
+        
+        if isinstance(node.op, ast.Not):
+            if not IntegerType.isinstance(operand.type):
+                raise RuntimeError("UnaryOp Not() on non-integer value.")
+            
+            zero = self.getConstantInt(0, IntegerType(operand.type).width)
+            self.pushValue(arith.CmpIOp(IntegerAttr.get(self.getIntegerType(), 0), operand, zero).result)
             return
 
         raise RuntimeError("unhandled UnaryOp: {}".format(ast.unparse(node)))
