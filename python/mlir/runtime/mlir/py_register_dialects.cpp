@@ -8,6 +8,7 @@
 
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 
+#include "cudaq/Optimizer/Builder/Intrinsics.h"
 #include "cudaq/Optimizer/CAPI/Dialects.h"
 #include "cudaq/Optimizer/CodeGen/Passes.h"
 #include "cudaq/Optimizer/CodeGen/Pipelines.h"
@@ -201,5 +202,13 @@ void registerCCDialectAndTypes(py::module &m) {
 void bindRegisterDialects(py::module &mod) {
   registerQuakeDialectAndTypes(mod);
   registerCCDialectAndTypes(mod);
+
+  mod.def("load_intrinsic", [](MlirModule module, std::string name) {
+    auto unwrapped = unwrap(module);
+    cudaq::IRBuilder builder = IRBuilder::atBlockEnd(unwrapped.getBody());
+    if (failed(builder.loadIntrinsic(unwrapped, name)))
+      unwrapped.emitError("failed to load intrinsic " + name);
+  });
+  
 }
 } // namespace cudaq

@@ -6,7 +6,7 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-import ast
+import ast, inspect
 from .utils import globalAstRegistry, globalKernelRegistry
 
 
@@ -107,6 +107,64 @@ class RewriteMeasures(ast.NodeTransformer):
 
         return node
 
+
+class MatrixToRowMajorList(ast.NodeTransformer):
+
+    def visit_Call(self, node):
+
+        self.generic_visit(node)
+
+        if not isinstance(node.func, ast.Attribute):
+            return node 
+        
+        # is an attribute
+        if not node.func.value.id in ['numpy','np']:
+            return node 
+        
+        if not node.func.attr == 'array':
+            return node 
+        
+        # this is an np.array
+        args = node.args
+
+        if len(args) != 1 and not isinstance(args[0], ast.List):
+            return node 
+        
+
+        # [[this], [this], [this], [this], ...]
+        subLists = args[0].elts 
+        # convert to [this, this, this, this, ...]
+        newElts = []
+        for l in subLists:
+            for e in l.elts:
+                newElts.append(e)
+
+        newList = ast.List(elts=newElts, ctx=ast.Load())
+        newCall = ast.Call(func=node.func, args=[newList], keywords=[])
+        ast.copy_location(newCall, node)
+        ast.fix_missing_locations(newCall)
+        return newCall
+
+class LambdaOrLambdaAssignToFunctionDef(ast.NodeTransformer):
+    def visit_Assign(self, node):
+        if isinstance(node.value, ast.Call):
+            if isinstance(node.value.args[0], ast.Lambda):
+                n = ast.FunctionDef(name=node.targets[0].id, args=node.value.args[0].args, body=[ast.Return(value=node.value.args[0].body)], decorator_list=[])
+                ast.copy_location(n, node.value)
+                ast.fix_missing_locations(n)
+                for a in n.args.args:
+                    a.annotation = ast.Name(id='float')
+                return n
+
+def preprocessCustomOperationLambda(unitaryCallable):
+    unitarySrc = inspect.getsource(unitaryCallable)
+    leadingSpaces = len(unitarySrc) - len(unitarySrc.lstrip())
+    unitarySrc = '\n'.join(
+        [line[leadingSpaces:] for line in unitarySrc.split('\n')])
+    unitaryModule = ast.parse(unitarySrc)
+    MatrixToRowMajorList().visit(unitaryModule)
+    LambdaOrLambdaAssignToFunctionDef().visit(unitaryModule)
+    return unitaryModule 
 
 class FindDepKernelsVisitor(ast.NodeVisitor):
 

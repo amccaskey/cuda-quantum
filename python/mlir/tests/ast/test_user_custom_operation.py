@@ -12,7 +12,7 @@ import pytest
 import numpy as np
 
 import cudaq
-
+from cudaq import spin 
 
 def test_custom_op():
 
@@ -63,3 +63,37 @@ def test_custom_op():
     counts = cudaq.sample(bell3, False, shots_count=100)
     counts.dump()
     assert '000' in counts and len(counts) == 1
+
+def test_parameterized_op():
+    custom_ry = cudaq.register_operation(lambda param: np.array([[
+        np.cos(param / 2), -np.sin(param / 2)
+    ], [np.sin(param / 2), np.cos(param / 2)]]))
+
+    @cudaq.kernel(jit=True)
+    def ansatz(theta: float):
+        q = cudaq.qvector(2)
+        x(q[0])
+        custom_ry(theta, q[1])
+        x.ctrl(q[1], q[0])
+
+    print(ansatz)
+    hamiltonian = 5.907 - 2.1433 * spin.x(0) * spin.x(1) - 2.1433 * spin.y(
+        0) * spin.y(1) + .21829 * spin.z(0) - 6.125 * spin.z(1)
+
+    result = cudaq.observe(ansatz, hamiltonian, .59)
+    assert np.isclose(result.expectation(), -1.74, atol=1e-2)
+
+def test_parameterized_op2():
+    custom_rx = cudaq.register_operation(lambda param: np.array([[
+        np.cos(param / 2), -1j*np.sin(param / 2)
+    ], [-1j*np.sin(param / 2), np.cos(param / 2)]]))
+
+    @cudaq.kernel(jit=True, verbose=True)
+    def kernel(theta: float):
+        q = cudaq.qubit()
+        custom_rx(theta, q)
+
+    print(kernel)
+
+    counts = cudaq.sample(kernel, np.pi)
+    assert '1' in counts and len(counts) == 1

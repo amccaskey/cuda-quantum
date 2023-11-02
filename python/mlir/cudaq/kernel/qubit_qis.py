@@ -15,6 +15,7 @@ import inspect
 import numpy as np
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 from .utils import globalRegisteredUnitaries 
+from typing import Callable
 
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
@@ -94,6 +95,10 @@ class quantum_operation(object):
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         qubitIds = [q for q in processQubitIds(opName, *quantumArguments)]
+        
+        # If the unitary is callable, evaluate it
+        if isinstance(unitary, Callable):
+            unitary = unitary(*parameters)
 
         if len(unitary) > 0:
             unitary, numTargets = quantum_operation.__validateAndProcessUnitary(
@@ -130,6 +135,10 @@ class quantum_operation(object):
         qubitIds = processQubitIds(opName, *quantumArguments)
         controls = qubitIds[:len(qubitIds) - 1]
         targets = [qubitIds[-1]]
+        # If the unitary is callable, evaluate it
+        if isinstance(unitary, Callable):
+            unitary = unitary(*parameters)
+
         if len(unitary) > 0:
             unitary, numTargets = quantum_operation.__validateAndProcessUnitary(
                 unitary)
@@ -156,6 +165,10 @@ class quantum_operation(object):
         parameters = list(args)[:cls.get_num_parameters()]
         quantumArguments = list(args)[cls.get_num_parameters():]
         qubitIds = [q for q in processQubitIds(opName, *quantumArguments)]
+        
+        # If the unitary is callable, evaluate it
+        if isinstance(unitary, Callable):
+            unitary = unitary(*parameters)
 
         if len(unitary) > 0:
             unitary, numTargets = quantum_operation.__validateAndProcessUnitary(
@@ -323,12 +336,17 @@ def register_operation(unitary, operation_name=None):
             )
         operation_name = codeContext.split('=')[0].strip()
 
+    numParameters = 0
+    if isinstance(unitary, Callable):
+        numParameters = len(inspect.getfullargspec(unitary).args)
+    
     # register a new function for kernels of the given
     # name, have it apply the unitary data
     registeredOp = type(
         operation_name, (quantum_operation,), {
             'get_name': staticmethod(lambda: operation_name),
-            'get_unitary': staticmethod(lambda: unitary)
+            'get_unitary': staticmethod(lambda: unitary),
+            'get_num_parameters': staticmethod(lambda: numParameters)
         })
 
     # Register the operation name so JIT AST can

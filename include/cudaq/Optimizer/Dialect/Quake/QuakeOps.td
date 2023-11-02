@@ -843,12 +843,13 @@ def UnitaryOp : QuakeOp<"unitary", [AttrSizedOperandSegments]> {
   let arguments = (ins StrAttr:$opName, 
                        Variadic<AnyQType>:$controls, 
                        Variadic<RefType>:$targets, 
-                       ArrayAttr:$unitary);
+                       OptionalAttr<ArrayAttr>:$constantUnitary,
+                       Optional<cc_StdVectorType>:$unitary);
   let results = (outs );
 
   let assemblyFormat = [{
     (`[` $controls^ `]`)?
-    $targets `:` functional-type(operands, results) attr-dict
+    $targets (`(` $unitary^ `)`)? `:` functional-type(operands, results) attr-dict
   }];
 
   let hasVerifier = 1;

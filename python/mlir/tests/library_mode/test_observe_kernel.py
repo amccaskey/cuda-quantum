@@ -12,10 +12,12 @@ import pytest
 import numpy as np
 
 import cudaq
-from cudaq import spin 
+from cudaq import spin
+
 
 def test_simple_observe():
     """Test that we can create parameterized kernels and call observe."""
+
     @cudaq.kernel
     def ansatz(angle):
         q = cudaq.qvector(2)
@@ -33,6 +35,7 @@ def test_simple_observe():
 
 def test_optimization():
     """Test that we can optimize over a parameterized kernel."""
+
     @cudaq.kernel
     def ansatz(angle):
         q = cudaq.qvector(2)
@@ -50,8 +53,7 @@ def test_optimization():
 
     optimizer = cudaq.optimizers.COBYLA()
     optimizer.max_iterations = 50
-    energy, params = optimizer.optimize(
-        1, objectiveFunction)
+    energy, params = optimizer.optimize(1, objectiveFunction)
     print(energy, params)
     assert np.isclose(energy, -1.74, 1e-2)
 
@@ -146,15 +148,17 @@ def test_broadcast():
 
 def test_observe_list():
     """Test that we can observe a list of spin_ops."""
-    hamiltonianList = [-2.1433 * spin.x(0) * spin.x(1), -2.1433 * spin.y(
-        0) * spin.y(1),  .21829 * spin.z(0), - 6.125 * spin.z(1)]
+    hamiltonianList = [
+        -2.1433 * spin.x(0) * spin.x(1), -2.1433 * spin.y(0) * spin.y(1),
+        .21829 * spin.z(0), -6.125 * spin.z(1)
+    ]
 
     @cudaq.kernel
-    def circuit(theta:float):
+    def circuit(theta: float):
         q = cudaq.qvector(2)
         x(q[0])
         ry(theta, q[1])
-        x.ctrl(q[1], q[0]) # can use cx or
+        x.ctrl(q[1], q[0])  # can use cx or
 
     results = cudaq.observe(circuit, hamiltonianList, .59)
 
@@ -164,6 +168,7 @@ def test_observe_list():
     print(sum)
     want_expectation_value = -1.7487948611472093
     assert np.isclose(want_expectation_value, sum, atol=1e-2)
+
 
 # TODO observe_async
 # TODO observe_async spin_op list

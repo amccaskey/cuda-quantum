@@ -16,6 +16,7 @@ import cudaq
 
 def test_adjoint():
     """Test that adjoint can be called on kernels and operations."""
+
     @cudaq.kernel
     def single_adjoint_test():
         q = cudaq.qubit()
@@ -70,6 +71,7 @@ def test_adjoint():
 
 def test_control():
     """Test that we can control on kernel functions."""
+
     @cudaq.kernel
     def fancyCnot(a, b):
         x.ctrl(a, b)
@@ -91,6 +93,7 @@ def test_control():
         q, r, s = cudaq.qubit(), cudaq.qubit(), cudaq.qubit()
         x(q, s)
         swap.ctrl(q, r, s)
+
     counts = cudaq.sample(test)
     assert len(counts) == 1
     assert '110' in counts
@@ -98,9 +101,10 @@ def test_control():
 
 def test_grover():
     """Test that compute_action works in tandem with kernel composability."""
+
     @cudaq.kernel
     def reflect(qubits):
-        ctrls = qubits.front(qubits.size()-1)
+        ctrls = qubits.front(qubits.size() - 1)
         last = qubits.back()
         cudaq.compute_action(lambda: (h(qubits), x(qubits)),
                              lambda: z.ctrl(ctrls, last))
@@ -128,6 +132,7 @@ def test_grover():
 def test_dynamic_circuit():
     """Test that we correctly sample circuits with 
        mid-circuit measurements and conditionals."""
+
     @cudaq.kernel
     def simple():
         q = cudaq.qvector(2)
@@ -145,6 +150,7 @@ def test_dynamic_circuit():
 
 
 def test_teleport():
+
     @cudaq.kernel
     def teleport():
         q = cudaq.qvector(3)

@@ -16,33 +16,35 @@ import cudaq
 
 def test_simple_sampling_ghz():
     """Test that we can build a very simple kernel and sample it."""
+
     @cudaq.kernel
     def simple(numQubits):
         qubits = cudaq.qvector(numQubits)
         h(qubits.front())
-        for i, qubit in enumerate(qubits.front(numQubits-1)):
-            x.ctrl(qubit, qubits[i+1])
+        for i, qubit in enumerate(qubits.front(numQubits - 1)):
+            x.ctrl(qubit, qubits[i + 1])
 
     counts = cudaq.sample(simple, 10)
     assert len(counts) == 2
-    assert '0'*10 in counts and '1'*10 in counts
+    assert '0' * 10 in counts and '1' * 10 in counts
 
 
 def test_simple_sampling_qpe():
     """Test that we can build up a set of kernels, compose them, and sample."""
+
     @cudaq.kernel
     def iqft(qubits):
         N = qubits.size()
-        for i in range(N//2):
-            swap(qubits[i], qubits[N-i-1])
+        for i in range(N // 2):
+            swap(qubits[i], qubits[N - i - 1])
 
-        for i in range(N-1):
+        for i in range(N - 1):
             h(qubits[i])
             j = i + 1
             for y in range(i, -1, -1):
-                r1.ctrl(-np.pi / 2**(j-y), qubits[j], qubits[y])
+                r1.ctrl(-np.pi / 2**(j - y), qubits[j], qubits[y])
 
-        h(qubits[N-1])
+        h(qubits[N - 1])
 
     @cudaq.kernel
     def tGate(qubit):
@@ -54,7 +56,7 @@ def test_simple_sampling_qpe():
 
     @cudaq.kernel
     def qpe(nC, nQ, statePrep, oracle):
-        q = cudaq.qvector(nC+nQ)
+        q = cudaq.qvector(nC + nQ)
         countingQubits = q.front(nC)
         stateRegister = q.back()
         statePrep(stateRegister)
@@ -78,8 +80,8 @@ def test_broadcast():
     def circuit(inSize: int):
         qubits = cudaq.qvector(inSize)
         h(qubits[0])
-        for i in range(inSize-1):
-            x.ctrl(qubits[i], qubits[i+1])
+        for i in range(inSize - 1):
+            x.ctrl(qubits[i], qubits[i + 1])
 
     cudaq.set_random_seed(13)
     allCounts = cudaq.sample(circuit, [3, 4, 5, 6, 7])

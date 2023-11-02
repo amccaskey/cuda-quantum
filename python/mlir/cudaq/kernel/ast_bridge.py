@@ -10,13 +10,13 @@ import sys
 from typing import Callable
 from collections import deque
 import numpy as np
-from .analysis import FindDepKernelsVisitor
+from .analysis import FindDepKernelsVisitor, preprocessCustomOperationLambda
 from .utils import globalAstRegistry, globalKernelRegistry, nvqppPrefix, globalRegisteredUnitaries
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
 from mlir_cudaq.dialects import builtin, func, arith, math, complex
-from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
+from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime, load_intrinsic
 
 # This file implements the CUDA Quantum Python AST to MLIR conversion.
 # It provides a PyASTBridge class that implements the ast.NodeVisitor type
@@ -48,11 +48,20 @@ class PyASTBridge(ast.NodeVisitor):
         symbol table, which maps variable names to constructed mlir.Values. 
         """
         self.valueStack = deque()
-        self.ctx = Context()
-        quake.register_dialect(self.ctx)
-        cc.register_dialect(self.ctx)
-        self.loc = Location.unknown(context=self.ctx)
-        self.module = Module.create(loc=self.loc)
+        self.knownResultType = kwargs['knownResultType'] if 'knownResultType' in kwargs else None
+        if 'existingModule' in kwargs:
+            self.module = kwargs['existingModule']
+            self.ctx = self.module.context
+            self.loc = Location.unknown(context=self.ctx)
+        else:
+            self.ctx = Context()
+            quake.register_dialect(self.ctx)
+            cc.register_dialect(self.ctx)
+            self.loc = Location.unknown(context=self.ctx)
+            self.module = Module.create(loc=self.loc)
+
+        self.disableEntryPointTag = kwargs['disableEntryPointTag'] if 'disableEntryPointTag' in kwargs else False
+        self.disableNvqppPrefix = kwargs['disableNvqppPrefix'] if 'disableNvqppPrefix' in kwargs else False
         self.symbolTable = {}
         self.increment = 0
         self.buildingEntryPoint = False
@@ -380,10 +389,14 @@ class PyASTBridge(ast.NodeVisitor):
             self.name = node.name
 
             # the full function name in MLIR is __nvqpp__mlirgen__ + the function name
-            fullName = nvqppPrefix + node.name
+            if not self.disableNvqppPrefix:
+                fullName = nvqppPrefix + node.name
+            else:
+                fullName = node.name
 
             # Create the FuncOp
-            f = func.FuncOp(fullName, (self.argTypes, []), loc=self.loc)
+            f = func.FuncOp(fullName, (self.argTypes, [] if self.knownResultType == None else [
+                            self.knownResultType]), loc=self.loc)
 
             # Set this kernel as an entry point if the arg types are classical only
             def isQuantumTy(ty):
@@ -391,7 +404,7 @@ class PyASTBridge(ast.NodeVisitor):
                     ty)
 
             areQuantumTypes = [isQuantumTy(ty) for ty in self.argTypes]
-            if True not in areQuantumTypes:
+            if True not in areQuantumTypes and not self.disableEntryPointTag:
                 f.attributes.__setitem__('cudaq-entrypoint', UnitAttr.get())
 
             # Create the entry block
@@ -416,7 +429,8 @@ class PyASTBridge(ast.NodeVisitor):
                 # Visit the function
                 [self.visit(n) for n in node.body]
                 # Add the return operation
-                ret = func.ReturnOp([])
+                if not self.hasTerminator(self.entry):
+                    ret = func.ReturnOp([])
                 self.buildingEntryPoint = False
 
             if True not in areQuantumTypes:
@@ -812,19 +826,43 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.id in globalRegisteredUnitaries:
                 unitary = globalRegisteredUnitaries[node.func.id]
-                # how many targets should there be? 
+
+                # Unitary could be constant or it could be a parameterized callable
+                if isinstance(unitary, Callable):
+                    if node.func.id not in SymbolTable(self.module.operation):
+                        # Get unitary source and AST
+                        unitaryModule = preprocessCustomOperationLambda(unitary)
+                        resTy = cc.StdvecType.get(
+                            self.ctx, ComplexType.get(self.getFloatType()))
+                        PyASTBridge(existingModule=self.module,
+                                    knownResultType=resTy, disableEntryPointTag=True, disableNvqppPrefix=True).visit(unitaryModule)
+                    
+                    funcOp = SymbolTable(self.module.operation)[node.func.id]
+                    numParams = len(funcOp.arguments)
+                    numVals = len(self.valueStack)
+                    operands = [self.popValue() for _ in range(numVals)]
+                    param = operands[-numParams]
+                    qubits = operands[:numVals-numParams]
+                    res = func.CallOp([resTy], 
+                                    node.func.id, [param]).result
+                    quake.UnitaryOp(StringAttr.get(node.func.id), [], qubits, unitary=res)
+                    return
+
+                # how many targets should there be?
                 numTargets = int(np.log2(unitary.shape[0]))
                 # flatten the matrix
                 unitary = list(unitary.flat)
-                # Need to map to an ArrayAttr<ArrayAttr> where each element 
+                # Need to map to an ArrayAttr<ArrayAttr> where each element
                 # is a pair (represented as an array) -> (real, imag)
                 arrayAttrList = []
-                for el in unitary: 
-                    arrayAttrList.append(DenseF32ArrayAttr.get([np.real(el), np.imag(el)]))
+                for el in unitary:
+                    arrayAttrList.append(DenseF32ArrayAttr.get(
+                        [np.real(el), np.imag(el)]))
                 unitary = ArrayAttr.get(arrayAttrList)
-                quake.UnitaryOp(StringAttr.get(node.func.id), [], [self.popValue() for _ in range(numTargets)], unitary)
-                return 
-            
+                quake.UnitaryOp(StringAttr.get(node.func.id), [], [
+                                self.popValue() for _ in range(numTargets)], constantUnitary=unitary)
+                return
+
             if node.func.id in globalKernelRegistry:
                 # If in globalKernelRegistry, it has to be in this Module
                 otherKernel = SymbolTable(
@@ -869,6 +907,29 @@ class PyASTBridge(ast.NodeVisitor):
 
         elif isinstance(node.func, ast.Attribute):
             self.generic_visit(node)
+            if node.func.value.id in ['numpy', 'np']:
+                if node.func.attr == 'array':
+                    return
+
+                if node.func.attr == 'cos':
+                    value = self.popValue()
+                    if F64Type.isinstance(value.type):
+                        value = complex.CreateOp(ComplexType.get(
+                            value.type), value, self.getConstantFloat(0.0)).result
+
+                    self.pushValue(complex.CosOp(value).result)
+                    return
+                if node.func.attr == 'sin':
+                    value = self.popValue()
+                    if F64Type.isinstance(value.type):
+                        value = complex.CreateOp(ComplexType.get(
+                            value.type), value, self.getConstantFloat(0.0)).result
+
+                    self.pushValue(complex.SinOp(value).result)
+                    return
+                raise RuntimeError(
+                    "numpy calls are not yet supported ({})".format(node.func.attr))
+
             if node.func.value.id == 'cudaq':
                 if node.func.attr == 'qvector':
                     # Handle cudaq.qvector(N)
@@ -1026,7 +1087,7 @@ class PyASTBridge(ast.NodeVisitor):
 
             # We have a func name . ctrl
             if node.func.value.id in ['h', 'x', 'y', 'z', 's', 't'
-                                     ] and node.func.attr == 'ctrl':
+                                      ] and node.func.attr == 'ctrl':
                 target = self.popValue()
                 controls = [
                     self.popValue() for i in range(len(self.valueStack))
@@ -1038,23 +1099,25 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.value.id in globalRegisteredUnitaries and node.func.attr == 'ctrl':
                 unitary = globalRegisteredUnitaries[node.func.value.id]
-                # how many targets should there be? 
+                # how many targets should there be?
                 numTargets = int(np.log2(unitary.shape[0]))
                 # flatten the matrix
                 unitary = list(unitary.flat)
-                # Need to map to an ArrayAttr<ArrayAttr> where each element 
+                # Need to map to an ArrayAttr<ArrayAttr> where each element
                 # is a pair (represented as an array) -> (real, imag)
                 arrayAttrList = []
-                for el in unitary: 
-                    arrayAttrList.append(DenseF32ArrayAttr.get([np.real(el), np.imag(el)]))
+                for el in unitary:
+                    arrayAttrList.append(DenseF32ArrayAttr.get(
+                        [np.real(el), np.imag(el)]))
                 unitary = ArrayAttr.get(arrayAttrList)
                 targets = [self.popValue() for _ in range(numTargets)]
                 controls = [
                     self.popValue() for i in range(len(self.valueStack))
                 ]
-                quake.UnitaryOp(StringAttr.get(node.func.value.id), controls, targets, unitary)
-                return 
-            
+                quake.UnitaryOp(StringAttr.get(
+                    node.func.value.id), controls, targets, constantUnitary=unitary)
+                return
+
             # We have a func name . ctrl
             if node.func.value.id == 'swap' and node.func.attr == 'ctrl':
                 targetB = self.popValue()
@@ -1068,7 +1131,7 @@ class PyASTBridge(ast.NodeVisitor):
                 return
 
             if node.func.value.id in ['rx', 'ry', 'rz', 'r1'
-                                     ] and node.func.attr == 'ctrl':
+                                      ] and node.func.attr == 'ctrl':
                 target = self.popValue()
                 controls = [
                     self.popValue() for i in range(len(self.valueStack))
@@ -1083,7 +1146,7 @@ class PyASTBridge(ast.NodeVisitor):
 
             # We have a func name . adj
             if node.func.value.id in ['h', 'x', 'y', 'z', 's', 't'
-                                     ] and node.func.attr == 'adj':
+                                      ] and node.func.attr == 'adj':
                 target = self.popValue()
                 opCtor = getattr(quake,
                                  '{}Op'.format(node.func.value.id.title()))
@@ -1109,7 +1172,7 @@ class PyASTBridge(ast.NodeVisitor):
                             target.type))
 
             if node.func.value.id in ['rx', 'ry', 'rz', 'r1'
-                                     ] and node.func.attr == 'adj':
+                                      ] and node.func.attr == 'adj':
                 target = self.popValue()
                 param = self.popValue()
                 if IntegerType.isinstance(param.type):
@@ -1175,7 +1238,8 @@ class PyASTBridge(ast.NodeVisitor):
         listElementValues = [self.popValue() for _ in range(len(node.elts))]
         listElementValues.reverse()
         valueTys = [
-            quake.VeqType.isinstance(v.type) or quake.RefType.isinstance(v.type)
+            quake.VeqType.isinstance(
+                v.type) or quake.RefType.isinstance(v.type)
             for v in listElementValues
         ]
         if False not in valueTys:
@@ -1195,7 +1259,7 @@ class PyASTBridge(ast.NodeVisitor):
             if firstTy != v.type:
                 raise RuntimeError(
                     "non-homogenous list not allowed - must all be same type: {}"
-                    .format([v.type for v in values]))
+                    .format([v.type for v in listElementValues]))
 
         arrSize = self.getConstantInt(len(node.elts))
         arrTy = cc.ArrayType.get(self.ctx, listElementValues[0].type)
@@ -1205,7 +1269,8 @@ class PyASTBridge(ast.NodeVisitor):
 
         for i, v in enumerate(listElementValues):
             eleAddr = cc.ComputePtrOp(
-                cc.PointerType.get(self.ctx, listElementValues[0].type), alloca,
+                cc.PointerType.get(
+                    self.ctx, listElementValues[0].type), alloca,
                 [self.getConstantInt(i)],
                 DenseI32ArrayAttr.get([-2147483648], context=self.ctx)).result
             cc.StoreOp(v, eleAddr)
@@ -1241,6 +1306,10 @@ class PyASTBridge(ast.NodeVisitor):
                 cc.CreateStringLiteralOp(strLitTy,
                                          StringAttr.get(node.value)).result)
             return
+        elif isinstance(node.value, type(1j)):
+            self.pushValue(complex.CreateOp(ComplexType.get(self.getFloatType()),
+                    self.getConstantFloat(node.value.real), self.getConstantFloat(node.value.imag)).result)
+            return 
         else:
             raise RuntimeError("unhandled constant: {}".format(
                 ast.unparse(node)))
@@ -1286,7 +1355,8 @@ class PyASTBridge(ast.NodeVisitor):
 
             if quake.VeqType.isinstance(var.type):
                 # Upper bound is exclusive
-                upperVal = arith.SubIOp(upperVal, self.getConstantInt(1)).result
+                upperVal = arith.SubIOp(
+                    upperVal, self.getConstantInt(1)).result
                 self.pushValue(
                     quake.SubVeqOp(self.getVeqType(), var, lowerVal,
                                    upperVal).result)
@@ -1323,7 +1393,8 @@ class PyASTBridge(ast.NodeVisitor):
                 idx.owner.opview, arith.ConstantOp):
             if 'value' in idx.owner.attributes:
                 try:
-                    concreteIntAttr = IntegerAttr(idx.owner.attributes['value'])
+                    concreteIntAttr = IntegerAttr(
+                        idx.owner.attributes['value'])
                     idxConcrete = concreteIntAttr.value
                     if idxConcrete == -1:
                         qrSize = quake.VeqSizeOp(self.getIntegerType(),
@@ -1686,6 +1757,34 @@ class PyASTBridge(ast.NodeVisitor):
                     cc.ContinueOp([])
                 self.popIfStmtBlockStack()
 
+    def visit_Return(self, node):
+        if self.verbose:
+            print("[Visit Return] = {}]".format(ast.unparse(node)))
+
+        self.visit(node.value)
+
+        if len(self.valueStack) == 0:
+            return
+
+        result = self.popValue()
+        if cc.StdvecType.isinstance(result.type):
+            symName = '__nvqpp_vectorCopyCtor'
+            load_intrinsic(self.module, symName)
+            eleTy = cc.StdvecType.getElementType(result.type)
+            ptrTy = cc.PointerType.get(self.ctx, self.getIntegerType(8))
+            resBuf = cc.StdvecDataOp(ptrTy, result).result
+            # TODO Revisit this calc
+            byteWidth = 16 if ComplexType.isinstance(eleTy) else 8
+            eleSize = self.getConstantInt(byteWidth)
+            dynSize = cc.StdvecSizeOp(self.getIntegerType(), result).result
+            heapCopy = func.CallOp(
+                [ptrTy], symName, [resBuf, dynSize, eleSize]).result
+            res = cc.StdvecInitOp(result.type, heapCopy, dynSize).result
+            func.ReturnOp([res])
+            return
+
+        raise RuntimeError("Return op not implemented.")
+
     def visit_UnaryOp(self, node):
         """
         Map unary operations in the Python AST to equivalents in MLIR.
@@ -1704,6 +1803,10 @@ class PyASTBridge(ast.NodeVisitor):
 
             if F64Type.isinstance(operand.type):
                 self.pushValue(arith.NegFOp(operand).result)
+            elif ComplexType.isinstance(operand.type):
+                # complex.NegOp does not seem to work
+                self.pushValue(complex.MulOp(complex.CreateOp(operand.type,
+                    self.getConstantFloat(-1.), self.getConstantFloat(0.)).result, operand).result)
             else:
                 negOne = self.getConstantInt(-1)
                 self.pushValue(arith.MulIOp(negOne, operand).result)
@@ -1812,6 +1915,12 @@ class PyASTBridge(ast.NodeVisitor):
             self.pushValue(math.PowFOp(left, right).result)
             return
         if isinstance(node.op, ast.Mult):
+            if ComplexType.isinstance(left.type):
+                if not ComplexType.isinstance(right.type):
+                    raise RuntimeError("Fix this, left is complex, right is not")
+                self.pushValue(complex.MulOp(left, right).result)
+                return 
+            
             if F64Type.isinstance(left.type):
                 if not F64Type.isinstance(right.type):
                     right = arith.SIToFPOp(self.getFloatType(), right).result

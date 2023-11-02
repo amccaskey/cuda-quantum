@@ -20,6 +20,7 @@ def test_state_vector_simple():
     backend. Begins with a kernel, converts to state, then checks
     its member functions.
     """
+
     @cudaq.kernel
     def bell():
         qubits = cudaq.qvector(2)
@@ -69,7 +70,7 @@ def test_state_vector_integration():
         z.ctrl(qubits[0], qubits[1])
 
     want_state = np.array([1. / np.sqrt(2.), 0., 0., 1. / np.sqrt(2.)],
-                 dtype=np.complex128)
+                          dtype=np.complex128)
 
     def objective(x):
         got_state = cudaq.get_state(kernel, x)
@@ -123,4 +124,3 @@ def test_state_density_matrix_simple():
     assert np.allclose(want_state, np.array(got_state))
 
     cudaq.reset_target()
-
