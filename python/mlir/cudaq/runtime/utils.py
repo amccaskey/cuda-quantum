@@ -41,8 +41,9 @@ def __isBroadcast(kernel, *args):
             return False
         firstArg = args[0]
         firstArgType = next(iter(argTypes))
+        # FIXME can I merge list into the 'in' list?
         firstArgTypeIsStdvec = argTypes[firstArgType] == list or argTypes[
-            firstArgType] == list[int] or argTypes[firstArgType] == np.ndarray
+            firstArgType] in [list[float], list[complex], list[int], np.ndarray] 
         if isinstance(firstArg, list) and not firstArgTypeIsStdvec:
             return True
 

@@ -34,18 +34,28 @@ globalRegisteredUnitaries = {}
 
 # By default and to keep things easier,
 # we only deal with int==i64 and float=f64
-def mlirTypeFromPyType(argType, ctx, argInstance=None):
+def mlirTypeFromPyType(argType, ctx, argInstance=None, argTypeToCompareTo=None):
     if argType == int:
         return IntegerType.get_signless(64, ctx)
     if argType == float:
         return F64Type.get(ctx)
     if argType == bool:
         return IntegerType.get_signless(1, ctx)
-    if argType == list and argInstance is not None and type(
-            argInstance[0]) == int:
-        return cc.StdvecType.get(ctx, mlirTypeFromPyType(int, ctx))
-    if argType == list or argType == np.ndarray:
-        return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))
+    if argType == complex:
+        return ComplexType.get(mlirTypeFromPyType(float, ctx))
+    
+    if argType in [list, np.ndarray]:
+        if isinstance(argInstance[0], int):
+            return cc.StdvecType.get(ctx, mlirTypeFromPyType(int,ctx))
+        if isinstance(argInstance[0], float):
+            # check if we are comparing to a complex...
+            eleTy = cc.StdvecType.getElementType(argTypeToCompareTo)
+            if ComplexType.isinstance(eleTy):
+                raise RuntimeError("invalid runtime argument to kernel. list[complex] required, but list[float] provided.")
+            return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))
+        if isinstance(argInstance[0], complex):
+            return cc.StdvecType.get(ctx, mlirTypeFromPyType(complex, ctx))
+        
     if argType == qvector or argType == qreg:
         return quake.VeqType.get(ctx)
     if argType == qubit:

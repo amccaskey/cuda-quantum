@@ -256,6 +256,7 @@ class PyASTBridge(ast.NodeVisitor):
             raise RuntimeError(
                 'cudaq.kernel functions must have argument type annotations.')
 
+        print(annotation)
         if hasattr(annotation, 'attr'):
             if annotation.value.id == 'cudaq':
                 if annotation.attr == 'qview' or annotation.attr == 'qvector':
@@ -296,6 +297,8 @@ class PyASTBridge(ast.NodeVisitor):
             return cc.StdvecType.get(self.ctx, F64Type.get())
         elif annotation.id == 'bool':
             return self.getIntegerType(1)
+        elif annotation.id == 'complex':
+            return ComplexType.get(self.getFloatType())
         else:
             raise RuntimeError('{} is not a supported type yet.'.format(
                 annotation.id))

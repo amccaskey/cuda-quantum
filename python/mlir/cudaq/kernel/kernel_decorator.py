@@ -152,7 +152,8 @@ class PyKernelDecorator(object):
         for i, arg in enumerate(args):
             mlirType = mlirTypeFromPyType(type(arg),
                                           self.module.context,
-                                          argInstance=arg)
+                                          argInstance=arg, 
+                                          argTypeToCompareTo=self.argTypes[i])
             if not cc.CallableType.isinstance(
                     mlirType) and mlirType != self.argTypes[i]:
                 raise RuntimeError("invalid runtime arg type ({} vs {})".format(

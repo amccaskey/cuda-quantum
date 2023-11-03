@@ -13,6 +13,7 @@
 #include <chrono>
 #include <functional>
 #include <future>
+#include <pybind11/complex.h>
 #include <pybind11/pybind11.h>
 #include <vector>
 
@@ -242,6 +243,18 @@ packArgs(OpaqueArguments &argData, py::args args,
         }
         argData.emplace_back(ourAllocatedArg, [](void *ptr) {
           delete static_cast<std::vector<std::size_t> *>(ptr);
+        });
+      } else if (py::hasattr(firstElement, "real") &&
+                 py::hasattr(firstElement, "imag")) {
+        std::vector<std::complex<double>> *ourAllocatedArg =
+            new std::vector<std::complex<double>>(casted.size());
+        for (std::size_t counter = 0; auto el : casted) {
+          (*ourAllocatedArg)[counter++] = {
+              PyFloat_AsDouble(el.attr("real").ptr()),
+              PyFloat_AsDouble(el.attr("imag").ptr())};
+        }
+        argData.emplace_back(ourAllocatedArg, [](void *ptr) {
+          delete static_cast<std::vector<std::complex<double>> *>(ptr);
         });
       } else {
         std::vector<double> *ourAllocatedArg =

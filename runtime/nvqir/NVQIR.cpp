@@ -338,8 +338,9 @@ void __quantum__qis__initialize_state(Array *targets,
   auto targetIds = arrayToVectorSizeT(targets);
   auto numElements = (1UL << targetIds.size());
   if (data.size != numElements)
-    throw std::runtime_error("invalid number of state vector elements vs "
-                             "number of qubits in initialize_state.");
+    throw std::runtime_error("invalid number of state vector elements provided (" +
+                             std::to_string(data.size) + " provided, " +
+                             std::to_string(numElements) + " required).");
   std::vector<std::complex<double>> vector(numElements);
   for (std::size_t i = 0; i < numElements; i++)
     vector[i] = {data.data[i].real, data.data[i].imag};

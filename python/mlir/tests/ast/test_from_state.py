@@ -54,6 +54,34 @@ def test_from_state_again2():
     counts.dump()
     assert '00' in counts and '11' in counts 
 
+def test_from_state_again4():
+    @cudaq.kernel(jit=True)
+    def bell(vector: list[complex] ):
+        q = cudaq.qvector(2)
+        cudaq.initialize_state(q, vector)
+
+    print(bell)
+
+    # can pass a numpy array of complex
+    vec = np.asarray([1./np.sqrt(2),0,0,1./np.sqrt(2)],dtype=complex)
+    counts = cudaq.sample(bell, vec)
+    counts.dump()
+    assert '00' in counts and '11' in counts 
+
+    # Make sure we throw an error if you pass wrong typed array
+    with pytest.raises(RuntimeError) as error:
+        vec = [1./np.sqrt(2),0,0,1./np.sqrt(2)]
+        cudaq.sample(bell, vec)
+    
+    # Can pass a list of complex
+    vec = [1./np.sqrt(2) + 0j,0j,0j,1./np.sqrt(2)+0j]
+    cudaq.sample(bell, vec)
+
+    # Another test
+    vec = 1./np.sqrt(2) * np.asarray([1, 0, 0, 1], dtype=complex)
+    cudaq.sample(bell, vec)
+    
+
 # WILL TAKE SOME WORK
 # def test_from_state_again3():
 #     @cudaq.kernel(jit=True)
