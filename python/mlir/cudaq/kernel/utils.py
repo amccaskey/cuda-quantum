@@ -76,3 +76,32 @@ def mlirTypeFromPyType(argType, ctx, **kwargs): #argInstance=None, argTypeToComp
     raise RuntimeError(
         "can not handle conversion of python type {} to mlir type.".format(
             argType))
+
+def mlirTypeToPyType(argType):
+
+    if IntegerType.isinstance(argType):
+        if IntegerType(argType).width == 1:
+            return bool
+        return int 
+    
+    if F64Type.isinstance(argType):
+        return float 
+    
+    if ComplexType.isinstance(argType):
+        return complex 
+    
+    if cc.StdvecType.isinstance(argType):
+        eleTy = cc.StdvecType.getElementType(argType)
+        if IntegerType.isinstance(argType):
+            if IntegerType(argType).width == 1:
+                return list[bool]
+            return list[int] 
+        if F64Type.isinstance(argType):
+            return list[float] 
+        if ComplexType.isinstance(argType):
+            return list[complex] 
+
+    raise RuntimeError("unhandled mlir-to-pytype {}".format(argType))    
+
+    
+    

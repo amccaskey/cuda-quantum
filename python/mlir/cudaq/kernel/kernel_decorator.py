@@ -13,7 +13,7 @@ from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
 from .ast_bridge import compile_to_mlir
-from .utils import mlirTypeFromPyType
+from .utils import mlirTypeFromPyType, nvqppPrefix, mlirTypeToPyType
 from .qubit_qis import h, x, y, z, s, t, rx, ry, rz, r1, swap, exp_pauli, mx, my, mz, adjoint, control, compute_action
 from .analysis import MidCircuitMeasurementAnalyzer, RewriteMeasures
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
@@ -53,6 +53,7 @@ class PyKernelDecorator(object):
         self.module = None if module == None else module
         self.verbose = verbose
         self.name = kernelName if kernelName != None else self.kernelFunction.__name__
+        self.argTypes = None 
 
         # check if the user requested JIT be used exclusively
         if self.globalJIT:
@@ -67,7 +68,15 @@ class PyKernelDecorator(object):
         if self.kernelFunction is None:
             if self.module is not None:
                 # Could be that we don't have a function
-                # but someone has provided an external Module
+                # but someone has provided an external Module.
+                # But if we want this new decorator to be callable 
+                # we'll need to turn library_mode off and set the argTypes
+                symbols = SymbolTable(self.module.operation)
+                if nvqppPrefix+self.name in symbols:
+                    function = symbols[nvqppPrefix+self.name]
+                    entryBlock = function.entry_block
+                    self.argTypes = [v.type for v in entryBlock.arguments]
+                    self.signature = {'arg{}'.format(i):mlirTypeToPyType(v.type) for i,v in enumerate(self.argTypes)}
                 return
             else:
                 raise RuntimeError(
@@ -90,6 +99,7 @@ class PyKernelDecorator(object):
 
         # Assign the signature for use later
         self.signature = inspect.getfullargspec(self.kernelFunction).annotations
+        print(self.signature)
 
         # Run analyzers and attach metadata (only have 1 right now)
         analyzer = MidCircuitMeasurementAnalyzer()
@@ -135,6 +145,14 @@ class PyKernelDecorator(object):
         return "{cannot print this kernel}"
 
     def __call__(self, *args):
+
+        if self.kernelFunction is None:
+            if self.module is None:
+                raise RuntimeError("this kernel is not callable (no function or MLIR Module found)")
+            if self.argTypes is None:
+                raise RuntimeError("this kernel is not callable (no function and no MLIR argument types found)")
+            # if here, we can execute, but not in library mode
+            self.library_mode = False 
 
         # Library Mode, don't need Quake, just call the function
         if self.library_mode:
