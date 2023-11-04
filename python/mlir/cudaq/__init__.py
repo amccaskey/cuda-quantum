@@ -5,7 +5,7 @@
 # This source code and the accompanying materials are made available under     #
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
-
+import sys, os
 from ._packages import *
 from .kernel.kernel_decorator import kernel, PyKernelDecorator
 from .kernel.kernel_builder import make_kernel, QuakeValue, PyKernel
@@ -23,6 +23,7 @@ spin = cudaq_runtime.spin
 qubit = cudaq_runtime.qubit
 qvector = cudaq_runtime.qvector
 qview = cudaq_runtime.qview
+qlist = qvector
 SpinOperator = cudaq_runtime.SpinOperator
 Pauli = cudaq_runtime.Pauli
 Kernel = PyKernel
@@ -99,3 +100,13 @@ if not "CUDAQ_DYNLIBS" in os.environ:
         if not importlib.util.find_spec("cuda-quantum") is None:
             print("Could not find a suitable cuQuantum Python package.")
         pass
+
+
+initKwargs = {'target': 'default'}
+
+if '--target' in sys.argv:
+    initKwargs['target'] = sys.argv[sys.argv.index('--target') + 1]
+if '--emulate' in sys.argv:
+    initKwargs['emulate'] = True 
+
+cudaq_runtime.initialize_cudaq(**initKwargs)

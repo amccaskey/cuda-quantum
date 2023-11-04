@@ -6,6 +6,7 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
+#include "common/Logger.h"
 #include "cudaq.h"
 
 #include <pybind11/complex.h>
@@ -44,6 +45,32 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindRegisterDialects(m);
 
   auto cudaqRuntime = m.def_submodule("cudaq_runtime");
+  cudaqRuntime.def(
+      "initialize_cudaq",
+      [&](py::kwargs kwargs) {
+        cudaq::info("Calling initialize_cudaq.");
+        if (!kwargs)
+          return;
+
+        std::map<std::string, std::string> extraConfig;
+        for (auto &[keyPy, valuePy] : kwargs) {
+          std::string key = py::str(keyPy);
+          if (key == "emulate") {
+            extraConfig.insert({"emulate", "true"});
+            break;
+          }
+        }
+
+        for (auto &[keyPy, valuePy] : kwargs) {
+          std::string key = py::str(keyPy);
+          std::string value = py::str(valuePy);
+          cudaq::info("Processing Python Arg: {} - {}", key, value);
+          if (key == "target")
+            holder->setTarget(value, extraConfig);
+        }
+      },
+      "Initialize the CUDA Quantum environment.");
+
   cudaq::bindRuntimeTarget(cudaqRuntime, *holder.get());
   cudaq::bindMeasureCounts(cudaqRuntime);
   cudaq::bindObserveResult(cudaqRuntime);
@@ -63,7 +90,7 @@ PYBIND11_MODULE(_quakeDialects, m) {
                    "Provide the seed for backend quantum kernel simulation.");
   cudaqRuntime.def("num_available_gpus", &cudaq::num_available_gpus,
                    "The number of available GPUs detected on the system.");
-  
+
   auto mpiSubmodule = cudaqRuntime.def_submodule("mpi");
   mpiSubmodule.def(
       "initialize", []() { cudaq::mpi::initialize(); },

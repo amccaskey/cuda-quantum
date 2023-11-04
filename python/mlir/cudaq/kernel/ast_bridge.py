@@ -256,7 +256,6 @@ class PyASTBridge(ast.NodeVisitor):
             raise RuntimeError(
                 'cudaq.kernel functions must have argument type annotations.')
 
-        print(annotation)
         if hasattr(annotation, 'attr'):
             if annotation.value.id == 'cudaq':
                 if annotation.attr == 'qview' or annotation.attr == 'qvector':
@@ -1003,7 +1002,7 @@ class PyASTBridge(ast.NodeVisitor):
                         node.func.attr))
 
             if node.func.value.id == 'cudaq':
-                if node.func.attr == 'qvector':
+                if node.func.attr in ['qvector', 'qlist']:
                     # Handle cudaq.qvector(N)
                     size = self.popValue()
                     if hasattr(size, "literal_value"):

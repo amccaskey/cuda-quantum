@@ -99,7 +99,6 @@ class PyKernelDecorator(object):
 
         # Assign the signature for use later
         self.signature = inspect.getfullargspec(self.kernelFunction).annotations
-        print(self.signature)
 
         # Run analyzers and attach metadata (only have 1 right now)
         analyzer = MidCircuitMeasurementAnalyzer()
