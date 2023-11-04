@@ -14,6 +14,7 @@ from .kernel.qubit_qis import register_operation, adjoint, control, compute_acti
 from .runtime.sample import sample
 from .runtime.observe import observe
 from .runtime.state import get_state
+from ._query_gpu import is_gpu_available
 from mlir_cudaq._mlir_libs._quakeDialects import cudaq_runtime
 
 global globalJIT
@@ -102,7 +103,10 @@ if not "CUDAQ_DYNLIBS" in os.environ:
         pass
 
 
-initKwargs = {'target': 'default'}
+
+initKwargs = {'target': 'qpp-cpu'}
+if is_gpu_available():
+    initKwargs = {'target': 'nvidia'}
 
 if '--target' in sys.argv:
     initKwargs['target'] = sys.argv[sys.argv.index('--target') + 1]
