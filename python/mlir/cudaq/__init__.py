@@ -38,6 +38,9 @@ gradients = cudaq_runtime.gradients
 set_target = cudaq_runtime.set_target
 reset_target = cudaq_runtime.reset_target
 set_random_seed = cudaq_runtime.set_random_seed
+initialize_state = cudaq_runtime.initialize_state 
+mpi = cudaq_runtime.mpi 
+num_available_gpus = cudaq_runtime.num_available_gpus 
 
 # Noise Modeling
 KrausChannel = cudaq_runtime.KrausChannel

@@ -245,7 +245,9 @@ packArgs(OpaqueArguments &argData, py::args args,
           delete static_cast<std::vector<std::size_t> *>(ptr);
         });
       } else if (py::hasattr(firstElement, "real") &&
-                 py::hasattr(firstElement, "imag")) {
+                 py::hasattr(firstElement, "imag") &&
+                 !py::isinstance<py::float_>(firstElement)) {
+        // Trying to catch elements of type complex
         std::vector<std::complex<double>> *ourAllocatedArg =
             new std::vector<std::complex<double>>(casted.size());
         for (std::size_t counter = 0; auto el : casted) {

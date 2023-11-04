@@ -953,6 +953,7 @@ class PyKernel(object):
             else:
                 processedArgs.append(arg)
 
+        print("HELLO: ", processedArgs)
         cudaq_runtime.pyAltLaunchKernel(self.name, self.module, *processedArgs)
 
 

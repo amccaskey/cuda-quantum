@@ -58,11 +58,39 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindSampleAsync(cudaqRuntime);
   cudaq::bindObserveAsync(cudaqRuntime);
   cudaq::bindAltLaunchKernel(cudaqRuntime);
+
   cudaqRuntime.def("set_random_seed", &cudaq::set_random_seed,
                    "Provide the seed for backend quantum kernel simulation.");
-  cudaqRuntime.def("set_noise", &cudaq::set_noise, "");
-  cudaqRuntime.def("unset_noise", &cudaq::unset_noise, "");
-  cudaqRuntime.def("cloneModule", [](MlirModule mod) {return wrap(unwrap(mod).clone());});
+  cudaqRuntime.def("num_available_gpus", &cudaq::num_available_gpus,
+                   "The number of available GPUs detected on the system.");
+  
+  auto mpiSubmodule = cudaqRuntime.def_submodule("mpi");
+  mpiSubmodule.def(
+      "initialize", []() { cudaq::mpi::initialize(); },
+      "Initialize MPI if available.");
+  mpiSubmodule.def(
+      "rank", []() { return cudaq::mpi::rank(); },
+      "Return the rank of this process.");
+  mpiSubmodule.def(
+      "num_ranks", []() { return cudaq::mpi::num_ranks(); },
+      "Return the total number of ranks.");
+  mpiSubmodule.def(
+      "all_gather",
+      [](std::size_t globalVectorSize, std::vector<double> &local) {
+        std::vector<double> global(globalVectorSize);
+        cudaq::mpi::all_gather(global, local);
+        return global;
+      },
+      "Gather and scatter the `local` list, returning a concatenation of all "
+      "lists across all ranks. The total global list size must be provided.");
+  mpiSubmodule.def(
+      "is_initialized", []() { return cudaq::mpi::is_initialized(); },
+      "Return true if MPI has already been initialized.");
+  mpiSubmodule.def(
+      "finalize", []() { cudaq::mpi::finalize(); }, "Finalize MPI.");
+
+  cudaqRuntime.def("cloneModule",
+                   [](MlirModule mod) { return wrap(unwrap(mod).clone()); });
   cudaqRuntime.def("isTerminator", [](MlirOperation op) {
     return unwrap(op)->hasTrait<OpTrait::IsTerminator>();
   });

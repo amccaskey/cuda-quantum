@@ -74,7 +74,7 @@ def test_state_vector_integration():
 
     def objective(x):
         got_state = cudaq.get_state(kernel, x)
-        return 1. - np.dot(want_state.transpose(), got_state)
+        return 1. - np.real(np.dot(want_state.transpose(), got_state))
 
     # Compute the parameters that make this kernel produce the
     # Bell state.

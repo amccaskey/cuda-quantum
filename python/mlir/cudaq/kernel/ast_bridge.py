@@ -1004,33 +1004,17 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.value.id == 'cudaq':
                 if node.func.attr == 'qvector':
-                    if IntegerType.isinstance(self.valueStack[0].type):
-                        # Handle cudaq.qvector(N)
-                        size = self.popValue()
-                        if hasattr(size, "literal_value"):
-                            ty = self.getVeqType(size.literal_value)
-                            qubits = quake.AllocaOp(ty)
-                        else:
-                            ty = self.getVeqType()
-                            qubits = quake.AllocaOp(ty, size=size)
-                        self.pushValue(qubits.results[0])
-                    elif cc.StdvecType.isinstance(self.valueStack[0].type):
-                        initialStateVal = self.popValue()
-                        # get the size of the vector. then allocate the qvector, 
-                        # then pass the vector to InitState
-                        size = cc.StdvecSizeOp(self.getIntegerType(), initialStateVal).result
-                        size = arith.SIToFPOp(self.getFloatType(), size).result
-                        numQubits = math.Log2Op(size).result 
-                        numQubits = arith.FPToSIOp(self.getIntegerType(), numQubits).result
-                        qubits = quake.AllocaOp(self.getVeqType(), size=numQubits).results[0]
-                        quake.InitializeStateOp(qubits, initialStateVal)
-                        self.pushValue(qubits)
+                    # Handle cudaq.qvector(N)
+                    size = self.popValue()
+                    if hasattr(size, "literal_value"):
+                        ty = self.getVeqType(size.literal_value)
+                        qubits = quake.AllocaOp(ty)
                     else:
-                        raise RuntimeError("invalid argument passed to cudaq.qvector().")
-                    
+                        ty = self.getVeqType()
+                        qubits = quake.AllocaOp(ty, size=size)
+                    self.pushValue(qubits.results[0])
                     return
                 
-                # FIXME these can probably just be ifs
                 if node.func.attr == "qubit":
                     self.pushValue(quake.AllocaOp(self.getRefType()).result)
                     return

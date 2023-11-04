@@ -34,7 +34,8 @@ globalRegisteredUnitaries = {}
 
 # By default and to keep things easier,
 # we only deal with int==i64 and float=f64
-def mlirTypeFromPyType(argType, ctx, argInstance=None, argTypeToCompareTo=None):
+def mlirTypeFromPyType(argType, ctx, **kwargs): #argInstance=None, argTypeToCompareTo=None):
+
     if argType == int:
         return IntegerType.get_signless(64, ctx)
     if argType == float:
@@ -45,6 +46,12 @@ def mlirTypeFromPyType(argType, ctx, argInstance=None, argTypeToCompareTo=None):
         return ComplexType.get(mlirTypeFromPyType(float, ctx))
     
     if argType in [list, np.ndarray]:
+        if 'argInstance' not in kwargs:
+            return cc.StdvecType.get(ctx, mlirTypeFromPyType(float, ctx))
+        
+        argInstance = kwargs['argInstance']
+        argTypeToCompareTo = kwargs['argTypeToCompareTo']
+
         if isinstance(argInstance[0], int):
             return cc.StdvecType.get(ctx, mlirTypeFromPyType(int,ctx))
         if isinstance(argInstance[0], float):
@@ -60,8 +67,11 @@ def mlirTypeFromPyType(argType, ctx, argInstance=None, argTypeToCompareTo=None):
         return quake.VeqType.get(ctx)
     if argType == qubit:
         return quake.RefType.get(ctx)
-    if isinstance(argInstance, Callable):
-        return cc.CallableType.get(ctx, argInstance.argTypes)
+
+    if 'argInstance' in kwargs:
+        argInstance = kwargs['argInstance']
+        if isinstance(argInstance, Callable):
+            return cc.CallableType.get(ctx, argInstance.argTypes)
 
     raise RuntimeError(
         "can not handle conversion of python type {} to mlir type.".format(
