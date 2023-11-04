@@ -53,7 +53,7 @@ class PyKernelDecorator(object):
         self.module = None if module == None else module
         self.verbose = verbose
         self.name = kernelName if kernelName != None else self.kernelFunction.__name__
-        self.argTypes = None 
+        self.argTypes = None
 
         # check if the user requested JIT be used exclusively
         if self.globalJIT:
@@ -69,14 +69,17 @@ class PyKernelDecorator(object):
             if self.module is not None:
                 # Could be that we don't have a function
                 # but someone has provided an external Module.
-                # But if we want this new decorator to be callable 
+                # But if we want this new decorator to be callable
                 # we'll need to turn library_mode off and set the argTypes
                 symbols = SymbolTable(self.module.operation)
-                if nvqppPrefix+self.name in symbols:
-                    function = symbols[nvqppPrefix+self.name]
+                if nvqppPrefix + self.name in symbols:
+                    function = symbols[nvqppPrefix + self.name]
                     entryBlock = function.entry_block
                     self.argTypes = [v.type for v in entryBlock.arguments]
-                    self.signature = {'arg{}'.format(i):mlirTypeToPyType(v.type) for i,v in enumerate(self.argTypes)}
+                    self.signature = {
+                        'arg{}'.format(i): mlirTypeToPyType(v.type)
+                        for i, v in enumerate(self.argTypes)
+                    }
                 return
             else:
                 raise RuntimeError(
@@ -109,6 +112,14 @@ class PyKernelDecorator(object):
             # If not eager mode, JIT compile to MLIR
             self.module, self.argTypes = compile_to_mlir(self.astModule,
                                                          verbose=self.verbose)
+            if self.metadata['conditionalOnMeasure']:
+                SymbolTable(
+                    self.module.operation)[nvqppPrefix +
+                                           self.name].attributes.__setitem__(
+                                               'qubitMeasurementFeedback',
+                                               BoolAttr.get(
+                                                   True,
+                                                   context=self.module.context))
         else:
             # If eager mode, implicitly load the quantum operations
             self.kernelFunction.__globals__['h'] = h()
@@ -147,11 +158,15 @@ class PyKernelDecorator(object):
 
         if self.kernelFunction is None:
             if self.module is None:
-                raise RuntimeError("this kernel is not callable (no function or MLIR Module found)")
+                raise RuntimeError(
+                    "this kernel is not callable (no function or MLIR Module found)"
+                )
             if self.argTypes is None:
-                raise RuntimeError("this kernel is not callable (no function and no MLIR argument types found)")
+                raise RuntimeError(
+                    "this kernel is not callable (no function and no MLIR argument types found)"
+                )
             # if here, we can execute, but not in library mode
-            self.library_mode = False 
+            self.library_mode = False
 
         # Library Mode, don't need Quake, just call the function
         if self.library_mode:
@@ -169,7 +184,7 @@ class PyKernelDecorator(object):
         for i, arg in enumerate(args):
             mlirType = mlirTypeFromPyType(type(arg),
                                           self.module.context,
-                                          argInstance=arg, 
+                                          argInstance=arg,
                                           argTypeToCompareTo=self.argTypes[i])
             if not cc.CallableType.isinstance(
                     mlirType) and mlirType != self.argTypes[i]:

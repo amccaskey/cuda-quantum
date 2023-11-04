@@ -7,12 +7,7 @@
 # ============================================================================ #
 
 # RUN: PYTHONPATH=../../../../../python_packages/cudaq python3 %s 
-##ADD THIS LATER# QRQUN: PYTHONPATH=../../../../../python_packages/cudaq python3 %s --target quantinuum --emulate 
-
-import os
-
-import pytest
-import numpy as np
+# RUN: PYTHONPATH=../../../../../python_packages/cudaq python3 %s --target quantinuum --emulate 
 
 import cudaq
 

@@ -10,6 +10,8 @@
 
 using namespace mlir;
 
+extern "C" void deviceCodeHolderAdd(const char*, const char*);
+
 namespace cudaq {
 
 // We have to reproduce the TranslationRegistry here in this Translation Unit
@@ -65,6 +67,12 @@ protected:
       return true;
     }();
     (void)initOnce;
+    std::string moduleStr;
+    {
+      llvm::raw_string_ostream os(moduleStr);
+      m_module.print(os);
+    }
+    deviceCodeHolderAdd(kernelName.c_str(), moduleStr.c_str());
     return std::make_tuple(m_module, context, wrapper->rawArgs);
   }
 };

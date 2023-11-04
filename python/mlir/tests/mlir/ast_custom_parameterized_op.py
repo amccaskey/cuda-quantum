@@ -65,9 +65,7 @@ def test_custom_parameterized_op():
 # CHECK:           cc.store %[[VAL_11]], %[[VAL_17]] : !cc.ptr<complex<f64>>
 # CHECK:           %[[VAL_18:.*]] = cc.compute_ptr %[[VAL_14]][3] : (!cc.ptr<!cc.array<complex<f64> x 4>>) -> !cc.ptr<complex<f64>>
 # CHECK:           cc.store %[[VAL_10]], %[[VAL_18]] : !cc.ptr<complex<f64>>
-# CHECK:           %[[VAL_19:.*]] = cc.stdvec_init %[[VAL_14]], %[[VAL_2]] : (!cc.ptr<!cc.array<complex<f64> x 4>>, i64) -> !cc.stdvec<complex<f64>>
-# CHECK:           %[[VAL_20:.*]] = cc.cast %[[VAL_14]] : (!cc.ptr<!cc.array<complex<f64> x 4>>) -> !cc.ptr<i8>
-# CHECK:           %[[VAL_21:.*]] = cc.stdvec_size %[[VAL_19]] : (!cc.stdvec<complex<f64>>) -> i64
-# CHECK:           %[[VAL_22:.*]] = call @__nvqpp_vectorCopyCtor(%[[VAL_20]], %[[VAL_21]], %[[VAL_1]]) : (!cc.ptr<i8>, i64, i64) -> !cc.ptr<i8>
-# CHECK:           %[[VAL_23:.*]] = cc.stdvec_init %[[VAL_22]], %[[VAL_21]] : (!cc.ptr<i8>, i64) -> !cc.stdvec<complex<f64>>
-# CHECK:           return %[[VAL_23]] : !cc.stdvec<complex<f64>>
+# CHECK:           %[[VAL_19:.*]] = cc.cast %[[VAL_14]] : (!cc.ptr<!cc.array<complex<f64> x 4>>) -> !cc.ptr<i8>
+# CHECK:           %[[VAL_20:.*]] = call @__nvqpp_vectorCopyCtor(%[[VAL_19]], %[[VAL_2]], %[[VAL_1]]) : (!cc.ptr<i8>, i64, i64) -> !cc.ptr<i8>
+# CHECK:           %[[VAL_21:.*]] = cc.stdvec_init %[[VAL_20]], %[[VAL_2]] : (!cc.ptr<i8>, i64) -> !cc.stdvec<complex<f64>>
+# CHECK:           return %[[VAL_21]] : !cc.stdvec<complex<f64>>
