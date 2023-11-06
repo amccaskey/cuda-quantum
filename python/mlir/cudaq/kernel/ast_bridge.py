@@ -566,19 +566,6 @@ class PyASTBridge(ast.NodeVisitor):
         # Can assign a, b, c, = Tuple...
         # or single assign a = something
         if isinstance(node.targets[0], ast.Tuple):
-            if len(self.valueStack) != len(node.targets[0].elts) and len(self.valueStack) == 1:
-                # We allow q,r,s,... = qvector(N)
-                veqValue = self.popValue()
-                size = quake.VeqType.getSize(veqValue.type)
-                if size == 0:
-                    raise RuntimeError("error - initializing a veq<?> to a tuple target variables (unknown size)")
-                for i in range(size):
-                    qubit = quake.ExtractRefOp(self.getRefType(),
-                                                      veqValue,
-                                                      i).result
-                    self.symbolTable[node.targets[0].elts[i].id] = qubit 
-                return  
-                
             assert len(self.valueStack) == len(node.targets[0].elts)
             varValues = [
                 self.popValue() for _ in range(len(node.targets[0].elts))
@@ -1019,18 +1006,10 @@ class PyASTBridge(ast.NodeVisitor):
                 if node.func.attr in ['qvector', 'qlist']:
                     # Handle cudaq.qvector(N)
                     size = self.popValue()
-                    if isinstance(size.owner.opview, arith.ConstantOp):
-                        # If here, we know that the veq size is constant
-                        value = IntegerAttr(size.owner.attributes['value']).value 
-                        self.pushValue(quake.AllocaOp(self.getVeqType(value)).result)
-                        return 
-                    
-                    # FIXME is this check still valid (it's old)
                     if hasattr(size, "literal_value"):
                         ty = self.getVeqType(size.literal_value)
                         qubits = quake.AllocaOp(ty)
                     else:
-                        # runtime-known size
                         ty = self.getVeqType()
                         qubits = quake.AllocaOp(ty, size=size)
                     self.pushValue(qubits.results[0])

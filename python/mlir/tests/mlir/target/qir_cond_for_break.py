@@ -6,6 +6,7 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
+# RUN: PYTHONPATH=../../../../../python_packages/cudaq python3 %s --target quantinuum --emulate
 
 import cudaq
 
@@ -26,3 +27,5 @@ cudaq.set_random_seed(13)
 
 counts = cudaq.sample(kernel, nIter, shots_count=nShots)
 counts.dump()
+
+assert len(counts.register_names)-1 < nIter 

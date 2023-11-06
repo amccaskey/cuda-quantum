@@ -14,7 +14,7 @@ cudaq.enable_jit()
 
 @cudaq.kernel 
 def foo():
-    q0, q1, q2 = cudaq.qlist(3) 
+    q0, q1, q2 = cudaq.qubit(), cudaq.qubit(), cudaq.qubit() 
     x(q0)
     x(q1)
     x.ctrl(q0, q1)

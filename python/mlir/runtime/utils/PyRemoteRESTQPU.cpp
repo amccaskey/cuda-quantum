@@ -10,6 +10,8 @@
 
 using namespace mlir;
 
+extern "C" void deviceCodeHolderAdd(const char *, const char *);
+
 namespace cudaq {
 
 // We have to reproduce the TranslationRegistry here in this Translation Unit
@@ -89,6 +91,14 @@ protected:
       throw std::runtime_error(
           "Failure to synthesize callable block arguments in PyRemoteRESTQPU ");
 
+    std::string moduleStr;
+    {
+      llvm::raw_string_ostream os(moduleStr);
+      cloned.print(os);
+    }
+    // The remote rest qpu workflow will need the module string in 
+    // the internal registry.
+    deviceCodeHolderAdd(kernelName.c_str(), moduleStr.c_str());
     return std::make_tuple(cloned, context, wrapper->rawArgs);
   }
 };

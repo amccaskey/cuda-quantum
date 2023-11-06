@@ -65,6 +65,17 @@ void registerQuakeDialectAndTypes(py::module &m) {
           },
           py::arg("cls"), py::arg("context"), py::arg("size") = 0)
       .def_staticmethod(
+          "hasSpecifiedSize",
+          [](MlirType type) {
+            auto veqTy = unwrap(type).dyn_cast<quake::VeqType>();
+            if (!veqTy)
+              throw std::runtime_error(
+                  "Invalid type passed to VeqType.getSize()");
+
+            return veqTy.hasSpecifiedSize();
+          },
+          py::arg("veqTypeInstance"))
+      .def_staticmethod(
           "getSize",
           [](MlirType type) {
             auto veqTy = unwrap(type).dyn_cast<quake::VeqType>();
@@ -209,6 +220,5 @@ void bindRegisterDialects(py::module &mod) {
     if (failed(builder.loadIntrinsic(unwrapped, name)))
       unwrapped.emitError("failed to load intrinsic " + name);
   });
-  
 }
 } // namespace cudaq

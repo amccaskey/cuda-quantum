@@ -15,9 +15,11 @@
 struct kernel {
   void operator()(const int n_iter) __qpu__ {
     cudaq::qubit q0;
+    // printf("new shot\n");
     for (int i = 0; i < n_iter; i++) {
       h(q0);
       auto q0result = mz(q0);
+      // printf("hi: %d\n", static_cast<int>(q0result));
       if (q0result)
         break; // loop until it lands heads
     }
@@ -33,16 +35,14 @@ int main() {
   // Sample
   auto counts = cudaq::sample(/*shots=*/nShots, kernel{}, nIter);
   counts.dump();
-  
+
   // Count the maximum number of iterations it took
   int nIterRan = nIter;
   for (int i = 0; i < nIter; i++) {
     char regName1[32];
     snprintf(regName1, sizeof(regName1), "q0result%%%02d", i);
-    printf("TEST: %s\n", regName1);
     char regName2[32];
     snprintf(regName2, sizeof(regName2), "auto_register_%d", i);
-    printf("TEST2: %s\n", regName2);
     if (counts.size(regName1) == 0 && counts.size(regName2) == 0) {
       nIterRan = i;
       break;
