@@ -38,7 +38,7 @@ def mlirTypeFromPyType(argType, ctx, **kwargs): #argInstance=None, argTypeToComp
 
     if argType == int:
         return IntegerType.get_signless(64, ctx)
-    if argType == float:
+    if argType in [float, np.float64]:
         return F64Type.get(ctx)
     if argType == bool:
         return IntegerType.get_signless(1, ctx)

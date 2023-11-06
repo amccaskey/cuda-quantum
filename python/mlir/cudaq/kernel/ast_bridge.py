@@ -70,6 +70,7 @@ class PyASTBridge(ast.NodeVisitor):
         self.buildingEntryPoint = False
         self.inForBodyStack = deque()
         self.inIfStmtBlockStack = deque()
+        self.controlNegations = []
         self.verbose = 'verbose' in kwargs and kwargs['verbose']
 
     def getVeqType(self, size=None):
@@ -258,7 +259,7 @@ class PyASTBridge(ast.NodeVisitor):
 
         if hasattr(annotation, 'attr'):
             if annotation.value.id == 'cudaq':
-                if annotation.attr == 'qview' or annotation.attr == 'qvector':
+                if annotation.attr in ['qlist', 'qview', 'qvector']:
                     return self.getVeqType()
                 if annotation.attr == 'qubit':
                     return self.getRefType()
@@ -565,6 +566,19 @@ class PyASTBridge(ast.NodeVisitor):
         # Can assign a, b, c, = Tuple...
         # or single assign a = something
         if isinstance(node.targets[0], ast.Tuple):
+            if len(self.valueStack) != len(node.targets[0].elts) and len(self.valueStack) == 1:
+                # We allow q,r,s,... = qvector(N)
+                veqValue = self.popValue()
+                size = quake.VeqType.getSize(veqValue.type)
+                if size == 0:
+                    raise RuntimeError("error - initializing a veq<?> to a tuple target variables (unknown size)")
+                for i in range(size):
+                    qubit = quake.ExtractRefOp(self.getRefType(),
+                                                      veqValue,
+                                                      i).result
+                    self.symbolTable[node.targets[0].elts[i].id] = qubit 
+                return  
+                
             assert len(self.valueStack) == len(node.targets[0].elts)
             varValues = [
                 self.popValue() for _ in range(len(node.targets[0].elts))
@@ -1005,10 +1019,18 @@ class PyASTBridge(ast.NodeVisitor):
                 if node.func.attr in ['qvector', 'qlist']:
                     # Handle cudaq.qvector(N)
                     size = self.popValue()
+                    if isinstance(size.owner.opview, arith.ConstantOp):
+                        # If here, we know that the veq size is constant
+                        value = IntegerAttr(size.owner.attributes['value']).value 
+                        self.pushValue(quake.AllocaOp(self.getVeqType(value)).result)
+                        return 
+                    
+                    # FIXME is this check still valid (it's old)
                     if hasattr(size, "literal_value"):
                         ty = self.getVeqType(size.literal_value)
                         qubits = quake.AllocaOp(ty)
                     else:
+                        # runtime-known size
                         ty = self.getVeqType()
                         qubits = quake.AllocaOp(ty, size=size)
                     self.pushValue(qubits.results[0])
@@ -1028,21 +1050,23 @@ class PyASTBridge(ast.NodeVisitor):
                     # Handle cudaq.adjoint(kernel, ...)
                     otherFuncName = node.args[0].id
                     if otherFuncName in self.symbolTable:
-                        # This is a callable argument
+                        # This is a callable block argument
                         values = [
                             self.popValue()
                             for _ in range(len(self.valueStack) - 2)
                         ]
-                        a = quake.ApplyOp([], [self.popValue()], [], values)
+                        quake.ApplyOp([], [self.popValue()], [], values)
                         return
 
                     if otherFuncName not in globalKernelRegistry:
                         raise RuntimeError(
                             "{} is not a known quantum kernel (was it annotated?)."
                             .format(otherFuncName))
+                    
                     values = [
                         self.popValue() for _ in range(len(self.valueStack))
                     ]
+                    values.reverse()
                     if len(values) != len(
                             globalKernelRegistry[otherFuncName].arguments):
                         raise RuntimeError(
@@ -1172,9 +1196,17 @@ class PyASTBridge(ast.NodeVisitor):
                 controls = [
                     self.popValue() for i in range(len(self.valueStack))
                 ]
+                negatedControlQubits = None 
+                if len(self.controlNegations):
+                    negCtrlBools = [None]*len(controls)
+                    for i, c in enumerate(controls):
+                        negCtrlBools[i] = c in self.controlNegations
+                    negatedControlQubits = DenseBoolArrayAttr.get(negCtrlBools)
+                    self.controlNegations.clear()
+
                 opCtor = getattr(quake,
                                  '{}Op'.format(node.func.value.id.title()))
-                opCtor([], [], controls, [target])
+                opCtor([], [], controls, [target], negated_qubit_controls=negatedControlQubits)
                 return
 
             if node.func.value.id in globalRegisteredUnitaries and node.func.attr == 'ctrl':
@@ -1907,6 +1939,13 @@ class PyASTBridge(ast.NodeVisitor):
 
         self.generic_visit(node)
         operand = self.popValue()
+        # Handle qubit negations 
+        if isinstance(node.op, ast.Invert):
+            if quake.RefType.isinstance(operand.type):
+                self.controlNegations.append(operand)
+                self.pushValue(operand)
+                return 
+            
         if isinstance(node.op, ast.USub):
             # Make our lives easier for -1 used in variable subscript extraction
             if isinstance(node.operand,

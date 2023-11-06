@@ -10,8 +10,6 @@
 
 using namespace mlir;
 
-extern "C" void deviceCodeHolderAdd(const char*, const char*);
-
 namespace cudaq {
 
 // We have to reproduce the TranslationRegistry here in this Translation Unit
@@ -54,10 +52,13 @@ protected:
                              void *data) override {
     struct ArgsWrapper {
       ModuleOp mod;
+      std::vector<std::string> callablNames;
       void *rawArgs = nullptr;
     };
     auto *wrapper = reinterpret_cast<ArgsWrapper *>(data);
     auto m_module = wrapper->mod;
+    auto callableNames = wrapper->callablNames;
+
     auto *context = m_module->getContext();
     static bool initOnce = [&] {
       registerToQIRTranslation();
@@ -67,13 +68,28 @@ protected:
       return true;
     }();
     (void)initOnce;
-    std::string moduleStr;
-    {
-      llvm::raw_string_ostream os(moduleStr);
-      m_module.print(os);
-    }
-    deviceCodeHolderAdd(kernelName.c_str(), moduleStr.c_str());
-    return std::make_tuple(m_module, context, wrapper->rawArgs);
+
+    // Here we have an opportunity to run any passes that are
+    // specific to python before the rest of the RemoteRESTQPU workflow
+    auto cloned = m_module.clone();
+    PassManager pm(cloned.getContext());
+    pm.addNestedPass<func::FuncOp>(
+        cudaq::opt::createPySynthCallableBlockArgs(callableNames));
+    cudaq::opt::addAggressiveEarlyInlining(pm);
+    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        cudaq::opt::createUnwindLoweringPass());
+    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(cudaq::opt::createApplyOpSpecializationPass());
+    pm.addPass(createInlinerPass());
+    pm.addPass(cudaq::opt::createExpandMeasurementsPass());
+    pm.addPass(createCanonicalizerPass());
+    pm.addPass(createCSEPass());
+    if (failed(pm.run(cloned)))
+      throw std::runtime_error(
+          "Failure to synthesize callable block arguments in PyRemoteRESTQPU ");
+
+    return std::make_tuple(cloned, context, wrapper->rawArgs);
   }
 };
 } // namespace cudaq

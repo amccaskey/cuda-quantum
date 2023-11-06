@@ -30,7 +30,7 @@ void bindExecutionContext(py::module &mod) {
       .def("setSpinOperator", [](cudaq::ExecutionContext &ctx,
                                  cudaq::spin_op &spin) { ctx.spin = &spin; })
       .def("getExpectationValue", [](cudaq::ExecutionContext &ctx) {
-        return ctx.expectationValue.value();
+        return ctx.expectationValue;
       });
   mod.def(
       "setExecutionContext",

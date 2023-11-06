@@ -126,9 +126,10 @@ void pyAltLaunchKernel(const std::string &name, MlirModule module,
   if (platform.is_remote() || platform.is_emulated()) {
     struct ArgWrapper {
       ModuleOp mod;
+      std::vector<std::string> callableNames;
       void *rawArgs = nullptr;
     };
-    auto *wrapper = new ArgWrapper{mod, rawArgs};
+    auto *wrapper = new ArgWrapper{mod, names, rawArgs};
     cudaq::altLaunchKernel(name.c_str(), thunk,
                            reinterpret_cast<void *>(wrapper), size, 0);
     delete wrapper;
