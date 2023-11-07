@@ -151,13 +151,13 @@ class quantum_operation(object):
                     "incorrect number of target qubits provided.")
 
         for q in quantumArguments: 
-            if q.is_negated(): x()(q)
+            if isinstance(q, qubit) and q.is_negated(): x()(q)
 
         cudaq_runtime.applyQuantumOperation(opName, parameters,
                                             controls, targets, False,
                                             SpinOperator(), unitary)
         for q in quantumArguments: 
-            if q.is_negated(): 
+            if isinstance(q, qubit) and q.is_negated(): 
                 x()(q)
                 q.reset_negation()
 

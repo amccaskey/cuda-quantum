@@ -834,14 +834,17 @@ def ExpPauliOp : QuakeOp<"exp_pauli"> {
 def InitializeStateOp : QuakeOp<"init_state"> {
   let summary = "Initialize the quantum state to a specific complex vector.";
   let description = [{
-    }];
+    Given a cc.stdvec<complex<T>> of size 2**N, where N is the number of qubits 
+    in the targets operand, initialize the state of those target qubits to 
+    the provided state vector. 
+  }];
 
   let arguments = (ins VeqType:$targets, 
-                       cc_StdVectorType:$vector);
+                       StdvecOf<[Complex<AnyFloat>]>:$vector);
   let results = (outs );
 
   let assemblyFormat = [{
-    `(` $vector `,` $targets `)` `:` functional-type(operands, results) attr-dict
+    `(` $targets `,` $vector `)` `:` functional-type(operands, results) attr-dict
   }];
 
 }
@@ -851,13 +854,22 @@ def UnitaryOp : QuakeOp<"unitary", [AttrSizedOperandSegments]> {
   let description = [{
     This operation affects a general user-specified unitary operation, where 
     the unitary can be specified at compile-time or at runtime via its matrix representation.
-    }];
+
+    The matrix data must be provided as a row-major 1D array. It can be a 
+    compile-time known attribute, or a runtime value. 
+
+    If the unitary is provided at compile time, all target operands must 
+    have constant size (e.g. veq<?> will result in an error).
+
+    For compile-time unitary data, we represent as an ArrayAttr of DenseF32ArrayAttr 
+    elements, each element is a 2-tuple, the real and imaginary parts.
+  }];
 
   let arguments = (ins StrAttr:$opName, 
                        Variadic<AnyQType>:$controls, 
                        Variadic<RefType>:$targets, 
                        OptionalAttr<ArrayAttr>:$constantUnitary,
-                       Optional<cc_StdVectorType>:$unitary);
+                       Optional<StdvecOf<[Complex<AnyFloat>]>>:$unitary);
   let results = (outs );
 
   let assemblyFormat = [{
@@ -866,7 +878,6 @@ def UnitaryOp : QuakeOp<"unitary", [AttrSizedOperandSegments]> {
   }];
 
   let hasVerifier = 1;
-
 }
 
 def HOp : OneTargetOp<"h", [Hermitian]> {

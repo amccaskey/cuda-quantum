@@ -613,9 +613,19 @@ LogicalResult quake::UnitaryOp::verify() {
     }
 
     // verify correct number of unitary elements
-    auto expectedNumElements =
-        (1ULL << targets.size()) * (1ULL << targets.size());
+    std::size_t numQubits = 0;
+    for (auto target : targets)
+      if (auto veqTy = dyn_cast<quake::VeqType>(target.getType())) {
+        if (!veqTy.hasSpecifiedSize())
+          return op->emitOpError(
+              "quake.unitary cannot have runtime-known veq<?> types for "
+              "constant-sized matrix data.");
+        numQubits += veqTy.getSize();
+      } else // otherwise, must be a quake.ref
+        numQubits++;
 
+    // Should have 2**NumQ x 2**NumQ
+    std::size_t expectedNumElements = (1UL << numQubits) * (1UL << numQubits);
     if (expectedNumElements != unitary.size())
       return op->emitOpError(
           "invalid number of unitary matrix elements. For " +
