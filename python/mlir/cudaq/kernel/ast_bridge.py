@@ -11,7 +11,7 @@ from typing import Callable
 from collections import deque
 import numpy as np
 from .analysis import FindDepKernelsVisitor, preprocessCustomOperationLambda
-from .utils import globalAstRegistry, globalKernelRegistry, nvqppPrefix, globalRegisteredUnitaries
+from .utils import globalAstRegistry, globalKernelRegistry, nvqppPrefix, globalRegisteredUnitaries, mlirTypeFromAnnotation
 from mlir_cudaq.ir import *
 from mlir_cudaq.passmanager import *
 from mlir_cudaq.dialects import quake, cc
@@ -253,55 +253,13 @@ class PyASTBridge(ast.NodeVisitor):
         Return the MLIR Type corresponding to the given kernel function argument type annotation.
         Throws an exception if the programmer did not annotate function argument types. 
         """
-        if annotation == None:
-            raise RuntimeError(
-                'cudaq.kernel functions must have argument type annotations.')
+        return mlirTypeFromAnnotation(annotation, self.ctx)
 
-        if hasattr(annotation, 'attr'):
-            if annotation.value.id == 'cudaq':
-                if annotation.attr in ['qlist', 'qview', 'qvector']:
-                    return self.getVeqType()
-                if annotation.attr == 'qubit':
-                    return self.getRefType()
-
-            if annotation.value.id in ['numpy', 'np']:
-                if annotation.attr == 'ndarray':
-                    return cc.StdvecType.get(self.ctx, F64Type.get())
-
-        if isinstance(annotation,
-                      ast.Subscript) and annotation.value.id == 'Callable':
-            if not hasattr(annotation, 'slice'):
-                raise RuntimeError(
-                    'Callable type must have signature specified.')
-
-            argTypes = [
-                self.mlirTypeFromAnnotation(a)
-                for a in annotation.slice.elts[0].elts
-            ]
-            return cc.CallableType.get(self.ctx, argTypes)
-
-        if isinstance(annotation,
-                      ast.Subscript) and annotation.value.id == 'list':
-            if not hasattr(annotation, 'slice'):
-                raise RuntimeError('list subscript missing slice node.')
-
-            # expected that slice is a Name node
-            listEleTy = self.mlirTypeFromAnnotation(annotation.slice)
-            return cc.StdvecType.get(self.ctx, listEleTy)
-
-        if annotation.id == 'int':
-            return self.getIntegerType(64)
-        elif annotation.id == 'float':
-            return F64Type.get()
-        elif annotation.id == 'list':
-            return cc.StdvecType.get(self.ctx, F64Type.get())
-        elif annotation.id == 'bool':
-            return self.getIntegerType(1)
-        elif annotation.id == 'complex':
-            return ComplexType.get(self.getFloatType())
-        else:
-            raise RuntimeError('{} is not a supported type yet.'.format(
-                annotation.id))
+    def argumentsValidForFunction(self, values, functionTy):
+        return False not in [
+            ty == values[i].type
+            for i, ty in enumerate(FunctionType(functionTy).inputs)
+        ]
 
     def createInvariantForLoop(self,
                                endVal,
@@ -853,7 +811,6 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.id in ['mx', 'my', 'mz']:
                 qubit = self.popValue()
-                # FIXME Handle registerName
                 opCtor = getattr(quake, '{}Op'.format(node.func.id.title()))
                 i1Ty = self.getIntegerType(1)
                 resTy = i1Ty if quake.RefType.isinstance(
@@ -921,8 +878,8 @@ class PyASTBridge(ast.NodeVisitor):
 
             if node.func.id in globalKernelRegistry:
                 # If in globalKernelRegistry, it has to be in this Module
-                otherKernel = SymbolTable(
-                    self.module.operation)[nvqppPrefix + node.func.id]
+                otherKernel = SymbolTable(self.module.operation)[nvqppPrefix +
+                                                                 node.func.id]
                 fType = otherKernel.type
                 if len(fType.inputs) != len(node.args):
                     raise RuntimeError(
@@ -940,10 +897,12 @@ class PyASTBridge(ast.NodeVisitor):
                 if cc.CallableType.isinstance(val.type):
                     numVals = len(self.valueStack)
                     values = [self.popValue() for _ in range(numVals)]
-                    # FIXME check value types match callable type signature
                     callableTy = cc.CallableType.getFunctionType(val.type)
-                    # if len(callableTy.inputs) != len(values):
-                    # raise RuntimeError("invalid number of arguments passed to callable {}".format(node.func.id))
+                    if not self.argumentsValidForFunction(values, callableTy):
+                        raise RuntimeError(
+                            "invalid argument types for callable function ({} vs {})"
+                            .format([v.type for v in values], callableTy))
+
                     callable = cc.CallableFuncOp(callableTy, val).result
                     func.CallIndirectOp([], callable, values)
                     return
@@ -979,22 +938,22 @@ class PyASTBridge(ast.NodeVisitor):
                 if node.func.attr == 'sin':
                     value = self.popValue()
                     if IntegerType.isinstance(value.type):
-                        value = arith.SIToFPOp(self.getFloatType(), value).result
+                        value = arith.SIToFPOp(self.getFloatType(),
+                                               value).result
 
-                    value = complex.CreateOp(
-                        ComplexType.get(value.type), value,
-                        self.getConstantFloat(0.0)).result
+                    value = complex.CreateOp(ComplexType.get(value.type), value,
+                                             self.getConstantFloat(0.0)).result
 
                     self.pushValue(complex.SinOp(value).result)
                     return
                 if node.func.attr == 'sqrt':
                     value = self.popValue()
                     if IntegerType.isinstance(value.type):
-                        value = arith.SIToFPOp(self.getFloatType(), value).result 
-                    
-                    value = complex.CreateOp(
-                        ComplexType.get(value.type), value,
-                        self.getConstantFloat(0.0)).result
+                        value = arith.SIToFPOp(self.getFloatType(),
+                                               value).result
+
+                    value = complex.CreateOp(ComplexType.get(value.type), value,
+                                             self.getConstantFloat(0.0)).result
                     self.pushValue(complex.SqrtOp(value).result)
                     return
 
@@ -1014,17 +973,17 @@ class PyASTBridge(ast.NodeVisitor):
                         qubits = quake.AllocaOp(ty, size=size)
                     self.pushValue(qubits.results[0])
                     return
-                
+
                 if node.func.attr == "qubit":
                     self.pushValue(quake.AllocaOp(self.getRefType()).result)
                     return
-                
+
                 if node.func.attr == 'initialize_state':
                     state = self.popValue()
                     qubits = self.popValue()
                     quake.InitializeStateOp(qubits, state)
-                    return                
-                
+                    return
+
                 if node.func.attr == 'adjoint':
                     # Handle cudaq.adjoint(kernel, ...)
                     otherFuncName = node.args[0].id
@@ -1041,7 +1000,7 @@ class PyASTBridge(ast.NodeVisitor):
                         raise RuntimeError(
                             "{} is not a known quantum kernel (was it annotated?)."
                             .format(otherFuncName))
-                    
+
                     values = [
                         self.popValue() for _ in range(len(self.valueStack))
                     ]
@@ -1093,7 +1052,7 @@ class PyASTBridge(ast.NodeVisitor):
                                   callee=FlatSymbolRefAttr.get(nvqppPrefix +
                                                                otherFuncName))
                     return
-                
+
                 if node.func.attr == 'compute_action':
                     # There can only be 2 args here.
                     action = None
@@ -1175,9 +1134,9 @@ class PyASTBridge(ast.NodeVisitor):
                 controls = [
                     self.popValue() for i in range(len(self.valueStack))
                 ]
-                negatedControlQubits = None 
+                negatedControlQubits = None
                 if len(self.controlNegations):
-                    negCtrlBools = [None]*len(controls)
+                    negCtrlBools = [None] * len(controls)
                     for i, c in enumerate(controls):
                         negCtrlBools[i] = c in self.controlNegations
                     negatedControlQubits = DenseBoolArrayAttr.get(negCtrlBools)
@@ -1185,7 +1144,9 @@ class PyASTBridge(ast.NodeVisitor):
 
                 opCtor = getattr(quake,
                                  '{}Op'.format(node.func.value.id.title()))
-                opCtor([], [], controls, [target], negated_qubit_controls=negatedControlQubits)
+                opCtor([], [],
+                       controls, [target],
+                       negated_qubit_controls=negatedControlQubits)
                 return
 
             if node.func.value.id in globalRegisteredUnitaries and node.func.attr == 'ctrl':
@@ -1341,7 +1302,6 @@ class PyASTBridge(ast.NodeVisitor):
             if len(listElementValues) == 1:
                 self.pushValue(listElementValues[0])
             else:
-                # FIXME, may need to reverse the list here, order matters
                 self.pushValue(
                     quake.ConcatOp(self.getVeqType(), listElementValues).result)
             return
@@ -1918,13 +1878,13 @@ class PyASTBridge(ast.NodeVisitor):
 
         self.generic_visit(node)
         operand = self.popValue()
-        # Handle qubit negations 
+        # Handle qubit negations
         if isinstance(node.op, ast.Invert):
             if quake.RefType.isinstance(operand.type):
                 self.controlNegations.append(operand)
                 self.pushValue(operand)
-                return 
-            
+                return
+
         if isinstance(node.op, ast.USub):
             # Make our lives easier for -1 used in variable subscript extraction
             if isinstance(node.operand,
@@ -2034,18 +1994,18 @@ class PyASTBridge(ast.NodeVisitor):
             if ComplexType.isinstance(left.type):
                 if not ComplexType.isinstance(right.type):
                     right = complex.CreateOp(
-                            ComplexType.get(self.getFloatType()), right,
-                            self.getConstantFloat(0.0)).result
+                        ComplexType.get(self.getFloatType()), right,
+                        self.getConstantFloat(0.0)).result
                 self.pushValue(complex.DivOp(left, right).result)
-                return 
+                return
             if ComplexType.isinstance(right.type):
                 if not ComplexType.isinstance(left.type):
                     left = complex.CreateOp(
-                            ComplexType.get(self.getFloatType()), left,
-                            self.getConstantFloat(0.0)).result
+                        ComplexType.get(self.getFloatType()), left,
+                        self.getConstantFloat(0.0)).result
                 self.pushValue(complex.DivOp(left, right).result)
                 return
-            
+
             if IntegerType.isinstance(left.type):
                 left = arith.SIToFPOp(self.getFloatType(), left).result
             if IntegerType.isinstance(right.type):
@@ -2077,8 +2037,11 @@ class PyASTBridge(ast.NodeVisitor):
         if isinstance(node.op, ast.Mult):
             if ComplexType.isinstance(left.type):
                 if not ComplexType.isinstance(right.type):
-                    raise RuntimeError(
-                        "Fix this, left is complex, right is not")
+                    if IntegerType.isinstance(right.type):
+                        right = arith.SIToFPOp(self.getFloatType(),
+                                               right).result
+                    right = complex.CreateOp(left.type, right,
+                                             self.getConstantFloat(0.)).result
                 self.pushValue(complex.MulOp(left, right).result)
                 return
 
@@ -2086,7 +2049,12 @@ class PyASTBridge(ast.NodeVisitor):
                 if not F64Type.isinstance(right.type):
                     right = arith.SIToFPOp(self.getFloatType(), right).result
 
-            # FIXME more type checks
+            if IntegerType.isinstance(left.type):
+                if not IntegerType.isinstance(right.type):
+                    right = arith.FPToSIOp(left.type, right).result
+                self.pushValue(arith.MulIOp(left, right).result)
+                return
+
             self.pushValue(arith.MulFOp(left, right).result)
             return
         if isinstance(node.op, ast.Mod):
@@ -2113,7 +2081,6 @@ class PyASTBridge(ast.NodeVisitor):
             if cc.PointerType.isinstance(value.type):
                 loaded = cc.LoadOp(value).result
                 self.pushValue(loaded)
-            # FIXME need to handle this one better
             elif cc.CallableType.isinstance(
                     value.type) and not BlockArgument.isinstance(value):
                 return
@@ -2143,7 +2110,7 @@ def compile_to_mlir(astModule, **kwargs):
 
     # First we need to find any dependent kernels, they have to be
     # built as part of this ModuleOp...
-    vis = FindDepKernelsVisitor()
+    vis = FindDepKernelsVisitor(bridge.ctx)
     vis.visit(astModule)
     depKernels = vis.depKernels
 
@@ -2159,7 +2126,7 @@ def compile_to_mlir(astModule, **kwargs):
     # Canonicalize the code
     pm = PassManager.parse("builtin.module(canonicalize,cse)",
                            context=bridge.ctx)
-    
+
     try:
         pm.run(bridge.module)
     except:

@@ -372,7 +372,6 @@ class PyKernel(object):
                     if quake.VeqType.getSize(
                             inTy) and not quake.VeqType.getSize(argTy):
                         value = quake.RelaxSizeOp(argTy, value).result
-                # elif inTy != argTy: FIXME check this
 
                 mlirValues.append(value)
             if isAdjoint or len(controls) > 0:

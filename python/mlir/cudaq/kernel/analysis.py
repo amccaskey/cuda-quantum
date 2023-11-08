@@ -7,7 +7,9 @@
 # ============================================================================ #
 
 import ast, inspect
-from .utils import globalAstRegistry, globalKernelRegistry
+from .utils import globalAstRegistry, globalKernelRegistry, mlirTypeFromAnnotation
+from mlir_cudaq.dialects import cc
+from mlir_cudaq.ir import *
 
 
 class MidCircuitMeasurementAnalyzer(ast.NodeVisitor):
@@ -205,8 +207,9 @@ def preprocessCustomOperationLambda(unitaryCallable, desiredName):
 
 class FindDepKernelsVisitor(ast.NodeVisitor):
 
-    def __init__(self):
+    def __init__(self, ctx):
         self.depKernels = {}
+        self.context = ctx
 
     def visit_FunctionDef(self, node):
         """
@@ -228,9 +231,13 @@ class FindDepKernelsVisitor(ast.NodeVisitor):
                     raise RuntimeError(
                         'Callable type must have signature specified.')
 
-                # This is callable, let's add all in scope kernels
-                # FIXME only add those with the same signature
-                self.depKernels = {k: v for k, v in globalAstRegistry.items()}
+                # This is callable, let's add all in scope kernels with
+                # the same signature
+                callableTy = mlirTypeFromAnnotation(annotation, self.context)
+                for k, v in globalKernelRegistry.items():
+                    if str(v.type) == str(
+                            cc.CallableType.getFunctionType(callableTy)):
+                        self.depKernels[k] = globalAstRegistry[k]
 
         self.generic_visit(node)
 

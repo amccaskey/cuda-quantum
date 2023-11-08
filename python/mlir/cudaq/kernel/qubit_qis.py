@@ -150,14 +150,15 @@ class quantum_operation(object):
                 raise RuntimeError(
                     "incorrect number of target qubits provided.")
 
-        for q in quantumArguments: 
-            if isinstance(q, qubit) and q.is_negated(): x()(q)
+        for q in quantumArguments:
+            if isinstance(q, qubit) and q.is_negated():
+                x()(q)
 
         cudaq_runtime.applyQuantumOperation(opName, parameters,
                                             controls, targets, False,
                                             SpinOperator(), unitary)
-        for q in quantumArguments: 
-            if isinstance(q, qubit) and q.is_negated(): 
+        for q in quantumArguments:
+            if isinstance(q, qubit) and q.is_negated():
                 x()(q)
                 q.reset_negation()
 
@@ -294,8 +295,9 @@ def adjoint(kernel, *args):
     Apply the adjoint of the given kernel at the provided runtime arguments.
     """
     if not isinstance(kernel, Callable):
-        raise RuntimeError("cudaq.adjoint: first argument must be a callable kernel.")
-    
+        raise RuntimeError(
+            "cudaq.adjoint: first argument must be a callable kernel.")
+
     cudaq_runtime.startAdjointRegion()
     kernel(*args)
     cudaq_runtime.endAdjointRegion()
@@ -306,8 +308,9 @@ def control(kernel, controls, *args):
     Apply the general control version of the given kernel at the provided runtime arguments.
     """
     if not isinstance(kernel, Callable):
-        raise RuntimeError("cudaq.control: first argument must be a callable kernel.")
-    
+        raise RuntimeError(
+            "cudaq.control: first argument must be a callable kernel.")
+
     cudaq_runtime.startCtrlRegion([c.id() for c in controls])
     kernel(*args)
     cudaq_runtime.endCtrlRegion(len(controls))
