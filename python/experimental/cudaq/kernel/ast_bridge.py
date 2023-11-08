@@ -917,6 +917,7 @@ class PyASTBridge(ast.NodeVisitor):
                 return
 
             else:
+                print(globalKernelRegistry.keys())
                 raise RuntimeError("unhandled function call - {}".format(
                     node.func.id))
 
