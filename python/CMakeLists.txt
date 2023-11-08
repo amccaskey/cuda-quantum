@@ -95,4 +95,4 @@ if(CUDAQ_BUILD_TESTS)
   endif()
 endif()
 
-add_subdirectory(mlir)
+add_subdirectory(experimental)
