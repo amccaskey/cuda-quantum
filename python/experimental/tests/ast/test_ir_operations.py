@@ -14,6 +14,7 @@ import cudaq
 from cudaq import spin 
 
 def test_synthesize():
+    cudaq.disable_jit()
     @cudaq.kernel
     def wontWork(numQubits:int):
         q = cudaq.qvector(numQubits)
