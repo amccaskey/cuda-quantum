@@ -52,3 +52,9 @@ add_library(cudaq::cudaq-builder SHARED IMPORTED)
 set_target_properties(cudaq::cudaq-builder PROPERTIES
   IMPORTED_LOCATION "${CUDAQ_LIBRARY_DIR}/libcudaq-builder${CMAKE_SHARED_LIBRARY_SUFFIX}"
   IMPORTED_SONAME "libcudaq-builder${CMAKE_SHARED_LIBRARY_SUFFIX}")
+  
+add_library(cudaq::cudaq-default-cpu INTERFACE IMPORTED)
+target_link_libraries(cudaq::cudaq-default-cpu INTERFACE cudaq::cudaq cudaq::cudaq-spin cudaq::cudaq-platform-default ${CUDAQ_LIBRARY_DIR}/libnvqir-qpp${CMAKE_SHARED_LIBRARY_SUFFIX})
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
+  target_link_options(cudaq::cudaq-default-cpu INTERFACE -Wl,--no-as-needed)
+endif()
