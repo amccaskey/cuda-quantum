@@ -26,7 +26,6 @@ if not "CUDAQ_DYNLIBS" in os.environ:
         pass
 
 from ._pycudaq import *
-from .domains import chemistry
 
 initKwargs = {}
 if '-target' in sys.argv:
