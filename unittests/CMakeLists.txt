@@ -18,15 +18,10 @@ set(CUDAQ_RUNTIME_TEST_SOURCES
   integration/ccnot_tester.cpp
   integration/deuteron_variational_tester.cpp
   integration/ghz_nisq_tester.cpp
-  integration/gradient_tester.cpp
   integration/grover_test.cpp
-  integration/nlopt_tester.cpp
   integration/qpe_ftqc.cpp
   integration/qpe_nisq.cpp
   integration/qubit_allocation.cpp
-  integration/vqe_tester.cpp
-  integration/bug67_vqe_then_sample.cpp
-  integration/bug77_vqe_with_shots.cpp
   integration/bug116_cusv_measure_bug.cpp
   integration/async_tester.cpp
   integration/negative_controls_tester.cpp
@@ -180,37 +175,3 @@ gtest_discover_tests(test_photonics)
 
 add_subdirectory(backends)
 add_subdirectory(Optimizer)
-
-if (CUDAQ_ENABLE_PYTHON)
-  find_package(Python COMPONENTS Interpreter)
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "import openfermionpyscf"
-    OUTPUT_VARIABLE PYSCF_output
-    ERROR_VARIABLE  PYSCF_error
-    RESULT_VARIABLE PYSCF_result)
-
-  if(NOT ${PYSCF_result} EQUAL 0)
-    message(STATUS "OpenFermion PySCF not available for chemistry tests.")
-    return()
-  endif()
-
-  message(STATUS "OpenFermion PySCF found, enabling chemistry tests.")
-  add_executable(test_domains main.cpp domains/ChemistryTester.cpp)
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
-    target_link_options(test_domains PRIVATE -Wl,--no-as-needed)
-  endif()
-  target_compile_definitions(test_domains PRIVATE -DNVQIR_BACKEND_NAME=qpp)
-  target_include_directories(test_domains PRIVATE .)
-  set_property(TARGET test_domains PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/python")
-  target_link_libraries(test_domains
-    PRIVATE 
-    cudaq
-    cudaq-platform-default
-    nvqir nvqir-qpp
-    cudaq-spin
-    cudaq-chemistry
-    cudaq-pyscf
-    gtest_main)
-  gtest_discover_tests(test_domains
-    TEST_SUFFIX _Sampling PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/python")
-endif()
-

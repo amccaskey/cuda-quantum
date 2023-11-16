@@ -37,33 +37,6 @@ def test_simple_observe():
     assert np.isclose(result.expectation(), -1.74, atol=1e-2)
 
 
-def test_optimization():
-    """Test that we can optimize over a parameterized kernel."""
-    @cudaq.kernel(jit=True)
-    def ansatz(angle:float):
-        q = cudaq.qvector(2)
-        x(q[0])
-        ry(angle, q[1])
-        x.ctrl(q[1], q[0])
-
-    hamiltonian = 5.907 - 2.1433 * spin.x(0) * spin.x(1) - 2.1433 * spin.y(
-        0) * spin.y(1) + .21829 * spin.z(0) - 6.125 * spin.z(1)
-
-    cudaq.observe(ansatz, hamiltonian, .59)
-
-    def objectiveFunction(x):
-        return cudaq.observe(ansatz, hamiltonian, x[0]).expectation()
-
-    optimizer = cudaq.optimizers.COBYLA()
-    optimizer.max_iterations = 50
-    energy, params = optimizer.optimize(
-        1, objectiveFunction)
-    print(energy, params)
-    assert np.isclose(energy, -1.74, 1e-2)
-
-    # FIXME show gradients
-
-
 def test_broadcast():
     """Test that sample and observe broadcasting works."""
     hamiltonian = 5.907 - 2.1433 * spin.x(0) * spin.x(1) - 2.1433 * spin.y(

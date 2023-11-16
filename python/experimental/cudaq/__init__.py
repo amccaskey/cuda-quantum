@@ -32,10 +32,6 @@ Kernel = PyKernel
 # to be deprecated
 qreg = cudaq_runtime.qvector
 
-# Optimizers + Gradients
-optimizers = cudaq_runtime.optimizers
-gradients = cudaq_runtime.gradients
-
 # Runtime Functions
 set_target = cudaq_runtime.set_target
 reset_target = cudaq_runtime.reset_target

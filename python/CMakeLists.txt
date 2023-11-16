@@ -39,12 +39,9 @@ pybind11_add_module(_pycudaq
                      runtime/cudaq/builder/py_QuakeValue.cpp
                      runtime/cudaq/algorithms/py_observe.cpp
                      runtime/cudaq/algorithms/py_sample.cpp
-                     runtime/cudaq/algorithms/py_optimizer.cpp
                      runtime/cudaq/algorithms/py_state.cpp
-                     runtime/cudaq/algorithms/py_vqe.cpp
                      runtime/cudaq/spin/py_matrix.cpp
                      runtime/cudaq/spin/py_spin_op.cpp
-                     runtime/cudaq/kernels/py_chemistry.cpp
                      runtime/common/py_ObserveResult.cpp
                      runtime/common/py_SampleResult.cpp                     
                      runtime/common/py_NoiseModel.cpp)
@@ -70,10 +67,6 @@ if (NOT SKBUILD)
               ${CMAKE_BINARY_DIR}/python/cudaq)
 else()
   install(TARGETS _pycudaq LIBRARY DESTINATION cudaq)
-endif()
-
-if (NOT CUDAQ_DISABLE_CPP_FRONTEND)
-  add_subdirectory(runtime/cudaq/domains/plugins)
 endif()
 
 # Do we have pytest and numpy? 

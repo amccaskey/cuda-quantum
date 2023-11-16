@@ -31,7 +31,7 @@ if (CUDA_FOUND)
     PRIVATE .)
 
   target_link_libraries(${LIBRARY_NAME}
-    PUBLIC dl cudaq-spin cudaq-common cudaq-nlopt cudaq-ensmallen
+    PUBLIC dl cudaq-spin cudaq-common 
     PRIVATE nvqir fmt::fmt-header-only ${CUDA_LIBRARIES})
 
   target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
@@ -43,8 +43,7 @@ else()
     PRIVATE .)
 
   target_link_libraries(${LIBRARY_NAME}
-    PUBLIC dl cudaq-spin cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only)
+    PUBLIC dl cudaq-spin cudaq-common  PRIVATE nvqir fmt::fmt-header-only)
 endif()
 
 if (MPI_CXX_FOUND)
@@ -53,7 +52,6 @@ if (MPI_CXX_FOUND)
 endif()
 
 add_subdirectory(qis/managers)
-add_subdirectory(algorithms)
 add_subdirectory(platform)
 add_subdirectory(builder)
 add_subdirectory(domains)

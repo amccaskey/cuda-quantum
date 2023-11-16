@@ -9,7 +9,6 @@
 #include "CUDAQTestUtils.h"
 #include "common/FmtCore.h"
 #include <cudaq/algorithm.h>
-#include <cudaq/optimizers.h>
 #include <numeric>
 
 using namespace cudaq;
@@ -36,35 +35,4 @@ CUDAQ_TEST(GetStateTester, checkSimple) {
 #endif
 
   EXPECT_NEAR(state.overlap(state), 1.0, 1e-3);
-
-  // Demonstrate a useful use-case for get_state,
-  // specifically, let's approximate another 2-qubit state with a
-  // general so4 rotation. Here we'll see if we can find rotational
-  // parameters that create a circuit producing the bell state.
-  auto so4 = [](std::vector<double> parameters) __qpu__ {
-    cudaq::qubit q, r;
-    ry(parameters[0], q);
-    ry(parameters[1], r);
-
-    z<cudaq::ctrl>(q, r);
-
-    ry(parameters[2], q);
-    ry(parameters[3], r);
-
-    z<cudaq::ctrl>(q, r);
-
-    ry(parameters[4], q);
-    ry(parameters[5], r);
-
-    z<cudaq::ctrl>(q, r);
-  };
-
-  cudaq::optimizers::cobyla optimizer;
-  optimizer.max_eval = 100;
-  auto [opt_val, params] = optimizer.optimize(6, [&](std::vector<double> x) {
-    auto testState = cudaq::get_state(so4, x);
-    return 1.0 - state.overlap(testState);
-  });
-
-  EXPECT_NEAR(opt_val, 0.0, 1e-3);
 }

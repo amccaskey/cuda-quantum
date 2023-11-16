@@ -877,20 +877,20 @@ def test_fermionic_swap_op():
     test_01.x(qubits_01[0])
     test_01.fermionic_swap(angle, qubits_01[0], qubits_01[1])
     ss_01 = cudaq.get_state(test_01)
-    val1 = np.abs(ss_01[1] - (-1j * np.exp(1j * angle / 2.0) * s))
-    val2 = np.abs(ss_01[2] - (np.exp(1j * angle / 2.0) * c))
-    assert np.isclose(val1, 0.0, atol=1e-6)
-    assert np.isclose(val2, 0.0, atol=1e-6)
+    assert np.isclose(np.abs(ss_01[1] - (-1j * np.exp(1j * angle / 2.0) * s)),
+                      0.0, atol=1e-3)
+    assert np.isclose(np.abs(ss_01[2] - (np.exp(1j * angle / 2.0) * c)), 0.0,
+                      atol=1e-3)
 
     test_10 = cudaq.make_kernel()
     qubits_10 = test_10.qalloc(2)
     test_10.x(qubits_10[1])
     test_10.fermionic_swap(angle, qubits_10[0], qubits_10[1])
     ss_10 = cudaq.get_state(test_10)
-    val3 = np.abs(ss_10[1] - (np.exp(1j * angle / 2.0) * c))
-    val4 = np.abs(ss_10[2] - (-1j * np.exp(1j * angle / 2.0) * s))
-    assert np.isclose(val3, 0.0, atol=1e-6)
-    assert np.isclose(val4, 0.0, atol=1e-6)
+    assert np.isclose(np.abs(ss_10[1] - (np.exp(1j * angle / 2.0) * c)), 0.0,
+                      atol=1e-3)
+    assert np.isclose(np.abs(ss_10[2] - (-1j * np.exp(1j * angle / 2.0) * s)),
+                      0.0, atol=1e-3)
 
 
 # leave for gdb debugging

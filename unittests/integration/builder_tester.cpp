@@ -8,9 +8,7 @@
 
 #include "CUDAQTestUtils.h"
 #include <cudaq/algorithm.h>
-#include <cudaq/algorithms/gradients/central_difference.h>
 #include <cudaq/builder.h>
-#include <cudaq/optimizers.h>
 #include <regex>
 
 CUDAQ_TEST(BuilderTester, checkSimple) {
@@ -46,42 +44,6 @@ CUDAQ_TEST(BuilderTester, checkSimple) {
     cudaq::spin_op h3 = h + 9.625 - 9.625 * z(2) - 3.913119 * x(1) * x(2) -
                         3.913119 * y(1) * y(2);
 
-    auto [ansatz, theta, phi] = cudaq::make_kernel<double, double>();
-
-    auto q = ansatz.qalloc(3);
-    ansatz.x(q[0]);
-    ansatz.ry(theta, q[1]);
-    ansatz.ry(phi, q[2]);
-    ansatz.x<cudaq::ctrl>(q[2], q[0]);
-    ansatz.x<cudaq::ctrl>(q[0], q[1]);
-    ansatz.ry(-theta, q[1]);
-    ansatz.x<cudaq::ctrl>(q[0], q[1]);
-    ansatz.x<cudaq::ctrl>(q[1], q[0]);
-
-    auto argMapper = [](std::vector<double> x) {
-      return std::make_tuple(x[0], x[1]);
-    };
-    cudaq::gradients::central_difference gradient(ansatz, argMapper);
-    cudaq::optimizers::lbfgs optimizer;
-    optimizer.initial_parameters = {0.35, 0.25};
-    optimizer.max_eval = 10;
-    optimizer.max_line_search_trials = 10;
-    auto [opt_val_0, optpp] =
-        cudaq::vqe(ansatz, gradient, h3, optimizer, 2, argMapper);
-    printf("Opt-params: %lf %lf \n", optpp[0], optpp[1]);
-    printf("<H3> = %lf\n", opt_val_0);
-    EXPECT_NEAR(opt_val_0, -2.045375, 1e-3);
-  }
-
-  {
-    // Build up a 2 parameter circuit using a vector<double> parameter
-    // Run the cudaq optimizer to find optimal value.
-    using namespace cudaq::spin;
-    cudaq::spin_op h = 5.907 - 2.1433 * x(0) * x(1) - 2.1433 * y(0) * y(1) +
-                       .21829 * z(0) - 6.125 * z(1);
-    cudaq::spin_op h3 = h + 9.625 - 9.625 * z(2) - 3.913119 * x(1) * x(2) -
-                        3.913119 * y(1) * y(2);
-
     auto [ansatz, thetas] = cudaq::make_kernel<std::vector<double>>();
 
     auto q = ansatz.qalloc(3);
@@ -95,14 +57,14 @@ CUDAQ_TEST(BuilderTester, checkSimple) {
     ansatz.x<cudaq::ctrl>(q[0], q[1]);
     ansatz.x<cudaq::ctrl>(q[1], q[0]);
 
-    cudaq::gradients::central_difference gradient(ansatz);
-    cudaq::optimizers::lbfgs optimizer;
-    optimizer.initial_parameters = {0.35, 0.25};
-    optimizer.max_eval = 10;
-    optimizer.max_line_search_trials = 10;
-    auto [opt_val_0, optpp] = cudaq::vqe(ansatz, gradient, h3, optimizer, 2);
-    printf("<H3> = %lf\n", opt_val_0);
-    EXPECT_NEAR(opt_val_0, -2.045375, 1e-3);
+    // cudaq::gradients::central_difference gradient(ansatz);
+    // cudaq::optimizers::lbfgs optimizer;
+    // optimizer.initial_parameters = {0.35, 0.25};
+    // optimizer.max_eval = 10;
+    // optimizer.max_line_search_trials = 10;
+    // auto [opt_val_0, optpp] = cudaq::vqe(ansatz, gradient, h3, optimizer, 2);
+    // printf("<H3> = %lf\n", opt_val_0);
+    // EXPECT_NEAR(opt_val_0, -2.045375, 1e-3);
   }
 
   {
@@ -925,6 +887,16 @@ CUDAQ_TEST(BuilderTester, checkEntryPointAttribute) {
 }
 
 CUDAQ_TEST(BuilderTester, checkExpPauli) {
+  std::vector<double> h2_data{
+      3, 1, 1, 3, 0.0454063,  0,  2, 0, 0, 0, 0.17028,    0,
+      0, 0, 2, 0, -0.220041,  -0, 1, 3, 3, 1, 0.0454063,  0,
+      0, 0, 0, 0, -0.106477,  0,  0, 2, 0, 0, 0.17028,    0,
+      0, 0, 0, 2, -0.220041,  -0, 3, 3, 1, 1, -0.0454063, -0,
+      2, 2, 0, 0, 0.168336,   0,  2, 0, 2, 0, 0.1202,     0,
+      0, 2, 0, 2, 0.1202,     0,  2, 0, 0, 2, 0.165607,   0,
+      0, 2, 2, 0, 0.165607,   0,  0, 0, 2, 2, 0.174073,   0,
+      1, 1, 3, 3, -0.0454063, -0, 15};
+  cudaq::spin_op h(h2_data, 4);
   {
     auto [kernel, theta] = cudaq::make_kernel<double>();
     auto qubits = kernel.qalloc(4);
@@ -932,45 +904,10 @@ CUDAQ_TEST(BuilderTester, checkExpPauli) {
     kernel.x(qubits[1]);
     kernel.exp_pauli(theta, qubits, "XXXY");
     std::cout << kernel << "\n";
-    std::vector<double> h2_data{
-        3, 1, 1, 3, 0.0454063,  0,  2, 0, 0, 0, 0.17028,    0,
-        0, 0, 2, 0, -0.220041,  -0, 1, 3, 3, 1, 0.0454063,  0,
-        0, 0, 0, 0, -0.106477,  0,  0, 2, 0, 0, 0.17028,    0,
-        0, 0, 0, 2, -0.220041,  -0, 3, 3, 1, 1, -0.0454063, -0,
-        2, 2, 0, 0, 0.168336,   0,  2, 0, 2, 0, 0.1202,     0,
-        0, 2, 0, 2, 0.1202,     0,  2, 0, 0, 2, 0.165607,   0,
-        0, 2, 2, 0, 0.165607,   0,  0, 0, 2, 2, 0.174073,   0,
-        1, 1, 3, 3, -0.0454063, -0, 15};
-    cudaq::spin_op h(h2_data, 4);
     const double e = cudaq::observe(kernel, h, 0.11);
     EXPECT_NEAR(e, -1.13, 1e-2);
   }
-  {
-    auto [kernel, theta] = cudaq::make_kernel<double>();
-    auto qubits = kernel.qalloc(4);
-    kernel.x(qubits[0]);
-    kernel.x(qubits[1]);
-    kernel.exp_pauli(theta, qubits, "XXXY");
-    std::cout << kernel << "\n";
-    std::vector<double> h2_data{
-        3, 1, 1, 3, 0.0454063,  0,  2, 0, 0, 0, 0.17028,    0,
-        0, 0, 2, 0, -0.220041,  -0, 1, 3, 3, 1, 0.0454063,  0,
-        0, 0, 0, 0, -0.106477,  0,  0, 2, 0, 0, 0.17028,    0,
-        0, 0, 0, 2, -0.220041,  -0, 3, 3, 1, 1, -0.0454063, -0,
-        2, 2, 0, 0, 0.168336,   0,  2, 0, 2, 0, 0.1202,     0,
-        0, 2, 0, 2, 0.1202,     0,  2, 0, 0, 2, 0.165607,   0,
-        0, 2, 2, 0, 0.165607,   0,  0, 0, 2, 2, 0.174073,   0,
-        1, 1, 3, 3, -0.0454063, -0, 15};
-    cudaq::spin_op h(h2_data, 4);
-    cudaq::optimizers::cobyla optimizer;
-    optimizer.max_eval = 30;
-    auto [e, opt] = optimizer.optimize(1, [&](std::vector<double> x) -> double {
-      double e = cudaq::observe(kernel, h, x[0]);
-      printf("E = %lf, %lf\n", e, x[0]);
-      return e;
-    });
-    EXPECT_NEAR(e, -1.13, 1e-2);
-  }
+
   {
     auto [kernel, theta] = cudaq::make_kernel<double>();
     auto qubits = kernel.qalloc(4);
@@ -978,23 +915,7 @@ CUDAQ_TEST(BuilderTester, checkExpPauli) {
     kernel.x(qubits[1]);
     kernel.exp_pauli(theta, "XXXY", qubits[0], qubits[1], qubits[2], qubits[3]);
     std::cout << kernel << "\n";
-    std::vector<double> h2_data{
-        3, 1, 1, 3, 0.0454063,  0,  2, 0, 0, 0, 0.17028,    0,
-        0, 0, 2, 0, -0.220041,  -0, 1, 3, 3, 1, 0.0454063,  0,
-        0, 0, 0, 0, -0.106477,  0,  0, 2, 0, 0, 0.17028,    0,
-        0, 0, 0, 2, -0.220041,  -0, 3, 3, 1, 1, -0.0454063, -0,
-        2, 2, 0, 0, 0.168336,   0,  2, 0, 2, 0, 0.1202,     0,
-        0, 2, 0, 2, 0.1202,     0,  2, 0, 0, 2, 0.165607,   0,
-        0, 2, 2, 0, 0.165607,   0,  0, 0, 2, 2, 0.174073,   0,
-        1, 1, 3, 3, -0.0454063, -0, 15};
-    cudaq::spin_op h(h2_data, 4);
-    cudaq::optimizers::cobyla optimizer;
-    optimizer.max_eval = 30;
-    auto [e, opt] = optimizer.optimize(1, [&](std::vector<double> x) -> double {
-      double e = cudaq::observe(kernel, h, x[0]);
-      printf("E = %lf, %lf\n", e, x[0]);
-      return e;
-    });
+    const double e = cudaq::observe(kernel, h, 0.11);
     EXPECT_NEAR(e, -1.13, 1e-2);
   }
 }

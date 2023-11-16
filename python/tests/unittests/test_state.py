@@ -139,47 +139,6 @@ def test_state_vector_simple():
     assert np.isclose(got_state.overlap(got_state), 1.0)
 
 
-def test_state_vector_integration():
-    """
-    An integration test on the state vector class. Uses a CUDA Quantum
-    optimizer to find the correct kernel parameters for a Bell state.
-    """
-    # Make a general 2 qubit SO4 rotation.
-    kernel, parameters = cudaq.make_kernel(list)
-    qubits = kernel.qalloc(2)
-    kernel.ry(parameters[0], qubits[0])
-    kernel.ry(parameters[1], qubits[1])
-    kernel.cz(qubits[0], qubits[1])
-    kernel.ry(parameters[2], qubits[0])
-    kernel.ry(parameters[3], qubits[1])
-    kernel.cz(qubits[0], qubits[1])
-    kernel.ry(parameters[4], qubits[0])
-    kernel.ry(parameters[5], qubits[1])
-    kernel.cz(qubits[0], qubits[1])
-
-    want_state = cudaq.State(
-        np.array([1. / np.sqrt(2.), 0., 0., 1. / np.sqrt(2.)],
-                 dtype=np.complex128))
-
-    def objective(x):
-        got_state = cudaq.get_state(kernel, x)
-        return 1. - want_state.overlap(got_state)
-
-    # Compute the parameters that make this kernel produce the
-    # Bell state.
-    optimizer = cudaq.optimizers.COBYLA()
-    optimizer.max_iterations = 100
-    optimal_infidelity, optimal_parameters = optimizer.optimize(6, objective)
-
-    # Did we maximize the overlap (i.e, minimize the infidelity)?
-    assert np.isclose(optimal_infidelity, 0.0, atol=1e-3)
-
-    # Check the state from the kernel at the fixed parameters.
-    bell_state = cudaq.get_state(kernel, optimal_parameters)
-    print(bell_state)
-    assert np.allclose(want_state, bell_state, atol=1e-3)
-
-
 def test_state_density_matrix_simple():
     """
     A simple end-to-end test of the state class on a density matrix
@@ -219,51 +178,6 @@ def test_state_density_matrix_simple():
     assert np.isclose(got_state.overlap(want_state_object), 1.0)
     # Check the overlap overload with itself.
     assert np.isclose(got_state.overlap(got_state), 1.0)
-
-    cudaq.reset_target()
-
-
-def test_state_density_matrix_integration():
-    """
-    An integration test on the state density matrix class. Uses a CUDA Quantum
-    optimizer to find the correct kernel parameters for a Bell state.
-    """
-    cudaq.set_target('density-matrix-cpu')
-
-    # Make a general 2 qubit SO4 rotation.
-    kernel, parameters = cudaq.make_kernel(list)
-    qubits = kernel.qalloc(2)
-    kernel.ry(parameters[0], qubits[0])
-    kernel.ry(parameters[1], qubits[1])
-    kernel.cz(qubits[0], qubits[1])
-    kernel.ry(parameters[2], qubits[0])
-    kernel.ry(parameters[3], qubits[1])
-    kernel.cz(qubits[0], qubits[1])
-    kernel.ry(parameters[4], qubits[0])
-    kernel.ry(parameters[5], qubits[1])
-    kernel.cz(qubits[0], qubits[1])
-
-    want_state = cudaq.State(
-        np.array([[.5, 0., 0., .5], [0., 0., 0., 0.], [0., 0., 0., 0.],
-                  [.5, 0., 0., .5]],
-                 dtype=np.complex128))
-
-    def objective(x):
-        got_state = cudaq.get_state(kernel, x)
-        return 1. - want_state.overlap(got_state)
-
-    # Compute the parameters that make this kernel produce the
-    # Bell state.
-    optimizer = cudaq.optimizers.COBYLA()
-    optimizer.max_iterations = 100
-    optimal_infidelity, optimal_parameters = optimizer.optimize(6, objective)
-
-    # Did we maximize the overlap (i.e, minimize the infidelity)?
-    assert np.isclose(optimal_infidelity, 0.0, atol=1e-3)
-
-    # Check the state from the kernel at the fixed parameters.
-    bell_state = cudaq.get_state(kernel, optimal_parameters)
-    assert np.allclose(want_state, bell_state, atol=1e-3)
 
     cudaq.reset_target()
 

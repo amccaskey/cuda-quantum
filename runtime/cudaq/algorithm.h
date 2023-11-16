@@ -9,6 +9,4 @@
 #pragma once
 
 #include "algorithms/observe.h"
-#include "algorithms/optimizer.h"
 #include "algorithms/state.h"
-#include "algorithms/vqe.h"

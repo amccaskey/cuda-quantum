@@ -18,9 +18,7 @@
 #include "runtime/common/py_ObserveResult.h"
 #include "runtime/common/py_SampleResult.h"
 #include "runtime/cudaq/algorithms/py_observe_async.h"
-#include "runtime/cudaq/algorithms/py_optimizer.h"
 #include "runtime/cudaq/algorithms/py_sample_async.h"
-#include "runtime/cudaq/kernels/py_common_kernels.h"
 #include "runtime/cudaq/platform/py_alt_launch_kernel.h"
 #include "runtime/cudaq/qis/py_execution_manager.h"
 #include "runtime/cudaq/qis/py_qubit_qis.h"
@@ -77,8 +75,6 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindComplexMatrix(cudaqRuntime);
   cudaq::bindSpinWrapper(cudaqRuntime);
   cudaq::bindQIS(cudaqRuntime);
-  cudaq::bindOptimizerWrapper(cudaqRuntime);
-  cudaq::bindCommonKernels(cudaqRuntime);
   cudaq::bindNoise(cudaqRuntime);
   cudaq::bindExecutionContext(cudaqRuntime);
   cudaq::bindExecutionManager(cudaqRuntime);
