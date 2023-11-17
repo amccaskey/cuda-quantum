@@ -128,13 +128,13 @@ public:
       return;
     }
 
-    // Do any final post-processing before
-    // we deallocate the qudits
-    handleExecutionContextEnded();
-
     deallocateQudits(contextQuditIdsForDeletion);
     for (auto &q : contextQuditIdsForDeletion)
       returnIndex(q.id);
+ 
+    // Do any final post-processing before
+    // we deallocate the qudits
+    handleExecutionContextEnded();
 
     contextQuditIdsForDeletion.clear();
     executionContext = nullptr;
