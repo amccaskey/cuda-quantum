@@ -76,7 +76,7 @@ target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE
     cudaq-em-default
     fmt::fmt-header-only
     )
-
+   
 ################################################################################
 # Common CAPI
 ################################################################################
@@ -112,6 +112,7 @@ add_mlir_python_modules(CUDAQuantumPythonModules
   )
 
 file (COPY cudaq DESTINATION ${MLIR_BINARY_DIR}/python_packages/cudaq)
+install(DIRECTORY cudaq DESTINATION python_packages/cudaq)
 
 if (CUDAQ_BUILD_TESTS)
  add_subdirectory(tests)
