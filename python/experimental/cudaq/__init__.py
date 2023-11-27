@@ -28,6 +28,8 @@ qlist = qvector
 SpinOperator = cudaq_runtime.SpinOperator
 Pauli = cudaq_runtime.Pauli
 Kernel = PyKernel
+ObserveResult = cudaq_runtime.ObserveResult
+SampleResult = cudaq_runtime.SampleResult 
 
 # to be deprecated
 qreg = cudaq_runtime.qvector

@@ -24,6 +24,8 @@ void bindObserveResult(py::module &mod) {
       "This includes any measurement counts data, as well as the global "
       "expectation value of the user-defined `spin_operator`.\n")
       .def(py::init<double, spin_op, sample_result>())
+      .def(py::init<double, spin_op>())
+
       /// @brief Bind the member functions of `cudaq.ObserveResult`.
       .def("dump", &observe_result::dump,
            "Dump the raw data from the :class:`SampleResult` that are stored "

@@ -38,6 +38,8 @@ Attributes:
 		register that are stored in `self`.)#")
       .def_property_readonly("register_names", &sample_result::register_names)
       .def(py::init<>())
+      .def("serialize", &sample_result::serialize, "")
+      .def("deserialize", &sample_result::deserialize, "")
       .def(
           "dump", [](sample_result &self) { self.dump(); },
           "Print a string of the raw measurement counts data to the "
