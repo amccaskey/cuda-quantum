@@ -151,7 +151,7 @@ public:
 
   virtual void
   initializeState(const std::vector<std::size_t> &targets,
-                  const std::vector<std::complex<double>> &stateVector) = 0;
+                  const std::vector<std::complex<double>> &stateVector) { }
 
   /// @brief Apply a custom operation described by a matrix of data
   /// represented as 1-D vector of elements in row-major order, as well
