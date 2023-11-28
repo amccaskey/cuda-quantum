@@ -15,3 +15,7 @@
 [submodule "tpls/spdlog"]
 	path = tpls/spdlog
 	url = https://github.com/gabime/spdlog
+[submodule "tpls/pybind11"]
+    path = tpls/pybind11
+    url = https://github.com/pybind/pybind11
+    ignore = dirty

@@ -26,9 +26,8 @@ set(NVQPP_TEST_PARAMS
 # FIXME: These libraries should self-register to a CMake property so here we
 # can just use a macro instead of listing them.
 set(TEST_CUDAQ_LIBRARIES
-  cudaq cudaq-common cudaq-mlir-runtime cudaq-builder cudaq-ensmallen
-  cudaq-nlopt cudaq-spin
-  cudaq-em-default cudaq-platform-default
+  cudaq cudaq-common cudaq-mlir-runtime cudaq-builder
+  cudaq-spin cudaq-em-default cudaq-platform-default
   nvqir nvqir-qpp nvqir-dm)
 
 if (NOT CUDAQ_DISABLE_CPP_FRONTEND)
