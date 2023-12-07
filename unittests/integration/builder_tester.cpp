@@ -999,6 +999,16 @@ CUDAQ_TEST(BuilderTester, checkExpPauli) {
   }
 }
 
+TEST(BuilderTester, checkQallocFromStateVector) {
+  std::vector<std::complex<double>> state{.70710678, 0., 0., 0.70710678};
+  auto [kernel, initState] =
+      cudaq::make_kernel<std::vector<std::complex<double>>>();
+  auto qubits = kernel.qalloc(initState);
+  std::cout << kernel << "\n";
+  auto counts = cudaq::sample(kernel, state);
+  counts.dump();
+}
+
 #ifndef CUDAQ_BACKEND_TENSORNET_MPS
 // MPS doesn't support gates on more than 2 qubits
 CUDAQ_TEST(BuilderTester, checkControlledRotations) {

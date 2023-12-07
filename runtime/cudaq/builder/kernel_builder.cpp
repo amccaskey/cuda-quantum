@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -63,6 +64,13 @@ KernelBuilderType mapArgToType(int &e) {
 KernelBuilderType mapArgToType(std::vector<double> &e) {
   return KernelBuilderType([](MLIRContext *ctx) {
     return cudaq::cc::StdvecType::get(ctx, Float64Type::get(ctx));
+  });
+}
+
+KernelBuilderType mapArgToType(std::vector<std::complex<double>> &e) {
+  return KernelBuilderType([](MLIRContext *ctx) {
+    return cudaq::cc::StdvecType::get(ctx,
+                                      ComplexType::get(Float64Type::get(ctx)));
   });
 }
 
@@ -471,6 +479,28 @@ QuakeValue qalloc(ImplicitLocOpBuilder &builder, QuakeValue &size) {
   cudaq::info("kernel_builder allocating qubits from quake value");
   auto value = size.getValue();
   auto type = value.getType();
+  if (auto stdVecTy = dyn_cast<cudaq::cc::StdvecType>(type)) {
+    // initialize from state
+    auto eleTy = stdVecTy.getElementType();
+    if (!isa<ComplexType>(eleTy))
+      throw std::runtime_error(
+          "qalloc(stdvec<T>) error, T must be complex type.");
+
+    // Get the stdvec size
+    Value size = builder.create<cc::StdvecSizeOp>(builder.getI64Type(), value);
+    Value sizeAsFloat =
+        builder.create<arith::SIToFPOp>(builder.getF64Type(), size);
+    Value numQubits = builder.create<math::Log2Op>(sizeAsFloat);
+    numQubits =
+        builder.create<arith::FPToSIOp>(builder.getI64Type(), numQubits);
+
+    auto context = builder.getContext();
+    Value qubits = builder.create<quake::AllocaOp>(
+        quake::VeqType::getUnsized(context), numQubits);
+    builder.create<quake::InitializeStateOp>(qubits, value);
+    return QuakeValue(builder, qubits);
+  }
+
   if (!type.isIntOrIndex())
     throw std::runtime_error(
         "Invalid parameter passed to qalloc (must be integer type).");

@@ -67,12 +67,12 @@ concept KernelBuilderArgTypeIsValid =
 // If you want to add to the list of valid kernel argument types first add it
 // here, then add `details::mapArgToType()` function
 #define CUDAQ_VALID_BUILDER_ARGS_FOLD()                                        \
-  requires(                                                                    \
-      KernelBuilderArgTypeIsValid<                                             \
-          Args, float, double, std::size_t, int, std::vector<int>,             \
-          std::vector<float>, std::vector<std::size_t>, std::vector<double>,   \
-          cudaq::qubit, cudaq::qreg<>, cudaq::qvector<>> &&                    \
-      ...)
+  requires(KernelBuilderArgTypeIsValid<                                        \
+               Args, float, double, std::size_t, int, std::vector<int>,        \
+               std::vector<float>, std::vector<std::size_t>,                   \
+               std::vector<double>, std::vector<std::complex<double>>,         \
+               cudaq::qubit, cudaq::qreg<>, cudaq::qvector<>> &&               \
+           ...)
 #else
 // Not C++ 2020: stub these out.
 #define QuakeValueOrNumericType typename
@@ -124,6 +124,7 @@ KernelBuilderType mapArgToType(std::vector<float> &e);
 
 /// Map a `vector<double>` to a `KernelBuilderType`
 KernelBuilderType mapArgToType(std::vector<double> &e);
+KernelBuilderType mapArgToType(std::vector<std::complex<double>> &e);
 
 /// Map a `qubit` to a `KernelBuilderType`
 KernelBuilderType mapArgToType(cudaq::qubit &e);
@@ -164,6 +165,9 @@ QuakeValue qalloc(ImplicitLocOpBuilder &builder, const std::size_t nQubits);
 
 /// @brief Allocate a `qvector` from existing `QuakeValue` size
 QuakeValue qalloc(ImplicitLocOpBuilder &builder, QuakeValue &size);
+
+// QuakeValue qalloc(ImplicitLocOpBuilder &builder,
+// const std::vector<std::complex<double>> &state);
 
 /// @brief Create a QuakeValue representing a constant floating-point number
 QuakeValue constantVal(ImplicitLocOpBuilder &builder, double val);
@@ -302,6 +306,9 @@ struct ArgumentValidator<std::vector<T>> {
       throw std::runtime_error("Error validating stdvec input to "
                                "kernel_builder. argCounter >= args.size()");
 
+    if constexpr (std::is_same_v<T, std::complex<double>>)
+      return;
+
     // Get the argument, increment the counter
     auto &arg = args[argCounter];
     argCounter++;
@@ -417,6 +424,10 @@ public:
   QuakeValue qalloc(QuakeValue size) {
     return details::qalloc(*opBuilder.get(), size);
   }
+
+  // QuakeValue qalloc(const std::vector<std::complex<double>> &initial_state) {
+  //   return details::qalloc(*opBuilder.get(), initial_state);
+  // }
 
   /// @brief Return a `QuakeValue` representing the constant floating-point
   /// value.

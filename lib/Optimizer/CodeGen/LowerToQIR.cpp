@@ -489,6 +489,31 @@ public:
   }
 };
 
+class InitialStateOpRewrite
+    : public OpConversionPattern<quake::InitializeStateOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(quake::InitializeStateOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto ctx = op.getContext();
+    auto parentModule = op->getParentOfType<ModuleOp>();
+    auto qubits = adaptor.getTargets();
+    auto state = adaptor.getVector();
+    auto qirArrayTy = cudaq::opt::getArrayType(ctx);
+
+    auto symbolRef = cudaq::opt::factory::createLLVMFunctionSymbol(
+        cudaq::opt::QIRInitializeState, LLVM::LLVMVoidType::get(ctx),
+        {qirArrayTy, state.getType()}, parentModule);
+
+    SmallVector<Value> funcArgs{qubits, state};
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, TypeRange{}, symbolRef,
+                                              funcArgs);
+    return success();
+  }
+};
+
 /// Lower single target Quantum ops with no parameter to QIR:
 /// h, x, y, z, s, t
 template <typename OP>
@@ -1500,8 +1525,8 @@ public:
     cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
     populateFuncToLLVMConversionPatterns(typeConverter, patterns);
 
-    patterns.insert<GetVeqSizeOpRewrite, MxToMz, MyToMz, ReturnBitRewrite>(
-        context);
+    patterns.insert<GetVeqSizeOpRewrite, InitialStateOpRewrite, MxToMz, MyToMz,
+                    ReturnBitRewrite>(context);
     patterns.insert<
         AllocaOpRewrite, AllocaOpPattern, CallableClosureOpPattern,
         CallableFuncOpPattern, CallCallableOpPattern, CastOpPattern,

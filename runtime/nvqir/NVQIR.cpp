@@ -323,6 +323,32 @@ void __quantum__qis__phased_rx(double theta, double phi, Qubit *q) {
   nvqir::getCircuitSimulatorInternal()->applyCustomOperation(matrix, {}, {qI});
 }
 
+struct MyComplexT {
+  double real;
+  double imag;
+};
+
+struct SupportedCVectorComplex {
+  MyComplexT *data;
+  std::size_t size;
+};
+
+void __quantum__qis__initialize_state(Array *targets,
+                                      SupportedCVectorComplex data) {
+  auto targetIds = arrayToVectorSizeT(targets);
+  auto numElements = (1UL << targetIds.size());
+  if (data.size != numElements)
+    throw std::runtime_error(
+        "invalid number of state vector elements provided (" +
+        std::to_string(data.size) + " provided, " +
+        std::to_string(numElements) + " required).");
+  std::vector<std::complex<double>> vector(numElements);
+  for (std::size_t i = 0; i < numElements; i++)
+    vector[i] = {data.data[i].real, data.data[i].imag};
+
+  nvqir::getCircuitSimulatorInternal()->initializeState(targetIds, vector);
+}
+
 void __quantum__qis__cnot(Qubit *q, Qubit *r) {
   auto qI = qubitToSizeT(q);
   auto rI = qubitToSizeT(r);
