@@ -85,6 +85,10 @@ public:
   /// keep track of the register names.
   std::vector<std::string> registerNames;
 
+  /// @brief Keep track of vector register names when applying
+  /// `auto vec = mz(qvector)`
+  std::optional<std::string> measuringRegisterName = std::nullopt;
+
   /// @brief The Constructor, takes the name of the context
   /// @param n The name of the context
   ExecutionContext(const std::string n) : name(n) {}

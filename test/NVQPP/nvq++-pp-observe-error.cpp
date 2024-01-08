@@ -6,24 +6,19 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#include <cudaq.h>
+#include "cudaq.h"
 
-// RUN: nvq++ %s --target iqm --emulate --iqm-machine Apollo -o %t.x && %t.x | FileCheck %s
-// RUN: nvq++ %s --target iqm --emulate --iqm-machine=Apollo -o %t.x && %t.x | FileCheck %s
-// CHECK: { 0:1000 }
+// RUN: nvq++-pp %s -verify
+// RUN: nvq++ %s 2>&1 >/dev/null | FileCheck %s --check-prefix=COMPILEERROR
 
-template <std::size_t N>
-struct kernel_with_z {
-  auto operator()() __qpu__ {
-    cudaq::qarray<N> q;
-    z<cudaq::ctrl>(q[0], q[1]);
-    auto result = mz(q[0]);
-  }
-};
+__qpu__ void kernel(std::vector<double> x) { // expected-error {{CUDA Quantum kernel passed to cudaq::observe cannot have measurements specified}}
+  cudaq::qubit q;
+  mz(q);
+}
 
 int main() {
-  auto kernel = kernel_with_z<2>{};
-  auto counts = cudaq::sample(kernel);
-  counts.dump();
-  return 0;
+  cudaq::spin_op h;
+  cudaq::observe(kernel, h, std::vector<double>{1.2}); 
 }
+
+// COMPILEERROR: CUDA Quantum kernel passed to cudaq::observe cannot have measurements specified
