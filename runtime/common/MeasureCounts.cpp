@@ -8,6 +8,8 @@
 
 #include "MeasureCounts.h"
 
+#include "nlohmann/json.hpp"
+
 #include <algorithm>
 #include <numeric>
 #include <string.h>
@@ -41,13 +43,15 @@ ExecutionResult::ExecutionResult(CountsDictionary c, double e)
     : counts(c), expectationValue(e) {}
 ExecutionResult::ExecutionResult(const ExecutionResult &other)
     : counts(other.counts), expectationValue(other.expectationValue),
-      registerName(other.registerName), sequentialData(other.sequentialData) {}
+      registerName(other.registerName), sequentialData(other.sequentialData),
+      adaptiveData(other.adaptiveData) {}
 
 ExecutionResult &ExecutionResult::operator=(const ExecutionResult &other) {
   counts = other.counts;
   expectationValue = other.expectationValue;
   registerName = other.registerName;
   sequentialData = other.sequentialData;
+  adaptiveData = other.adaptiveData;
   return *this;
 }
 
@@ -228,25 +232,33 @@ sample_result &sample_result::operator+=(sample_result &other) {
   for (auto &otherResults : other.sampleResults) {
     auto regName = otherResults.first;
     auto foundIter = sampleResults.find(regName);
-    if (foundIter == sampleResults.end())
+    if (foundIter == sampleResults.end()) {
       sampleResults.insert({regName, otherResults.second});
-    else {
+      continue;
+    }
 
-      // we already have a sample result with this name, so
-      // now lets just merge them
-      auto &sr = sampleResults[regName];
-      for (auto &[bits, count] : otherResults.second.counts) {
-        auto &ourCounts = sr.counts;
-        if (ourCounts.count(bits))
-          ourCounts[bits] += count;
-        else
-          ourCounts.insert({bits, count});
-      }
+    // we already have a sample result with this name, so
+    // now lets just merge them
+    auto &sr = sampleResults[regName];
+    for (auto &[bits, count] : otherResults.second.counts) {
+      auto &ourCounts = sr.counts;
+      if (ourCounts.count(bits))
+        ourCounts[bits] += count;
+      else
+        ourCounts.insert({bits, count});
+    }
 
-      if (!otherResults.second.sequentialData.empty())
-        sr.sequentialData.insert(sr.sequentialData.end(),
-                                 otherResults.second.sequentialData.begin(),
-                                 otherResults.second.sequentialData.end());
+    if (!otherResults.second.sequentialData.empty())
+      sr.sequentialData.insert(sr.sequentialData.end(),
+                               otherResults.second.sequentialData.begin(),
+                               otherResults.second.sequentialData.end());
+
+    for (auto &[key, value] : otherResults.second.adaptiveData) {
+      auto iter = sr.adaptiveData.find(key);
+      if (iter == sr.adaptiveData.end())
+        sr.adaptiveData.insert({key, value});
+      else
+        iter->second.insert(iter->second.end(), value.begin(), value.end());
     }
   }
   return *this;
@@ -452,41 +464,58 @@ void sample_result::clear() {
   totalShots = 0;
 }
 
+AdaptiveResults &
+sample_result::adaptive_results(const std::string_view registerName) {
+  auto iter = sampleResults.find(registerName.data());
+  if (iter == sampleResults.end())
+    throw std::runtime_error("[sample_result::adaptive_results] " +
+                             std::string(registerName.data()) +
+                             " is not a valid adaptive register name.");
+
+  return iter->second.adaptiveData;
+}
+
 void sample_result::dump(std::ostream &os) {
-  os << "{ ";
-  if (sampleResults.size() > 1) {
-    os << "\n  ";
-    std::size_t counter = 0;
-    for (auto &result : sampleResults) {
-      os << result.first << " : { ";
-      for (auto &kv : result.second.counts) {
-        os << kv.first << ":" << kv.second << " ";
-      }
-      bool isLast = counter == sampleResults.size() - 1;
-      counter++;
-      os << "}\n" << (!isLast ? "   " : "");
+  nlohmann::json json;
+
+  // Every printout should contain a __global__ register
+  if (sampleResults.count(GlobalRegisterName))
+    json[GlobalRegisterName] = sampleResults[GlobalRegisterName].counts;
+
+  /// Loop over the other non-global registers
+  for (auto &res : sampleResults) {
+    if (res.first == GlobalRegisterName)
+      continue;
+
+    // If we have no adaptive data, just add the counts
+    if (res.second.adaptiveData.empty()) {
+      json[res.first] = res.second.counts;
+      continue;
     }
 
-  } else if (sampleResults.size() == 1) {
+    // Do we have trivial adaptive data, if so just
+    // print out the counts
+    std::size_t maxNumResults = 0;
+    for (auto &[shot, results] : res.second.adaptiveData)
+      if (results.size() > maxNumResults)
+        maxNumResults = results.size();
 
-    CountsDictionary counts;
-    auto iter = sampleResults.find(GlobalRegisterName);
-    if (iter != sampleResults.end())
-      counts = iter->second.counts;
+    if (maxNumResults == 1)
+      json[res.first] = res.second.counts;
     else {
-      auto first = sampleResults.begin();
-      os << "\n   " << first->first << " : { ";
-      counts = sampleResults.begin()->second.counts;
+      // If we have non trivial adaptive data, print it out for each shot
+      json[res.first] = {};
+      for (auto &[shot, results] : res.second.adaptiveData) {
+        nlohmann::json tmp;
+        tmp["shot"] = shot;
+        tmp["results"] = results;
+        json[res.first].push_back(tmp);
+      }
     }
-
-    for (auto &kv : counts) {
-      os << kv.first << ":" << kv.second << " ";
-    }
-
-    if (iter == sampleResults.end())
-      os << "}\n";
   }
-  os << "}\n";
+
+  // write to the output stream.
+  os << json.dump() << "\n";
 }
 
 void sample_result::dump() { dump(std::cout); }

@@ -597,40 +597,43 @@ protected:
       }
 
       // FIXME Should we drop the __global__ register when registers specified?
-      if (!registerNameToMeasuredQubit.count(cudaq::GlobalRegisterName)) {
-        cudaq::ExecutionResult globalResult(cudaq::GlobalRegisterName);
-        std::vector<std::string> sortedRegNames =
-            executionContext->result.register_names();
-        std::sort(sortedRegNames.begin(), sortedRegNames.end());
+      // if (!registerNameToMeasuredQubit.count(cudaq::GlobalRegisterName)) {
+      //   cudaq::ExecutionResult globalResult(cudaq::GlobalRegisterName);
+      //   std::vector<std::string> sortedRegNames =
+      //       executionContext->result.register_names();
+      //   std::sort(sortedRegNames.begin(), sortedRegNames.end());
 
-        // Populate sequential_data[] once so that we don't have to do it every
-        // shot. This is because calling result.sequential_data() is relatively
-        // slow if done inside a loop because it would constructs a copy of the
-        // data on every call.
-        std::vector<std::vector<std::string>> sequential_data;
-        sequential_data.reserve(sortedRegNames.size());
-        for (auto regName : sortedRegNames)
-          sequential_data.push_back(
-              executionContext->result.sequential_data(regName));
+      //   // Populate sequential_data[] once so that we don't have to do it
+      //   every
+      //   // shot. This is because calling result.sequential_data() is
+      //   relatively
+      //   // slow if done inside a loop because it would constructs a copy of
+      //   the
+      //   // data on every call.
+      //   std::vector<std::vector<std::string>> sequential_data;
+      //   sequential_data.reserve(sortedRegNames.size());
+      //   for (auto regName : sortedRegNames)
+      //     sequential_data.push_back(
+      //         executionContext->result.sequential_data(regName));
 
-        // Count how often each occurrence happened (in the new sorted order)
-        cudaq::CountsDictionary myGlobalCountDict;
-        globalResult.sequentialData.reserve(executionContext->shots);
-        for (size_t shot = 0; shot < executionContext->shots; shot++) {
-          std::string myResult;
-          myResult.reserve(sortedRegNames.size());
-          for (auto &dataByShot : sequential_data)
-            if (shot < dataByShot.size())
-              myResult += dataByShot[shot];
-          globalResult.sequentialData.push_back(myResult);
-          myGlobalCountDict[myResult]++;
-        }
-        for (auto &[bits, count] : myGlobalCountDict)
-          globalResult.appendResult(bits, count);
+      //   // Count how often each occurrence happened (in the new sorted order)
+      //   cudaq::CountsDictionary myGlobalCountDict;
+      //   globalResult.sequentialData.reserve(executionContext->shots);
+      //   for (size_t shot = 0; shot < executionContext->shots; shot++) {
+      //     std::string myResult;
+      //     myResult.reserve(sortedRegNames.size());
+      //     for (auto &dataByShot : sequential_data)
+      //       if (shot < dataByShot.size())
+      //         myResult += dataByShot[shot];
+      //     globalResult.sequentialData.push_back(myResult);
+      //     myGlobalCountDict[myResult]++;
+      //   }
+      //   for (auto &[bits, count] : myGlobalCountDict)
+      //     globalResult.appendResult(bits, count);
 
-        // Append the newly calculated globalResult into the result list
-        executionContext->result.append(globalResult);
-      }
+      //   // Append the newly calculated globalResult into the result list
+      //   executionContext->result.append(globalResult);
+      // }
     }
 
     sampleQubits.clear();
@@ -869,6 +872,41 @@ public:
       // Flush any queued up sampling tasks
       flushAnySamplingTasks(/*force this*/ true);
 
+      // look for vector insertions
+      // we have vec%0 -> 0, vec%1 -> 1, vec%2 -> 1, ... etc
+      // we want vec -> 011..., start by creating
+      // mapping of vec -> numBits
+      std::map<std::string, std::size_t> vecRegisterSizes;
+      for (auto &[regName, bitResults] : midCircuitSampleResults) {
+        if (regName.find("%") != std::string::npos) {
+          // we have a vector insertion
+          auto split = cudaq::split(regName, '%');
+          auto vecRegName = split[0];
+          auto vecRegIdx = std::stoi(split[1]);
+          auto iter = vecRegisterSizes.find(vecRegName);
+          auto getNumIfMax = [](std::size_t current, std::size_t next) {
+            if (next > current)
+              return next;
+            return current;
+          };
+          if (iter == vecRegisterSizes.end())
+            vecRegisterSizes.insert({vecRegName, getNumIfMax(0, vecRegIdx)});
+          else
+            iter->second = getNumIfMax(iter->second, vecRegIdx);
+        }
+      }
+
+      for (auto &[vecRegName, size] : vecRegisterSizes) {
+        std::string bitstr = "";
+        for (std::size_t i = 0; i <= size; i++) {
+          auto tmpRegName = vecRegName + "%" + std::to_string(i);
+          // assumption here is single bits, i think this is valid
+          bitstr += midCircuitSampleResults[tmpRegName][0];
+          midCircuitSampleResults.erase(tmpRegName);
+        }
+        midCircuitSampleResults.insert({vecRegName, {bitstr}});
+      }
+
       // Handle the processing for any mid circuit measurements
       for (auto &m : midCircuitSampleResults) {
         // Get the register name and the vector of bit results
@@ -886,11 +924,16 @@ public:
             bitStr += bitResults[j];
 
           counts.appendResult(bitStr, 1);
+          counts.adaptiveData.insert({executionContext->adaptiveExecutionShot,
+                                      std::vector<std::string>{bitStr}});
 
         } else {
           // Not a vector, collate all bits into a 1 qubit counts dict
           for (std::size_t j = 0; j < bitResults.size(); j++)
             counts.appendResult(bitResults[j], 1);
+
+          counts.adaptiveData.insert(
+              {executionContext->adaptiveExecutionShot, bitResults});
         }
         executionContext->result.append(counts);
       }

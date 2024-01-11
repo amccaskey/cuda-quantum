@@ -89,6 +89,10 @@ public:
   /// `auto vec = mz(qvector)`
   std::optional<std::string> measuringRegisterName = std::nullopt;
 
+  /// @brief When sampling an adaptive kernel, keep track of the 
+  /// current execution shot.
+  std::size_t adaptiveExecutionShot = 0;
+
   /// @brief The Constructor, takes the name of the context
   /// @param n The name of the context
   ExecutionContext(const std::string n) : name(n) {}

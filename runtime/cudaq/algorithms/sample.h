@@ -107,6 +107,8 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
 
     // If it has conditionals, loop over individual circuit executions
     for (auto &i : cudaq::range(shots)) {
+      // Set the adaptive shot 
+      ctx->adaptiveExecutionShot = i;
       // Run the kernel
       wrappedKernel();
       // Reset the context and get the single measure result,
@@ -180,6 +182,32 @@ struct sample_options {
   std::size_t shots = 1000;
   cudaq::noise_model noise;
 };
+
+template <typename QuantumKernel, typename... Args,
+          typename ReturnType = std::invoke_result_t<QuantumKernel, Args &&...>,
+          typename = std::enable_if_t<!std::is_same_v<ReturnType, void>>>
+auto sample(const sample_options &options, QuantumKernel &&kernel,
+            Args &&...args) {
+  // Use non performant sampling, collect results
+  std::vector<ReturnType> results;
+  for (auto i = 0u; i < options.shots; i++)
+    results.push_back(kernel(std::forward<Args>(args)...));
+  return sample_return_result<ReturnType>(results);
+}
+
+template <typename QuantumKernel, typename... Args,
+          typename ReturnType = std::invoke_result_t<QuantumKernel, Args &&...>,
+          typename = std::enable_if_t<!std::is_same_v<ReturnType, void>>>
+auto sample(std::size_t shots, QuantumKernel &&kernel, Args &&...args) {
+  return sample({.shots = shots}, kernel, args...);
+}
+
+template <typename QuantumKernel, typename... Args,
+          typename ReturnType = std::invoke_result_t<QuantumKernel, Args &&...>,
+          typename = std::enable_if_t<!std::is_same_v<ReturnType, void>>>
+auto sample(QuantumKernel &&kernel, Args &&...args) {
+  return sample({.shots = 100}, kernel, args...);
+}
 
 /// @brief Sample the given quantum kernel expression and return the
 /// mapping of observed bit strings to corresponding number of

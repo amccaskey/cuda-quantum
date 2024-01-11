@@ -18,6 +18,9 @@ namespace cudaq {
 /// to the number of times they were observed.
 using CountsDictionary = std::unordered_map<std::string, std::size_t>;
 
+using AdaptiveResults =
+    std::unordered_map<std::size_t, std::vector<std::string>>;
+
 inline static const std::string GlobalRegisterName = "__global__";
 
 /// The `ExecutionResult` models the result of a typical
@@ -37,6 +40,12 @@ struct ExecutionResult {
 
   /// @brief Sequential bit strings observed (not collated into a map)
   std::vector<std::string> sequentialData;
+
+  /// @brief For adaptive kernels (those with non-trivial
+  /// control flow, resets, conditional feedback, etc.),
+  /// store the observed measurement results for this registerName at each shot.
+  /// This member maps current shot to observed bit strings for the register.
+  AdaptiveResults adaptiveData;
 
   /// @brief Serialize this sample result to a vector of integers.
   /// Encoding: 1st element is size of the register name N, then next N
@@ -203,6 +212,17 @@ public:
   std::size_t count(std::string_view bitString,
                     const std::string_view registerName = GlobalRegisterName);
 
+  /// @brief Return results from sampling an adaptive kernel with
+  /// programmer specified measurements. The results will contain a vector
+  /// of qubit or qvector measurement bit strings for each shot executed by the
+  /// sampling task.
+  AdaptiveResults &adaptive_results(const std::string_view registerName);
+  std::vector<std::string> adaptive_results_at_shot(
+      std::size_t shot,
+      const std::string_view registerName = GlobalRegisterName) {
+    return adaptive_results(registerName)[shot];
+  }
+
   std::vector<std::string> sequential_data(
       const std::string_view registerName = GlobalRegisterName) const;
 
@@ -226,17 +246,6 @@ public:
   /// @return
   CountsDictionary
   to_map(const std::string_view registerName = GlobalRegisterName) const;
-
-  /// @brief Extract marginal counts, that is those counts for a subset
-  /// of measured qubits
-  /// @param marginalIndices The qubit indices as an `rvalue`
-  /// @param registerName
-  /// @return
-  sample_result
-  get_marginal(const std::vector<std::size_t> &&marginalIndices,
-               const std::string_view registerName = GlobalRegisterName) {
-    return get_marginal(marginalIndices, registerName);
-  }
 
   /// @brief Extract marginal counts, that is those counts for a subset
   /// of measured qubits
@@ -282,6 +291,24 @@ public:
   /// @param bitString
   /// @return
   static bool has_even_parity(std::string_view bitString);
+};
+
+template <typename KernelReturnType>
+class sample_return_result : public sample_result {
+protected:
+  std::vector<KernelReturnType> sampledReturnValues;
+
+public:
+  sample_return_result(const std::vector<KernelReturnType> &r)
+      : sampledReturnValues(r) {}
+  std::vector<KernelReturnType> get_results() { return sampledReturnValues; }
+  KernelReturnType get_result(std::size_t shot) {
+    return sampledReturnValues[shot];
+  }
+
+  auto begin() { return sampledReturnValues.begin(); }
+  auto end() { return sampledReturnValues.end(); }
+  auto size() const { return sampledReturnValues.size(); }
 };
 
 } // namespace cudaq
