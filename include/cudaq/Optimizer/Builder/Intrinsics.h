@@ -12,8 +12,7 @@
 
 namespace cudaq {
 
-static constexpr const char llvmMemCopyIntrinsic[] =
-    "llvm.memcpy.p0i8.p0i8.i64";
+static constexpr const char llvmMemCopyIntrinsic[] = "llvm.memcpy.p0.p0.i64";
 static constexpr const char setCudaqRangeVector[] = "__nvqpp_CudaqRangeInit";
 static constexpr const char stdvecBoolCtorFromInitList[] =
     "__nvqpp_initializer_list_to_vector_bool";
