@@ -42,7 +42,7 @@ class PyScopedSymbolTable(object):
     def popScope(self):
         self.symbolTable.pop()
 
-    def add(self, symbol, value, level=-1):
+    def add(self, symbol, value, level=0):
         """
         Add a symbol to the scoped symbol table at any scope level.
         """
@@ -830,9 +830,10 @@ class PyASTBridge(ast.NodeVisitor):
                 self.symbolTable[varNames[i]] = value
 
             else:
-                # We should allocate and store
-                alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, value.type),
-                                     TypeAttr.get(value.type)).result
+                with InsertionPoint.at_block_begin(self.entry):
+                    # We should allocate and store
+                    alloca = cc.AllocaOp(cc.PointerType.get(self.ctx, value.type),
+                                        TypeAttr.get(value.type)).result
                 cc.StoreOp(value, alloca)
                 self.symbolTable[varNames[i]] = alloca
 

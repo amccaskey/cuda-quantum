@@ -865,6 +865,19 @@ def test_bool_list_elements():
     assert '0' in counts and len(counts) == 1
     
 
+def test_pythonic_scoping():
+    @cudaq.kernel(verbose=True)
+    def test(flag: bool) -> int:
+        if flag:
+            a = 1
+        else:
+            a = 0 
+        return a
+    print(test)
+    assert test(True) == 1 
+    assert test(False) == 0
+
+
 def test_list_float_pass_list_int():
 
     @cudaq.kernel
