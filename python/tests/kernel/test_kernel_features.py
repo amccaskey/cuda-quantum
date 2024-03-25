@@ -877,6 +877,19 @@ def test_pythonic_scoping():
     assert test(True) == 1 
     assert test(False) == 0
 
+    @cudaq.kernel()
+    def test2(flag: bool) -> int:
+        if flag:
+            l = [1, 2, 3]
+        else:
+            l = [3, 4, 5]
+        
+        return l[0]
+
+    print(test2)
+    assert test2(True) == 1
+
+
 
 def test_list_float_pass_list_int():
 
