@@ -891,17 +891,31 @@ def test_pythonic_scoping():
     assert test2(False) == 3
 
     @cudaq.kernel()
-    def test3(flag: bool) -> int:
+    def test3(flag: bool, idx : int) -> int:
         if flag:
             l = [i for i in range(5, 10)] 
         else:
             l = [3, 4, 5]
         
-        return l[0]
+        return l[idx]
 
     print(test3)
-    assert test3(True) == 5
-    assert test3(False) == 3
+    for i in range(5, 10):
+        assert test3(True, i-5) == i
+    for i in range(3, 6):
+        assert test3(False, i-3) == i
+
+    # Does not work
+    # @cudaq.kernel
+    # def test4(flag :bool) -> int:
+    #     if flag:
+    #         q = cudaq.qvector(5)
+    #     else:
+    #         q = cudaq.qvector(2)
+    #     return q.size()
+
+    # print(test4)
+    # assert test4(True) == 5 
 
 def test_list_float_pass_list_int():
 
