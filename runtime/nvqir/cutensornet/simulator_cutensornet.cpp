@@ -5,6 +5,7 @@
  * This source code and the accompanying materials are made available under    *
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
+
 #include "simulator_cutensornet.h"
 #include "cudaq.h"
 #include "cutensornet.h"
@@ -230,6 +231,7 @@ static nvqir::CutensornetExecutor *getPluginInstance() {
   cudaq::info("Successfully loaded the cutensornet plugin.");
   return fcn();
 }
+
 /// @brief Evaluate the expectation value of a given observable
 cudaq::observe_result
 SimulatorTensorNetBase::observe(const cudaq::spin_op &ham) {
@@ -260,7 +262,8 @@ SimulatorTensorNetBase::observe(const cudaq::spin_op &ham) {
 }
 
 nvqir::CircuitSimulator *SimulatorTensorNetBase::clone() { return nullptr; }
-void SimulatorTensorNetBase::addQubitsToState(std::size_t count) {
+
+void SimulatorTensorNetBase::addQubitsToState(std::size_t count, const void *) {
   LOG_API_TIME();
   if (!m_state)
     m_state = std::make_unique<TensorNetState>(count, m_cutnHandle);

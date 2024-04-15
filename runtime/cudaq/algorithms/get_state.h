@@ -16,7 +16,7 @@
 #include "cudaq/platform/QuantumExecutionQueue.h"
 #include "cudaq/qis/state.h"
 
-#include "host_config.h"
+#include "cudaq/host_config.h"
 
 #include <complex>
 #include <vector>

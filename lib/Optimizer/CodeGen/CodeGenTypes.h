@@ -1,5 +1,5 @@
 /****************************************************************-*- C++ -*-****
- * Copyright (c) 2022 - 2024 NVIDIA Corporation & Affiliates.                  *
+ * Copyright (c) 2022 - 2023 NVIDIA Corporation & Affiliates.                  *
  * All rights reserved.                                                        *
  *                                                                             *
  * This source code and the accompanying materials are made available under    *
@@ -7,6 +7,14 @@
  ******************************************************************************/
 
 #pragma once
-#pragma message(                                                               \
-        "cudaq/algorithms/state.h is deprecated, use cudaq/algorithms/get_state.h")
-#include "cudaq/algorithms/get_state.h"
+
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Types.h"
+
+//===----------------------------------------------------------------------===//
+// Generated logic
+//===----------------------------------------------------------------------===//
+
+#define GET_TYPEDEF_CLASSES
+#include "cudaq/Optimizer/CodeGen/CodeGenTypes.h.inc"

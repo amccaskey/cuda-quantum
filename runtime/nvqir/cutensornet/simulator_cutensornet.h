@@ -55,7 +55,8 @@ public:
   virtual cudaq::observe_result observe(const cudaq::spin_op &op) override;
 
   /// @brief Add qubits to the underlying quantum state
-  virtual void addQubitsToState(std::size_t count) override;
+  virtual void addQubitsToState(std::size_t count,
+                                const void *state = nullptr) override;
 
   /// Clone API
   virtual nvqir::CircuitSimulator *clone() override;
