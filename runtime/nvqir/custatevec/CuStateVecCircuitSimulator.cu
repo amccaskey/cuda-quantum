@@ -335,7 +335,7 @@ protected:
         reinterpret_cast<CudaDataType *>(otherState),
         reinterpret_cast<CudaDataType *>(newDeviceStateVector));
     HANDLE_CUDA_ERROR(cudaGetLastError());
-    
+
     // Free the old vectors we don't need anymore.
     HANDLE_CUDA_ERROR(cudaFree(deviceStateVector));
     HANDLE_CUDA_ERROR(cudaFree(otherState));
@@ -374,6 +374,8 @@ protected:
 
   /// @brief Reset the qubit state.
   void deallocateStateImpl() override {
+    if (deviceStateVector)
+      HANDLE_ERROR(custatevecDestroy(handle));
     if (deviceStateVector && ownsDeviceVector) {
       HANDLE_CUDA_ERROR(cudaFree(deviceStateVector));
     }
@@ -383,8 +385,6 @@ protected:
     }
     deviceStateVector = nullptr;
     extraWorkspaceSizeInBytes = 0;
-    if (handle)
-      HANDLE_ERROR(custatevecDestroy(handle));
   }
 
   /// @brief Apply the given GateApplicationTask

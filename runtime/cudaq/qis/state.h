@@ -62,7 +62,7 @@ public:
   template <typename ScalarType>
   void to_host(std::complex<ScalarType> *hostPtr,
                std::size_t numElements) const {
-    if (is_on_gpu())
+    if (!is_on_gpu())
       throw std::runtime_error("to_host requested, but the state is already on "
                                "host. Check with is_on_gpu() method.");
     internal->toHost(hostPtr, numElements);
