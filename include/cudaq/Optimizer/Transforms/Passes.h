@@ -44,6 +44,7 @@ std::unique_ptr<mlir::Pass> createQuakeSynthesizer();
 std::unique_ptr<mlir::Pass> createQuakeSynthesizer(std::string_view, void *);
 std::unique_ptr<mlir::Pass> createRaiseToAffinePass();
 std::unique_ptr<mlir::Pass> createUnwindLoweringPass();
+std::unique_ptr<mlir::Pass> createQuantumCircuitOptimizationsPass();
 
 std::unique_ptr<mlir::Pass>
 createPySynthCallableBlockArgs(const std::vector<std::string> &);

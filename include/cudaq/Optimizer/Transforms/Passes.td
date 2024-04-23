@@ -58,6 +58,13 @@ def PySynthCallableBlockArgs : Pass<"py-synth-callable-block-args", "mlir::func:
   }];
 }
 
+def QuantumCircuitOptimizations : Pass<"qopt", "mlir::ModuleOp"> {
+  let summary = "";
+  let description = [{
+
+  }];
+}
+
 def BasisConversionPass: Pass<"basis-conversion", "mlir::ModuleOp"> {
   let summary = "Converts kernels to a set of basis operations.";
   let description = [{

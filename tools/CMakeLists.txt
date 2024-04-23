@@ -7,6 +7,7 @@
 # ============================================================================ #
 
 if (NOT CUDAQ_DISABLE_TOOLS)
+  add_subdirectory(cudaq-opt-compiler)
   add_subdirectory(cudaq-opt)
   add_subdirectory(cudaq-translate)
 

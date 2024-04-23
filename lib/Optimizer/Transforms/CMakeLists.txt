@@ -39,6 +39,7 @@ add_cudaq_library(OptTransforms
   PruneCtrlRelations.cpp
   QuakeAddMetadata.cpp
   QuakeSynthesizer.cpp
+  QuantumCircuitOptimizations.cpp
   RefToVeqAlloc.cpp
   RegToMem.cpp
   PySynthCallableBlockArgs.cpp
@@ -53,4 +54,7 @@ add_cudaq_library(OptTransforms
     MLIRIR
     OptimBuilder
     QuakeDialect
+    MLIRPDLDialect
+    MLIRTransformPDLExtension
+    MLIRTransformDialect
 )
