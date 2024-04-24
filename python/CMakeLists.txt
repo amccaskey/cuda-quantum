@@ -18,7 +18,7 @@ include(AddMLIRPython)
 # Check how to solve this better than just disable the warning for the whole directory.
 # If this is better addressed after updating to a newer LLVM version, track as an issue on GitHub.
 add_compile_options(-Wno-ambiguous-reversed-operator)
-
+add_compile_options(-Wno-address)
 # Specifies that all MLIR packages are co-located under the cudaq
 # top level package (the API has been embedded in a relocatable way).
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=cudaq.mlir.")
