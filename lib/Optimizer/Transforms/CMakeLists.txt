@@ -15,12 +15,14 @@ add_cudaq_library(OptTransforms
   AggressiveEarlyInlining.cpp
   ApplyControlNegations.cpp
   ApplyOpSpecialization.cpp
+  ApplyQuantumCircuitPatternRewrites.cpp
   BasisConversion.cpp
   CombineQuantumAlloc.cpp
   Decomposition.cpp
   DecompositionPatterns.cpp
   DelayMeasurements.cpp
   ExpandMeasurements.cpp
+  Extensions.cpp
   FactorQuantumAlloc.cpp
   GenKernelExecution.cpp
   GenDeviceCodeLoader.cpp
@@ -39,7 +41,6 @@ add_cudaq_library(OptTransforms
   PruneCtrlRelations.cpp
   QuakeAddMetadata.cpp
   QuakeSynthesizer.cpp
-  QuantumCircuitOptimizations.cpp
   RefToVeqAlloc.cpp
   RegToMem.cpp
   PySynthCallableBlockArgs.cpp

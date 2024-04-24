@@ -9,9 +9,9 @@
 #include "cudaq/Optimizer/CodeGen/Passes.h"
 #include "cudaq/Optimizer/Dialect/CC/CCDialect.h"
 #include "cudaq/Optimizer/Dialect/Common/InlinerInterface.h"
-#include "cudaq/Optimizer/Dialect/Common/Traits.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "cudaq/Optimizer/InitAllDialects.h"
+#include "cudaq/Optimizer/Transforms/Extensions.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
 #include "cudaq/Support/Plugin.h"
 #include "cudaq/Support/Version.h"
@@ -30,12 +30,6 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
-#include "mlir/Dialect/PDL/IR/PDL.h"
-#include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformOps.h"
-#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
-#include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
-
 using namespace llvm;
 using namespace mlir;
 
@@ -44,52 +38,6 @@ static cl::list<std::string> CudaQPlugins(
     "load-cudaq-plugin",
     cl::desc("Load CUDA Quantum plugin by specifying its library"));
 
-class CudaqTransformExtensions
-    : public mlir::transform::TransformDialectExtension<
-          CudaqTransformExtensions> {
-public:
-  using Base::Base;
-  void init() {
-
-    auto isHermitian = [](PatternRewriter &rewriter, PDLResultList &,
-                          ArrayRef<PDLValue> pdlValues) {
-      for (const PDLValue &pdlValue : pdlValues)
-        if (Operation *op = pdlValue.dyn_cast<Operation *>())
-          return success(op->hasTrait<cudaq::Hermitian>());
-
-      return failure();
-    };
-
-    auto isQuakeOp = [](PatternRewriter &rewriter, PDLResultList &,
-                        ArrayRef<PDLValue> pdlValues) {
-      for (const PDLValue &pdlValue : pdlValues)
-        if (Operation *op = pdlValue.dyn_cast<Operation *>())
-          if (auto *dialect = op->getDialect())
-            return success(dialect->getNamespace().equals("quake"));
-      return failure();
-    };
-
-    auto isSameName = [](PatternRewriter &rewriter, PDLResultList &,
-                         ArrayRef<PDLValue> pdlValues) {
-      if (pdlValues.size() != 2)
-        return failure();
-      auto *op1 = pdlValues[0].dyn_cast<Operation *>();
-      auto *op2 = pdlValues[1].dyn_cast<Operation *>();
-
-      return success(
-          op1->getName().stripDialect().equals(op2->getName().stripDialect()));
-    };
-
-    addDialectDataInitializer<mlir::transform::PDLMatchHooks>(
-        [&](mlir::transform::PDLMatchHooks &hooks) {
-          llvm::StringMap<mlir::PDLConstraintFunction> constraints;
-          constraints.try_emplace("IsHermitian", isHermitian);
-          constraints.try_emplace("IsQuakeOperation", isQuakeOp);
-          constraints.try_emplace("IsSameName", isSameName);
-          hooks.mergeInPDLMatchHooks(std::move(constraints));
-        });
-  }
-};
 int main(int argc, char **argv) {
   // Set the bug report message to indicate users should file issues on
   // nvidia/cuda-quantum
@@ -122,7 +70,7 @@ int main(int argc, char **argv) {
   registerAllDialects(registry);
   cudaq::registerAllDialects(registry);
   registerAllExtensions(registry);
-  registry.addExtensions<CudaqTransformExtensions>();
+  registry.addExtensions<cudaq::CudaqTransformExtensions>();
 
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "nvq++ optimizer\n", registry));

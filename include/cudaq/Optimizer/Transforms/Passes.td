@@ -58,11 +58,16 @@ def PySynthCallableBlockArgs : Pass<"py-synth-callable-block-args", "mlir::func:
   }];
 }
 
-def QuantumCircuitOptimizations : Pass<"qopt", "mlir::ModuleOp"> {
+def ApplyQuantumCircuitPatternRewrites : Pass<"qopt", "mlir::ModuleOp"> {
   let summary = "";
   let description = [{
 
   }];
+  let options = [Option<"patterns", "patterns", 
+                    "std::string", /*default*/ "", 
+                    "Install location for compiled circuit rewrite patterns.">, 
+                 Option<"pattern", "pattern", "std::string", "", 
+                 "Compiled pattern file to apply.">];
 }
 
 def BasisConversionPass: Pass<"basis-conversion", "mlir::ModuleOp"> {

@@ -26,6 +26,9 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
 
+#include <filesystem>
+#include <fstream>
+
 using namespace mlir;
 
 namespace {
@@ -44,11 +47,11 @@ module attributes {transform.with_named_sequence} {
 }
 )#";
 
-class QuantumCircuitOptimizationsPass
-    : public cudaq::opt::QuantumCircuitOptimizationsBase<
-          QuantumCircuitOptimizationsPass> {
+class ApplyQuantumCircuitPatternRewritesPass
+    : public cudaq::opt::ApplyQuantumCircuitPatternRewritesBase<
+          ApplyQuantumCircuitPatternRewritesPass> {
 public:
-  QuantumCircuitOptimizationsPass() = default;
+  ApplyQuantumCircuitPatternRewritesPass() = default;
   void getDependentDialects(::mlir::DialectRegistry &registry) const override {
     registry.insert<cudaq::cc::CCDialect>();
     registry.insert<quake::QuakeDialect>();
@@ -59,7 +62,6 @@ public:
   void runOnOperation() override {
     auto mod = getOperation();
     auto context = mod.getContext();
-    // mod.dump();
 
     // Goals:
     // 1. create new ModuleOp and add the input module op
@@ -69,58 +71,71 @@ public:
     moduleOp.push_back(mod);
 
     // 2. Load all PDLPatterns from `INSTALL/passes` directory.
-    std::string test = R"#(module {
-  pdl.pattern @RemoveSingleTargetCommutingPair : benefit(0) {
-    %0 = operand
-    %1 = types
-    %2 = operation(%0 : !pdl.value)  -> (%1 : !pdl.range<type>)
-    %3 = results of %2 
-    %4 = types
-    %5 = operation(%3 : !pdl.range<value>)  -> (%4 : !pdl.range<type>)
-    apply_native_constraint "IsQuakeOperation"(%2 : !pdl.operation)
-    apply_native_constraint "IsQuakeOperation"(%5 : !pdl.operation)
-    apply_native_constraint "IsHermitian"(%2 : !pdl.operation)
-    apply_native_constraint "IsSameName"(%2, %5 : !pdl.operation, !pdl.operation)
-    rewrite %5 {
-      replace %5 with(%0 : !pdl.value)
-      erase %2
+    std::vector<OwningOpRef<Operation *>> pdlMods;
+    std::map<std::string, pdl::PatternOp> pdlPatterns;
+    auto parseAndAddPattern =
+        [&](const std::string &fileName) -> LogicalResult {
+      if (!std::filesystem::exists(fileName))
+        return mod->emitOpError("Invalid circuit pattern rewrite file - " +
+                                fileName);
+
+      if (std::filesystem::path(fileName).extension() != ".pdl")
+        return mod->emitOpError(
+            "Invalid circuit pattern rewrite file - must be a .pdl file (got " +
+            fileName + ").");
+
+      std::ifstream t(fileName);
+      std::string str((std::istreambuf_iterator<char>(t)),
+                      std::istreambuf_iterator<char>());
+      auto pdlMod = parseSourceString(str, context);
+      pdlMod->walk([&](pdl::PatternOp op) {
+        auto iter = pdlPatterns.find(op.getName().str());
+        if (iter == pdlPatterns.end())
+          pdlPatterns.insert({op.getName().str(), op});
+
+        return WalkResult::advance();
+      });
+      pdlMods.emplace_back(std::move(pdlMod));
+      return success();
+    };
+
+    // If user provides a specific pattern, run it, skip
+    // any patterns in the pattern folder location
+    if (!pattern.empty()) {
+      if (failed(parseAndAddPattern(pattern.getValue()))) {
+        signalPassFailure();
+        return;
+      }
+    } else {
+      // If we made it here, we have to have a patterns folder
+      if (patterns.empty()) {
+        mod.emitOpError("Could not find a circuit rewrite pattern to apply.");
+        signalPassFailure();
+        return;
+      }
+
+      if (!std::filesystem::exists(patterns.getValue())) {
+        mod->emitOpError("Invalid circuit rewrite patterns directory - " +
+                         patterns.getValue());
+        signalPassFailure();
+        return;
+      }
+
+      // Loop over available patterns
+      for (auto &file :
+           std::filesystem::directory_iterator(patterns.getValue()))
+        if (failed(parseAndAddPattern(file.path().string()))) {
+          signalPassFailure();
+          return;
+        }
     }
-  }
-  pdl.pattern @RemoveCNOTCommutingPair : benefit(0) {
-    %0 = operand
-    %1 = operand
-    %2 = types
-    %3 = operation(%0, %1 : !pdl.value, !pdl.value)  -> (%2 : !pdl.range<type>)
-    apply_native_constraint "IsQuakeOperation"(%3 : !pdl.operation)
-    apply_native_constraint "IsHermitian"(%3 : !pdl.operation)
-    %4 = result 0 of %3
-    %5 = result 1 of %3
-    %6 = types
-    %7 = operation(%4, %5 : !pdl.value, !pdl.value)  -> (%6 : !pdl.range<type>)
-    apply_native_constraint "IsQuakeOperation"(%7 : !pdl.operation)
-    apply_native_constraint "IsHermitian"(%7 : !pdl.operation)
-    apply_native_constraint "IsSameName"(%3, %7 : !pdl.operation, !pdl.operation)
-    rewrite %7 {
-      replace %7 with(%0, %1 : !pdl.value, !pdl.value)
-      erase %3
-    }
-  }
-})#";
-    auto pdlMod = parseSourceString(test, context);
-    std::vector<pdl::PatternOp> patterns;
-    pdlMod->walk([&](pdl::PatternOp op) {
-      patterns.push_back(op);
-      // llvm::errs() << "Found pattern:\n";
-      // op.dump();
-      return WalkResult::advance();
-    });
 
     // 3. add the available PDL patterns to the transformer module
     auto transformMod = parseSourceString(transformInterpTemplate, context);
     transformMod->walk([&](transform::WithPDLPatternsOp op) {
       Block &block = *op.getBody().begin();
       auto localBuilder = OpBuilder::atBlockBegin(&block);
-      for (auto &pdlOp : patterns)
+      for (auto &[name, pdlOp] : pdlPatterns)
         localBuilder.insert(pdlOp.clone());
 
       return WalkResult::advance();
@@ -130,40 +145,36 @@ public:
       Block &block = *op.getBody().begin();
       auto localBuilder = OpBuilder::atBlockBegin(&block);
       auto arg = block.getArgument(0);
-      for (auto &pattern : patterns) {
-        // llvm::errs() << "TESTING HERE\n";
+      for (auto &[name, pattern] : pdlPatterns) {
         localBuilder.create<transform::PDLMatchOp>(
             location, transform::AnyOpType::get(context), arg,
-            FlatSymbolRefAttr::get(context, pattern.getName()));
+            FlatSymbolRefAttr::get(context, name));
       }
 
       return WalkResult::advance();
     });
 
-    // transformMod->dump();
+    // Add the transform module to the main payload
     moduleOp.push_back(cast<ModuleOp>(*transformMod));
 
+    // 4. Run the transform interpreter pass
     transform::TransformOptions options;
-
     ModuleOp transformModule =
         transform::detail::getPreloadedTransformModule(context);
     Operation *transformEntryPoint = transform::detail::findTransformEntryPoint(
         moduleOp, transformModule,
         transform::TransformDialect::kTransformEntryPointSymbolName.str());
-
     if (failed(transform::applyTransformNamedSequence(
             moduleOp, transformEntryPoint, transformModule, options))) {
       return signalPassFailure();
     }
 
-    // moduleOp.dump();
-    // 4. parse the transformer moduleop into the new moduleop
-    // 5. Run the transform interpreter pass
-    // 6. Extract the optimized code and replace on the original module op
+    // 5. Code is now optimized. Done.
   }
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> cudaq::opt::createQuantumCircuitOptimizations() {
-  return std::make_unique<QuantumCircuitOptimizationsPass>();
+std::unique_ptr<mlir::Pass>
+cudaq::opt::createApplyQuantumCircuitPatternRewrites() {
+  return std::make_unique<ApplyQuantumCircuitPatternRewritesPass>();
 }

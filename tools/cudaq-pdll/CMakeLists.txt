@@ -32,16 +32,16 @@ set(LIBS
   LLVMTableGen
   )
 
-add_tablegen(cudaq-opt-compiler CUDAQ_PDLL
+add_tablegen(cudaq-pdll CUDAQ_PDLL
   DESTINATION bin
   EXPORT CUDAQ
-  cudaq-opt-compiler.cpp
+  cudaq-pdll.cpp
 
   DEPENDS
   ${LIBS}
   )
 
-set_target_properties(cudaq-opt-compiler PROPERTIES FOLDER "Tablegenning")
-target_link_libraries(cudaq-opt-compiler PRIVATE ${LIBS})
+set_target_properties(cudaq-pdll PROPERTIES FOLDER "Tablegenning")
+target_link_libraries(cudaq-pdll PRIVATE ${LIBS})
 
-mlir_check_all_link_libraries(cudaq-opt-compiler)
+mlir_check_all_link_libraries(cudaq-pdll)

@@ -39,8 +39,6 @@ std::string getExecutablePath(const char *argv0, bool canonicalPrefixes) {
 }
 
 int main(int argc, char **argv) {
-  // FIXME: This is necessary because we link in TableGen, which defines its
-  // options as static variables.. some of which overlap with our options.
   llvm::cl::ResetCommandLineParser();
 
   llvm::cl::opt<bool> install("install", llvm::cl::desc(""),
@@ -129,7 +127,7 @@ int main(int argc, char **argv) {
   if (!pdlModule)
     return 1;
 
-  if (outputFilename == "-") {
+  if (!install && outputFilename == "-") {
     pdlModule->print(outputStrOS, OpPrintingFlags().enableDebugInfo());
     llvm::outs() << outputStr;
     return 0;
@@ -142,11 +140,15 @@ int main(int argc, char **argv) {
       llvm::errs() << "Failed to write bytecode\n";
       return 1;
     }
-    auto n = (cudaqCompilerInstallPath / outputFilename.getValue()).string();
-    llvm::outs() << "Writing to passes file " << n << "\n";
-    std::unique_ptr<llvm::ToolOutputFile> outputFile = openOutputFile(
-        (cudaqCompilerInstallPath / outputFilename.getValue()).string(),
-        &errorMessage);
+
+    if (outputFilename == "-")
+      outputFilename = std::filesystem::path(inputFilename.getValue())
+                           .filename()
+                           .replace_extension();
+
+    auto name = (cudaqCompilerInstallPath / outputFilename.getValue()).string();
+    std::unique_ptr<llvm::ToolOutputFile> outputFile =
+        openOutputFile(name + ".pdl", &errorMessage);
     if (!outputFile) {
       llvm::errs() << errorMessage << "\n";
       return 1;
