@@ -326,6 +326,16 @@ void __quantum__qis__phased_rx(double theta, double phi, Qubit *q) {
   nvqir::getCircuitSimulatorInternal()->applyCustomOperation(matrix, {}, {qI});
 }
 
+void __quantum__qis__quake_ext_op(std::complex<double> *unitary,
+                                  Array *controls, Array *targets) {
+  auto controlsQ = arrayToVectorSizeT(controls);
+  auto targetsQ = arrayToVectorSizeT(targets);
+  std::vector<std::complex<double>> matrix(
+      unitary, unitary + (int)std::pow(2, targetsQ.size()));
+  nvqir::getCircuitSimulatorInternal()->applyCustomOperation(matrix, controlsQ,
+                                                             targetsQ);
+}
+
 void __quantum__qis__cnot(Qubit *q, Qubit *r) {
   auto qI = qubitToSizeT(q);
   auto rI = qubitToSizeT(r);

@@ -30,13 +30,18 @@
 #include "llvm/Support/Program.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include <filesystem>
+#include <fstream>
 #include <sstream>
+
+#include "nlohmann/json.hpp"
 
 using namespace llvm;
 
@@ -201,8 +206,9 @@ public:
   using MangledKernelNamesMap = cudaq::ASTBridgeAction::MangledKernelNamesMap;
 
   CudaQAction(mlir::OwningOpRef<mlir::ModuleOp> &module,
-              MangledKernelNamesMap &kernelNames)
-      : mlirAction(module, kernelNames) {}
+              MangledKernelNamesMap &kernelNames,
+              cudaq::details::IRDLMetadata &metadata)
+      : mlirAction(module, kernelNames, metadata) {}
   virtual ~CudaQAction() = default;
 
   std::unique_ptr<clang::ASTConsumer>
@@ -222,7 +228,7 @@ public:
   using MangledKernelNamesMap = cudaq::ASTBridgeAction::MangledKernelNamesMap;
 
   InterceptCudaQAction(mlir::OwningOpRef<mlir::ModuleOp> &,
-                       MangledKernelNamesMap &)
+                       MangledKernelNamesMap &, cudaq::details::IRDLMetadata &)
       : clang::EmitLLVMAction{} {}
   virtual ~InterceptCudaQAction() = default;
 
@@ -239,12 +245,13 @@ template <typename ACTION>
 bool runTool(mlir::OwningOpRef<mlir::ModuleOp> &module,
              CudaQAction::MangledKernelNamesMap &mangledKernelNameMap,
              StringRef cplusplusCode, std::vector<std::string> &clArgs,
-             const std::string &inputFileName) {
+             const std::string &inputFileName,
+             cudaq::details::IRDLMetadata &metadata) {
   assert(cplusplusCode.size() > 0);
   assert(clArgs.size() > 0);
   if (!clang::tooling::runToolOnCodeWithArgs(
-          std::make_unique<ACTION>(module, mangledKernelNameMap), cplusplusCode,
-          clArgs, inputFileName, toolName)) {
+          std::make_unique<ACTION>(module, mangledKernelNameMap, metadata),
+          cplusplusCode, clArgs, inputFileName, toolName)) {
     errs() << "error: could not translate ";
     if (inputFilename == "-")
       errs() << "input";
@@ -269,6 +276,55 @@ std::string getExecutablePath(const char *argv0, bool canonicalPrefixes) {
   }
   void *p = (void *)(intptr_t)getExecutablePath;
   return llvm::sys::fs::getMainExecutable(argv0, p);
+}
+
+std::optional<cudaq::details::IRDLMetadata>
+loadIRDLDialects(mlir::MLIRContext &ctx, std::filesystem::path &installPath) {
+  using namespace mlir;
+  DialectRegistry registry;
+  registry.insert<irdl::IRDLDialect>();
+  ctx.appendDialectRegistry(registry);
+
+  auto irdlDirectory = installPath / "extensions" / "irdl";
+  if (!std::filesystem::exists(irdlDirectory))
+    return std::nullopt;
+
+  cudaq::details::IRDLMetadata metadata;
+  std::string irdlContents = "module {\nirdl.dialect @quake_ext {\n";
+  for (const auto &entry : std::filesystem::directory_iterator(irdlDirectory)) {
+    std::ifstream t(entry.path());
+    std::string str((std::istreambuf_iterator<char>(t)),
+                    std::istreambuf_iterator<char>());
+    if (entry.path().extension().string() == ".irdl")
+      irdlContents += str;
+    else if (entry.path().extension().string() == ".json") {
+      auto json = nlohmann::json::parse(str);
+      for (auto it = json.begin(); it != json.end(); ++it) {
+        json[it.key()].dump(4);
+        cudaq::details::IRDLOpMetadata opdata;
+        for (auto jt = it.value().begin(); jt != it.value().end(); ++jt) {
+          if (jt.key() == "num_targets")
+            opdata.num_targets = jt.value().get<std::size_t>();
+          if (jt.key() == "num_parameters")
+            opdata.num_parameters = jt.value().get<std::size_t>();
+        }
+        metadata.insert({it.key(), opdata});
+      }
+    }
+  }
+
+  irdlContents += "}\n}";
+
+  // llvm::outs() << "IRDL Contents:\n" << irdlContents << "\n";
+
+  // Parse the input file.
+  OwningOpRef<ModuleOp> module(parseSourceString<ModuleOp>(irdlContents, &ctx));
+
+  // Load IRDL dialects.
+  if (failed(irdl::loadDialects(module.get())))
+    return std::nullopt;
+
+  return metadata;
 }
 
 //===----------------------------------------------------------------------===//
@@ -317,6 +373,11 @@ int main(int argc, char **argv) {
   mlir::registerAllExtensions(registry);
   registry.insert<cudaq::cc::CCDialect, quake::QuakeDialect>();
   mlir::MLIRContext context(registry);
+
+  // Look for any user provided IRDL operations
+  auto maybeMetadata = loadIRDLDialects(context, cudaqInstallPath);
+  auto metadata = maybeMetadata.value_or(cudaq::details::IRDLMetadata());
+
   // TODO: Consider only loading the dialects we know we'll use.
   context.loadAllAvailableDialects();
   mlir::OpBuilder builder(&context);
@@ -434,15 +495,16 @@ int main(int argc, char **argv) {
   std::string inputFile = isStdinInput(inputFilename)
                               ? std::string("input.cc")
                               : sys::path::filename(inputFilename).str();
-  if (auto rc = emitLLVM
-                    ? runTool<CudaQAction>(module, mangledKernelNameMap,
-                                           cplusplusCode, clArgs, inputFile)
-                    : (llvmOnly ? runTool<InterceptCudaQAction>(
-                                      module, mangledKernelNameMap,
-                                      cplusplusCode, clArgs, inputFile)
-                                : runTool<cudaq::ASTBridgeAction>(
-                                      module, mangledKernelNameMap,
-                                      cplusplusCode, clArgs, inputFile)))
+  if (auto rc =
+          emitLLVM
+              ? runTool<CudaQAction>(module, mangledKernelNameMap,
+                                     cplusplusCode, clArgs, inputFile, metadata)
+              : (llvmOnly ? runTool<InterceptCudaQAction>(
+                                module, mangledKernelNameMap, cplusplusCode,
+                                clArgs, inputFile, metadata)
+                          : runTool<cudaq::ASTBridgeAction>(
+                                module, mangledKernelNameMap, cplusplusCode,
+                                clArgs, inputFile, metadata)))
     return rc;
 
   // Success! Dump the IR and exit.

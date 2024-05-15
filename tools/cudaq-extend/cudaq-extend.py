@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import ast, astpretty, tempfile, subprocess, os, shutil
+import ast, astpretty, tempfile, subprocess, os, shutil, json
 from pathlib import Path
 import argparse
 
@@ -42,6 +42,7 @@ class CustomOperation(object):
     def __init__(self):
         self.name = None
         self.num_parameters = 0
+        self.num_targets = 0
         self.cpp_generator = None
 
 
@@ -67,6 +68,13 @@ class CustomOperationVisitor(ast.NodeVisitor):
                 f'{self.currentOperation.name} requires {node.value.value} parameters'
             )
             self.currentOperation.num_parameters = node.value.value
+            return
+
+        if node.targets[0].id == 'num_targets':
+            print(
+                f'{self.currentOperation.name} is applied to {node.value.value} target qubits'
+            )
+            self.currentOperation.num_targets = node.value.value
             return
 
         if node.targets[0].id == 'cpp_generator':
@@ -147,11 +155,13 @@ ConcreteQubitOp({})
 
 irdlTemplate = '''irdl.operation @{} {{
     %target = irdl.is !quake.ref
+    %controls = irdl.is !quake.ref
     {}
-    irdl.operands({} %target)
+    irdl.operands({} variadic %controls, %target)
 }}
 '''
 
+metadata = {}
 for op in visitor.operations:
     cpp_code = cppTemplate.format(op.cpp_generator, op.name + "_generator")
     print(cpp_code)
@@ -199,3 +209,10 @@ for op in visitor.operations:
 
     with open(cudaq_irdl_path+os.path.sep+f'{fileName}.irdl', 'w') as f:
         f.write(irdl_code)
+
+    # Write the metadata file
+    metadata[op.name] = {'num_targets':op.num_targets, 'num_parameters':op.num_parameters}
+    with open(cudaq_irdl_path + os.path.sep + f'{fileName}.json', 'w') as f:
+        json.dump(metadata, f)
+
+    

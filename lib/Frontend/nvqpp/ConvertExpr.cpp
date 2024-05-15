@@ -1887,6 +1887,27 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
       return pushValue(call.getResult(0));
     }
 
+    if (mlirContext->getLoadedDialect("quake_ext") &&
+        mlirContext->isOperationRegistered("quake_ext." + funcName.str())) {
+      SmallVector<NamedAttribute> attributes;
+      auto iter = irdlMetadata.find(funcName.str());
+      if (iter != irdlMetadata.end()) {
+        attributes.push_back(
+            NamedAttribute(builder.getStringAttr("num_targets"),
+                           builder.getIntegerAttr(builder.getI64Type(),
+                                                  iter->second.num_targets)));
+        attributes.push_back(NamedAttribute(
+            builder.getStringAttr("num_parameters"),
+            builder.getIntegerAttr(builder.getI64Type(),
+                                   iter->second.num_parameters)));
+      }
+
+      OperationState state(loc, "quake_ext." + funcName.str(), args,
+                           TypeRange(), attributes);
+      builder.create(state);
+      return true;
+    }
+
     TODO_loc(loc, "unknown function, " + funcName + ", in cudaq namespace");
   } // end in cudaq namespace
 

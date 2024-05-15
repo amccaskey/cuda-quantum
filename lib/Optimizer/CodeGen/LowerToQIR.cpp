@@ -1554,6 +1554,115 @@ public:
   }
 };
 
+class QuakeExtRewrite : public RewritePattern {
+public:
+  QuakeExtRewrite(MLIRContext *ctx)
+      : RewritePattern(MatchAnyOpTypeTag(), 1, ctx) {}
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const override {
+    if (!op->getDialect()->getNamespace().equals("quake_ext"))
+      return failure();
+
+    auto loc = op->getLoc();
+    auto context = op->getContext();
+    auto parentModule = op->getParentOfType<ModuleOp>();
+
+    // Replace with:
+    // allocation of matrix data array
+    // call to auto-generated OPNAME_generator(params, numParams, array)
+    // call to __quantum__qis__custom__unitary(array, ctrls, target)
+
+    // Get the operation name, the generate function name,
+    // the number of target qubits, and the number of parameters.
+    auto operationName = op->getName().stripDialect().str();
+    auto generateFuncName = operationName + "_generator";
+    auto numTargets = op->getAttrOfType<IntegerAttr>("num_targets").getInt();
+    auto numParameters =
+        op->getAttrOfType<IntegerAttr>("num_parameters").getInt();
+
+    // Allocate numParams doubles, and store the values there
+    Value numParametersVal =
+        rewriter.create<arith::ConstantIntOp>(loc, numParameters, 64);
+    auto paramsPtr = rewriter.create<cudaq::cc::AllocaOp>(
+        loc, rewriter.getF64Type(), numParametersVal);
+    auto f64PtrTy = cudaq::cc::PointerType::get(rewriter.getF64Type());
+    for (int i = 0; i < numParameters; i++) {
+      auto ptr = rewriter.create<cudaq::cc::ComputePtrOp>(
+          loc, f64PtrTy, paramsPtr, ArrayRef<cudaq::cc::ComputePtrArg>{i});
+      rewriter.create<cudaq::cc::StoreOp>(loc, op->getOperand(i), ptr);
+    }
+
+    // Create output pointer
+    auto complexTy = ComplexType::get(rewriter.getF64Type());
+    auto complexPtrTy = cudaq::cc::PointerType::get(complexTy);
+    auto powTwo = (1UL << numTargets);
+    Value numElementsVal =
+        rewriter.create<arith::ConstantIntOp>(loc, powTwo*powTwo, 64);
+    auto unitaryData =
+        rewriter.create<cudaq::cc::AllocaOp>(loc, complexTy, numElementsVal);
+
+    {
+      auto ip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPointToStart(parentModule.getBody());
+      auto ftype = FunctionType::get(
+          context, {f64PtrTy, rewriter.getI64Type(), complexPtrTy}, {});
+      auto func = rewriter.create<func::FuncOp>(loc, generateFuncName, ftype);
+
+      rewriter.restoreInsertionPoint(ip);
+      rewriter.create<func::CallOp>(
+          loc, func, ValueRange{paramsPtr, numParametersVal, unitaryData});
+    }
+
+    // concatenate targets
+    auto targets = op->getOperands().take_back(numTargets);
+    Value concatTargets = rewriter.create<quake::ConcatOp>(
+        loc, quake::VeqType::getUnsized(context), targets);
+
+    // concatenate controls
+    SmallVector<Value> controls;
+    for (int64_t i = numParameters;
+         i < static_cast<int64_t>(op->getNumOperands()) - numTargets; i++)
+      controls.push_back(op->getOperand(i));
+
+    Value concatControls;
+    if (controls.empty()) {
+      // make an empty array
+      Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
+      Value zero32 = rewriter.create<arith::ConstantIntOp>(loc, 0, 32);
+
+      FlatSymbolRefAttr symbolRef =
+          cudaq::opt::factory::createLLVMFunctionSymbol(
+              cudaq::opt::QIRArrayCreateArray,
+              cudaq::opt::getArrayType(context),
+              {rewriter.getI32Type(), rewriter.getI64Type()}, parentModule);
+      concatControls =
+          rewriter
+              .create<LLVM::CallOp>(
+                  loc, TypeRange{cudaq::opt::getArrayType(context)}, symbolRef,
+                  ValueRange{zero32, zero})
+              .getResult();
+    } else
+      concatControls = rewriter.create<quake::ConcatOp>(
+          loc, quake::VeqType::getUnsized(context), controls);
+
+    auto ip = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPointToStart(parentModule.getBody());
+    auto ftype =
+        FunctionType::get(context,
+                          {complexPtrTy, cudaq::opt::getArrayType(context),
+                           cudaq::opt::getArrayType(context)},
+                          {});
+    auto func = rewriter.create<func::FuncOp>(
+        loc, "__quantum__qis__quake_ext_op", ftype);
+    rewriter.restoreInsertionPoint(ip);
+
+    rewriter.replaceOpWithNewOp<func::CallOp>(
+        op, func, ValueRange{unitaryData, concatControls, concatTargets});
+
+    return success();
+  }
+};
+
 /// In case we still have a RelaxSizeOp, we can just remove it,
 /// since QIR works on Array * for all sized veqs.
 class RemoveRelaxSizeRewrite : public OpConversionPattern<quake::RelaxSizeOp> {
@@ -1688,6 +1797,7 @@ public:
 
     patterns.insert<GetVeqSizeOpRewrite, RemoveRelaxSizeRewrite, MxToMz, MyToMz,
                     ReturnBitRewrite>(context);
+    patterns.insert<QuakeExtRewrite>(context);
     patterns.insert<
         AllocaOpRewrite, AllocaOpPattern, CallableClosureOpPattern,
         CallableFuncOpPattern, CallCallableOpPattern, CastOpPattern,

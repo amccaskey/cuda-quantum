@@ -396,10 +396,10 @@ bool ASTBridgeAction::ASTBridgeConsumer::isQuantum(
 
 ASTBridgeAction::ASTBridgeConsumer::ASTBridgeConsumer(
     clang::CompilerInstance &compiler, OwningOpRef<ModuleOp> &_module,
-    std::map<std::string, std::string> &cxx_mangled)
+    std::map<std::string, std::string> &cxx_mangled, details::IRDLMetadata& metadata)
     : astContext(compiler.getASTContext()), ci(compiler),
       cxx_mangled_kernel_names(cxx_mangled), module(_module),
-      builder(_module->getContext()) {
+      builder(_module->getContext()), irdlMetadata(metadata) {
   mangler =
       clang::ItaniumMangleContext::create(astContext, ci.getDiagnostics());
   assert(mangler && "mangler creation failed");
@@ -519,7 +519,7 @@ void ASTBridgeAction::ASTBridgeConsumer::HandleTranslationUnit(
   auto *ctx = module->getContext();
   details::QuakeBridgeVisitor visitor(
       &astContext, ctx, builder, module.get(), symbol_table, functionsToEmit,
-      reachableFuncs, cxx_mangled_kernel_names, ci, mangler);
+      reachableFuncs, cxx_mangled_kernel_names, ci, mangler, irdlMetadata);
 
   // First generate declarations for all kernels.
   bool ok = true;

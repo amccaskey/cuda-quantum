@@ -45,7 +45,7 @@ if (CMAKE_COMPILER_IS_GNUCXX
 endif()
 
 # We can only build the RestClient support if we have OpenSSL
-if(OPENSSL_FOUND)
+if(OPENSSL_FOUND AND CUDAQ_ENABLE_REST)
   message(STATUS "OpenSSL Found, building REST Client.")
 
   target_sources(${LIBRARY_NAME} PRIVATE RestClient.cpp)
