@@ -121,6 +121,12 @@ std::string getTagNameOfFunctionDecl(const clang::FunctionDecl *func,
 /// FIXME: This is a bit of a hack to skip over certain AST nodes.
 bool ignoredClass(clang::RecordDecl *x);
 
+struct IRDLOpMetadata {
+  std::size_t num_targets = 0;
+  std::size_t num_parameters = 0;
+};
+using IRDLMetadata = std::map<std::string, IRDLOpMetadata>;
+
 //===----------------------------------------------------------------------===//
 // QuakeBridgeVisitor
 //===----------------------------------------------------------------------===//
@@ -151,11 +157,12 @@ public:
                               llvm::ArrayRef<clang::Decl *> reachableFuncs,
                               MangledKernelNamesMap &namesMap,
                               clang::CompilerInstance &ci,
-                              clang::ItaniumMangleContext *mangler)
+                              clang::ItaniumMangleContext *mangler,
+                              IRDLMetadata &metadata)
       : astContext(astCtx), mlirContext(mlirCtx), builder(bldr), module(module),
         symbolTable(symTab), functionsToEmit(funcsToEmit),
         reachableFunctions(reachableFuncs), namesMap(namesMap),
-        compilerInstance(ci), mangler(mangler) {}
+        compilerInstance(ci), mangler(mangler), irdlMetadata(metadata) {}
 
   /// `nvq++` renames quantum kernels to differentiate them from classical C++
   /// code. This renaming is done on function names. \p tag makes it easier
@@ -560,6 +567,8 @@ private:
   std::string loweredFuncName;
   llvm::SmallVector<mlir::Value> negations;
 
+  IRDLMetadata &irdlMetadata;
+
   //===--------------------------------------------------------------------===//
   // Type traversals
   //===--------------------------------------------------------------------===//
@@ -606,15 +615,17 @@ public:
 
   /// Constructor.
   ASTBridgeAction(mlir::OwningOpRef<mlir::ModuleOp> &_module,
-                  MangledKernelNamesMap &cxx_mangled)
-      : module(_module), cxx_mangled_kernel_names(cxx_mangled) {}
+                  MangledKernelNamesMap &cxx_mangled,
+                  details::IRDLMetadata &metadata)
+      : module(_module), cxx_mangled_kernel_names(cxx_mangled),
+        irdlMetadata(metadata) {}
 
   /// Instantiate the ASTBridgeConsumer for this ASTFrontendAction.
   std::unique_ptr<clang::ASTConsumer>
   CreateASTConsumer(clang::CompilerInstance &compiler,
                     llvm::StringRef inFile) override {
-    return std::make_unique<ASTBridgeConsumer>(compiler, module,
-                                               cxx_mangled_kernel_names);
+    return std::make_unique<ASTBridgeConsumer>(
+        compiler, module, cxx_mangled_kernel_names, irdlMetadata);
   }
 
   //===--------------------------------------------------------------------===//
@@ -645,6 +656,8 @@ public:
     // The mangler is constructed and owned by `this`.
     clang::ItaniumMangleContext *mangler;
 
+    details::IRDLMetadata &irdlMetadata;
+
     /// Add a placeholder definition to the module in \p visitor for the
     /// function, \p funcDecl. This is used for adding the host-side function
     /// corresponding to the kernel. The code for this function will be
@@ -661,7 +674,8 @@ public:
   public:
     ASTBridgeConsumer(clang::CompilerInstance &compiler,
                       mlir::OwningOpRef<mlir::ModuleOp> &_module,
-                      MangledKernelNamesMap &cxx_mangled);
+                      MangledKernelNamesMap &cxx_mangled,
+                      details::IRDLMetadata &metadata);
 
     // This gets called after HandleTopLevelDecl, we have the quantum kernel
     // FunctionDecls, emit the MLIR code for each
@@ -681,6 +695,7 @@ protected:
   // The MLIR Module we are building up
   mlir::OwningOpRef<mlir::ModuleOp> &module;
   MangledKernelNamesMap &cxx_mangled_kernel_names;
+  details::IRDLMetadata &irdlMetadata;
 };
 
 /// Return true if and only if \p x was declared at the top-level.

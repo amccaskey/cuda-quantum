@@ -23,6 +23,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/AsmState.h"
@@ -36,6 +37,9 @@
 #include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 #include "mlir/Transforms/Passes.h"
+
+#include <filesystem>
+#include <fstream>
 
 //===----------------------------------------------------------------------===//
 // Command line options.
@@ -88,10 +92,65 @@ static void checkErrorCode(const std::error_code &ec) {
   }
 }
 
+/// @brief Retrieve the path of this executable, borrowed from
+/// the Clang Driver
+std::string getExecutablePath(const char *argv0, bool canonicalPrefixes) {
+  if (!canonicalPrefixes) {
+    SmallString<128> executablePath(argv0);
+    if (!llvm::sys::fs::exists(executablePath))
+      if (llvm::ErrorOr<std::string> p =
+              llvm::sys::findProgramByName(executablePath))
+        executablePath = *p;
+    return std::string(executablePath.str());
+  }
+  void *p = (void *)(intptr_t)getExecutablePath;
+  return llvm::sys::fs::getMainExecutable(argv0, p);
+}
+
+void loadIRDLDialects(mlir::MLIRContext &ctx,
+                      std::filesystem::path &installPath) {
+  using namespace mlir;
+  DialectRegistry registry;
+  registry.insert<irdl::IRDLDialect>();
+  ctx.appendDialectRegistry(registry);
+
+  auto irdlDirectory = installPath / "extensions" / "irdl";
+  if (!std::filesystem::exists(irdlDirectory))
+    return;
+
+  std::string irdlContents = "module {\nirdl.dialect @quake_ext {\n";
+  for (const auto &entry : std::filesystem::directory_iterator(irdlDirectory)) {
+    if (entry.path().extension() != ".irdl")
+      continue;
+    std::ifstream t(entry.path());
+    std::string str((std::istreambuf_iterator<char>(t)),
+                    std::istreambuf_iterator<char>());
+    irdlContents += str;
+  }
+  irdlContents += "}\n}";
+
+  // llvm::outs() << "IRDL Contents:\n" << irdlContents << "\n";
+
+  // Parse the input file.
+  OwningOpRef<ModuleOp> module(parseSourceString<ModuleOp>(irdlContents, &ctx));
+
+  // Load IRDL dialects.
+  if (failed(irdl::loadDialects(module.get()))) {
+    llvm::errs() << "BAD IRDL\n";
+  }
+}
+
 int main(int argc, char **argv) {
   // Set the bug report message to indicate users should file issues on
   // nvidia/cuda-quantum
   llvm::setBugReportMsg(cudaq::bugReportMsg);
+
+  // We need the location of this cudaq-quake executable so that we can get the
+  // install path
+  std::string executablePath = getExecutablePath(argv[0], true);
+  std::filesystem::path cudaqQuakePath{executablePath};
+  auto installBinPath = cudaqQuakePath.parent_path();
+  auto cudaqInstallPath = installBinPath.parent_path();
 
   registerAsmPrinterCLOptions();
   registerMLIRContextCLOptions();
@@ -109,6 +168,7 @@ int main(int argc, char **argv) {
   registerBuiltinDialectTranslation(registry);
   registerLLVMDialectTranslation(registry);
   MLIRContext context(registry);
+  loadIRDLDialects(context, cudaqInstallPath);
   context.loadAllAvailableDialects();
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileOrErr =
