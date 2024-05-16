@@ -43,6 +43,64 @@ ConcreteQubitOp(h) ConcreteQubitOp(x) ConcreteQubitOp(y) ConcreteQubitOp(z)
 inline QuditInfo qubitToQuditInfo(qubit &q) { return {q.n_levels(), q.id()}; }
 inline bool qubitIsNegative(qubit &q) { return q.is_negative(); }
 
+template <typename T>
+concept IsDouble = std::is_same_v<std::remove_cvref_t<T>, double>;
+
+template <typename T>
+concept IsQubitType = std::is_same_v<std::remove_cvref_t<T>, cudaq::qubit>;
+
+template <typename T>
+concept IsQvectorType = std::is_same_v<std::remove_cvref_t<T>, cudaq::qvector<>>;
+
+inline void segmentParameters(std::vector<double> &params,
+                              std::vector<QuditInfo> &qubits) {}
+
+template <typename T, typename... Args>
+void segmentParameters(std::vector<double> &params,
+                       std::vector<QuditInfo> &qubits, T &&first,
+                       Args &&...rest) {
+  if constexpr (IsDouble<T>) {
+    params.push_back(std::forward<T>(first));
+  } else if constexpr (IsQubitType<T>) {
+    qubits.push_back(qubitToQuditInfo(first));
+  } else if constexpr (IsQvectorType<T>) { // fixme support qarray
+    for (auto &q : first)
+      qubits.push_back(qubitToQuditInfo(q));
+  }
+  segmentParameters(params, qubits, std::forward<Args>(rest)...);
+}
+
+/// @brief broadcasting should be disabled for operations with numTargets > 1
+
+template <typename mod = base, typename... GeneralArgs>
+void applyQuakeExtOperation(const std::string &gateName, std::size_t numTargets,
+                    GeneralArgs &&...args) {
+
+  std::vector<double> parameters;
+  std::vector<QuditInfo> qubits;
+  segmentParameters(parameters, qubits, std::forward<GeneralArgs>(args)...);
+
+  if (std::is_same_v<mod, base> && numTargets > 1 && qubits.size() > numTargets)
+    throw std::runtime_error(
+        "cudaq does not support broadcast for multi-qubit operations.");
+
+  // Operation on correct number of targets, no controls, possible broadcast
+  if (std::is_same_v<mod, base> && numTargets == 1) {
+    for (auto &qubit : qubits)
+      getExecutionManager()->apply(gateName, parameters, {}, {qubit},
+                                   std::is_same_v<mod, adj>);
+    return;
+  }
+
+  std::size_t numControls = qubits.size() - numTargets;
+  std::vector<QuditInfo> targets(qubits.begin() + numControls, qubits.end()),
+      controls(qubits.begin(), qubits.begin() + numControls);
+
+  // Apply the gate
+  getExecutionManager()->apply(gateName, parameters, controls, targets,
+                               std::is_same_v<mod, adj>);
+}
+
 /// @brief This function will apply the specified `QuantumOp`. It will check the
 /// modifier template type and if it is `base`, it will apply the operation to
 /// any qubits provided as input. If `ctrl`, it will take the first `N-1` qubits
@@ -637,3 +695,8 @@ std::vector<T> slice_vector(std::vector<T> &original, std::size_t start,
 }
 
 } // namespace cudaq
+
+
+#ifdef CUDAQ_HAS_QUAKE_EXT_INCLUDES
+#include "quake_ext.h"
+#endif

@@ -66,3 +66,59 @@ CUDAQ_TEST(AllocationTester, checkDensityOrderingBug) {
   EXPECT_EQ(c, 1000);
 }
 #endif
+
+CUDAQ_TEST(TestNewQubitFunc, checkSimple) {
+  {
+    cudaq::qubit q;
+    cudaq::applyQuakeExtOperation("h", 1, q);
+    mz(q);
+  }
+
+  {
+    cudaq::qubit q, r;
+    cudaq::applyQuakeExtOperation("h", 1, q, r);
+    mz(q);
+  }
+
+  {
+    cudaq::qvector q(3);
+    cudaq::applyQuakeExtOperation("h", 1, q);
+    mz(q);
+  }
+
+  {
+    cudaq::qubit q, r;
+    cudaq::applyQuakeExtOperation<cudaq::ctrl>("x", 1, q, r);
+    mz(q);
+  }
+
+  {
+    cudaq::qubit q, r, s;
+    cudaq::applyQuakeExtOperation<cudaq::ctrl>("x", 1, q, r, s);
+    mz(q);
+  }
+
+  {
+    cudaq::qubit q;
+    cudaq::applyQuakeExtOperation("rx", 1, M_PI_2, q);
+    mz(q);
+  }
+
+  {
+    cudaq::qvector q(3);
+    cudaq::applyQuakeExtOperation("rx", 1, M_PI_2, q);
+    mz(q);
+  }
+
+  {
+    cudaq::qubit q, r;
+    cudaq::applyQuakeExtOperation<cudaq::ctrl>("rx", 1, M_PI_2, q, r);
+    mz(q);
+  }
+
+  {
+    cudaq::qubit q;
+    cudaq::applyQuakeExtOperation<cudaq::adj>("rx", 1, M_PI_2, q);
+    mz(q);
+  }
+}
