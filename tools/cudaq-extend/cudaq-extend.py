@@ -93,59 +93,28 @@ visitor = CustomOperationVisitor()
 visitor.visit(astModule)
 
 cppTemplate = '''
-#include <vector>
-#include <complex>
 
-using unitary = std::vector<std::complex<double>>;
-auto internal_call_lambda = {}
+auto internal_call_lambda_{} = {}
 
 extern "C" void {}(const double *params, std::size_t numParams,
                            std::complex<double> *output) {{
   std::vector<double> input(params, params + numParams);
-  auto tmpOutput = internal_call_lambda(input);
+  auto tmpOutput = internal_call_lambda_{}(input);
   for (int i = 0; i < tmpOutput.size(); i++) output[i] = tmpOutput[i];
   return;
 }}
 '''
 
-noParamSingleTargetTemplateDefine = '''
-#if CUDAQ_USE_STD20
-#define TEMPLATE(SORT)                                                         \\
-  template <typename mod = SORT, typename QubitRange>                          \\
-    requires(std::ranges::range<QubitRange>)
-#else
-#define TEMPLATE(SORT)                                                         \\
-  template <typename mod = SORT, typename QubitRange,                          \\
-            typename = std::enable_if_t<!std::is_same_v<                       \\
-                std::remove_reference_t<std::remove_cv_t<QubitRange>>,         \\
-                cudaq::qubit>>>
-#endif
-'''
-singleParamSingleTargetTemplateDefine = '''
-#if CUDAQ_USE_STD20
-#define TEMPLATE(SORT)                                                         \\
-  template <typename mod = SORT, typename ScalarAngle, typename QubitRange>    \\
-    requires(std::ranges::range<QubitRange>)
-#else
-#define TEMPLATE(SORT)                                                         \\
-  template <typename mod = SORT, typename ScalarAngle, typename QubitRange,    \\
-            typename = std::enable_if_t<!std::is_same_v<                       \\
-                std::remove_reference_t<std::remove_cv_t<QubitRange>>,         \\
-                cudaq::qubit>>>
-#endif
-'''
-
 headerTemplate = '''namespace cudaq {{
-namespace qubit_op {{
-ConcreteQubitOp({})
+
+template<typename mod = base, typename... GeneralArgs>
+void {}(GeneralArgs&&... args) {{
+  applyQuakeExtOperation<mod>("{}", {}, std::forward<GeneralArgs>(args)...);
 }}
-
-{}
-
-{}
 
 }}
 '''
+
 
 irdlTemplate = '''irdl.operation @{} {{
     %target = irdl.is !quake.ref
@@ -156,53 +125,27 @@ irdlTemplate = '''irdl.operation @{} {{
 '''
 
 metadata = {}
+cpp_code = '''#include <vector>
+#include <complex>
+
+using unitary = std::vector<std::complex<double>>;
+
+'''
+header_code = ''
+irdl_code = ''
 for op in visitor.operations:
-    cpp_code = cppTemplate.format(op.cpp_generator, op.name + "_generator")
+    cpp_code += cppTemplate.format(op.name, op.cpp_generator, op.name + "_generator", op.name)
     print(cpp_code)
-    # Create a temporary file to save the C++ code
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".cpp") as tmp_file:
-        tmp_file_path = tmp_file.name
-        tmp_file.write(cpp_code.encode())
-
-    # Compile the C++ code
-    compile_command = [
-        "clang++-15", tmp_file_path, '-std=c++17', '-shared', '-fPIC', '-o',
-        f'lib{fileName}.so'
-    ]
-    subprocess.run(compile_command, check=True)
-
-    # Clean up
-    os.remove(tmp_file_path)
-
-    # MOVE to the correct install location
-    shutil.move(f'lib{fileName}.so',
-                cudaq_unitary_path + os.path.sep + f'lib{fileName}.so')
-
-    if op.num_parameters == 1:
-        header_code = headerTemplate.format(
-            op.name, singleParamSingleTargetTemplateDefine,
-            f'CUDAQ_QIS_PARAM_ONE_TARGET_({op.name})')
-        print(header_code)
-    else:
-        header_code = headerTemplate.format(
-            op.name, noParamSingleTargetTemplateDefine,
-            f'CUDAQ_QIS_ONE_TARGET_QUBIT_({op.name})')
-
-    # WRITE HEADER to install location
-    with open(cudaq_headers_path+os.path.sep+f'{fileName}.h', 'w') as f:
-        f.write(header_code)
+   
+    # Write the header file for the operation
+    header_code += headerTemplate.format(
+        op.name, op.name, op.num_targets)
+    print(header_code)
 
     # Write the IRDL file
-    if op.num_parameters == 0:
-        irdl_code = irdlTemplate.format(op.name, '', '')
-    if op.num_parameters == 1:
-        irdl_code = irdlTemplate.format(op.name, '%param = irdl.is f64',
-                                        '%param,')
-
+    irdl_code += irdlTemplate.format(op.name, '%param = irdl.is f64',
+                                    '%param,'*op.num_parameters)
     print(irdl_code)
-
-    with open(cudaq_irdl_path+os.path.sep+f'{fileName}.irdl', 'w') as f:
-        f.write(irdl_code)
 
     # Write the metadata file
     metadata[op.name] = {'num_targets':op.num_targets, 'num_parameters':op.num_parameters}
@@ -210,3 +153,45 @@ for op in visitor.operations:
         json.dump(metadata, f)
 
     
+ # Create a temporary file to save the C++ code
+with tempfile.NamedTemporaryFile(delete=False, suffix=".cpp") as tmp_file:
+    tmp_file_path = tmp_file.name
+    tmp_file.write(cpp_code.encode())
+
+# Compile the C++ code
+compile_command = [
+    "clang++-15", tmp_file_path, '-std=c++17', '-shared', '-fPIC', '-o',
+    f'lib{fileName}.so'
+]
+subprocess.run(compile_command, check=True)
+
+# Clean up
+os.remove(tmp_file_path)
+
+# MOVE to the correct install location
+shutil.move(f'lib{fileName}.so',
+            cudaq_unitary_path + os.path.sep + f'lib{fileName}.so')
+
+# WRITE HEADER to install location
+with open(cudaq_headers_path+os.path.sep+f'{fileName}.h', 'w') as f:
+    f.write(header_code)
+
+# Scan quake_ext.h, create if not there, update if there
+toAdd = f'#include "{fileName}.h"'
+quakeExtHeader = cudaq_headers_path + os.path.sep + "quake_ext.h"
+if not os.path.exists(quakeExtHeader):
+    with open (quakeExtHeader, 'w') as f:
+        f.write('#pragma once\n')
+
+# Check the file contents first 
+update = True
+with open(quakeExtHeader, 'r') as f:
+    if toAdd in f.read(): update = False
+
+if update:
+    with open(quakeExtHeader, 'a') as f:
+        f.write(toAdd + '\n')
+
+with open(cudaq_irdl_path+os.path.sep+f'{fileName}.irdl', 'w') as f:
+    f.write(irdl_code)
+

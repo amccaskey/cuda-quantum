@@ -5,5 +5,5 @@
 # This source code and the accompanying materials are made available under     #
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
-install (PROGRAMS cudaq-extend.py DESTINATION bin/)
-file (COPY cudaq-extend.py DESTINATION ${CMAKE_BINARY_DIR}/bin)
+configure_file(cudaq-extend.py ${CMAKE_BINARY_DIR}/bin/cudaq-extend)
+install (PROGRAMS ${CMAKE_BINARY_DIR}/bin/cudaq-extend DESTINATION bin/)

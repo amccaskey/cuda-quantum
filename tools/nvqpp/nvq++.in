@@ -301,6 +301,12 @@ NVQIR_LIBS="-lnvqir -lnvqir-"
 CPPSTD=-std=c++20
 CUDAQ_OPT_EXTRA_PASSES=
 
+QUAKE_EXT_HEADER_FILE=${install_dir}/extensions/headers/quake_ext.h
+if [ -e "$QUAKE_EXT_HEADER_FILE" ]; then 
+   PREPROCESSOR_DEFINES="${PREPROCESSOR_DEFINES} -D CUDAQ_HAS_QUAKE_EXT_INCLUDES"
+   INCLUDES="${INCLUDES} -I ${install_dir}/extensions/headers"
+fi 
+
 # Provide a default backend, user can override
 NVQIR_SIMULATION_BACKEND="qpp"
 # Check availability of NVIDA GPU(s)
