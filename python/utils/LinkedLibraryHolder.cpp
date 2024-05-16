@@ -254,6 +254,21 @@ LinkedLibraryHolder::LinkedLibraryHolder() {
     }
   }
 
+  // Find any quake extension modules.
+  auto cudaqInstallPath = cudaqLibPath.parent_path();
+  auto cudaqExtensionsPath = cudaqInstallPath / "extensions";
+  if (std::filesystem::exists(cudaqExtensionsPath)) {
+    auto cudaqUnitariesPath = cudaqExtensionsPath / "unitaries";
+    if (std::filesystem::exists(cudaqUnitariesPath)) {
+      for (const auto &entry :
+           std::filesystem::directory_iterator(cudaqUnitariesPath)) {
+        if (entry.path().extension().string() == "." + libSuffix) {
+          availableQuakeExtensionModules.push_back(entry.path().string());
+        }
+      }
+    }
+  }
+
   // Set the default target
   // If environment variable set with a valid value, use it
   // Otherwise, if GPU(s) available and other dependencies are satisfied, set

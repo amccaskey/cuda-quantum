@@ -46,6 +46,7 @@ public:
   /// This will turn off (bypass) target modification in the LinkedLibraryHolder
   /// instance used by Python bindings.
   static inline bool disallowTargetModification = false;
+  std::vector<std::string> availableQuakeExtensionModules;
 
 protected:
   // Store the library suffix

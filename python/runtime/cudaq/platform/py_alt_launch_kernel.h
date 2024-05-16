@@ -8,10 +8,11 @@
 
 #pragma once
 
+#include "LinkedLibraryHolder.h"
 #include <pybind11/pybind11.h>
 
 namespace py = pybind11;
 
 namespace cudaq {
-void bindAltLaunchKernel(py::module &mod);
+void bindAltLaunchKernel(LinkedLibraryHolder& holder, py::module &mod);
 } // namespace cudaq

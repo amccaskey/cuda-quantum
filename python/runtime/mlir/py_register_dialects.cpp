@@ -252,8 +252,6 @@ void loadIRDLDialects(mlir::MLIRContext &ctx,
 
   irdlContents += "}\n}";
 
-  llvm::outs() << "IRDL Contents:\n" << irdlContents << "\n";
-
   // Parse the input file.
   OwningOpRef<ModuleOp> module(parseSourceString<ModuleOp>(irdlContents, &ctx));
 
@@ -284,7 +282,7 @@ void bindRegisterDialects(py::module &mod) {
     mlirContext->appendDialectRegistry(registry);
     mlirContext->loadAllAvailableDialects();
   });
-  
+
   mod.def("loadIRDLOperations",
           [](MlirContext ctx, std::string installLocation) {
             auto context = unwrap(ctx);

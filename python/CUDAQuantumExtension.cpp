@@ -102,7 +102,7 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindSampleAsync(cudaqRuntime);
   cudaq::bindObserveAsync(cudaqRuntime);
   cudaq::bindVQE(cudaqRuntime);
-  cudaq::bindAltLaunchKernel(cudaqRuntime);
+  cudaq::bindAltLaunchKernel(*holder.get(), cudaqRuntime);
   cudaq::bindTestUtils(cudaqRuntime, *holder.get());
 
   cudaqRuntime.def("set_random_seed", &cudaq::set_random_seed,

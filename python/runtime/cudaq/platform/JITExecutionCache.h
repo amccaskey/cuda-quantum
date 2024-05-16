@@ -24,11 +24,13 @@ protected:
   std::mutex mutex;
 
 public:
-  JITExecutionCache() = default;
+  JITExecutionCache(std::vector<std::string> modules)
+      : availableQuakeExtensionModules(modules) {}
   ~JITExecutionCache();
 
   void cache(std::size_t hash, ExecutionEngine *);
   bool hasJITEngine(std::size_t hash);
   ExecutionEngine *getJITEngine(std::size_t hash);
+  std::vector<std::string> availableQuakeExtensionModules;
 };
 } // namespace cudaq

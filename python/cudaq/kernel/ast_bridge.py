@@ -18,11 +18,7 @@ from ..mlir.ir import *
 from ..mlir.passmanager import *
 from ..mlir.dialects import quake, cc
 from ..mlir.dialects import builtin, func, arith, math, complex
-<<<<<<< HEAD
-from ..mlir._mlir_libs._quakeDialects import cudaq_runtime, load_intrinsic, register_all_dialects
-=======
-from ..mlir._mlir_libs._quakeDialects import cudaq_runtime, load_intrinsic, loadIRDLOperations
->>>>>>> bd5f166ab (start on python quake_ext support)
+from ..mlir._mlir_libs._quakeDialects import cudaq_runtime, load_intrinsic, register_all_dialects, loadIRDLOperations
 
 # This file implements the CUDA-Q Python AST to MLIR conversion.
 # It provides a `PyASTBridge` class that implements the `ast.NodeVisitor` type
@@ -174,8 +170,6 @@ class PyASTBridge(ast.NodeVisitor):
                         self.quakeExtOps[k] = v
             
             loadIRDLOperations(self.ctx, str(cudaq_install_path))
-
-        print(self.quakeExtOps)
 
     def emitFatalError(self, msg, astNode=None):
         """
@@ -1534,7 +1528,7 @@ class PyASTBridge(ast.NodeVisitor):
                         params[idx] = arith.SIToFPOp(self.getFloatType(),
                                                      val).result
                 self.__applyQuantumOperation(node.func.id, params, qubitTargets)
-                
+
             if node.func.id in self.quakeExtOps:
                 quakeExtOp = self.quakeExtOps[node.func.id]
                 valueStackSize = len(self.valueStack)
@@ -1558,7 +1552,6 @@ class PyASTBridge(ast.NodeVisitor):
                                  results=[],
                                  operands=operandsList,
                                  attributes=attributes)
-                print(self.module)
                 return
 
             if node.func.id in globalKernelRegistry:

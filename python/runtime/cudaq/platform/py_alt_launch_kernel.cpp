@@ -6,6 +6,8 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
+#include "py_alt_launch_kernel.h"
+
 #include "JITExecutionCache.h"
 #include "common/ArgumentWrapper.h"
 #include "cudaq/Optimizer/CAPI/Dialects.h"
@@ -92,7 +94,10 @@ jitAndCreateArgs(const std::string &name, MlirModule module,
     opts.enablePerfNotificationListener = false;
     opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
     opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::None;
-    SmallVector<StringRef, 4> sharedLibs;
+    SmallVector<StringRef, 4> sharedLibs(
+        jitCache->availableQuakeExtensionModules.begin(),
+        jitCache->availableQuakeExtensionModules.end());
+    opts.sharedLibPaths = sharedLibs;
     opts.llvmModuleBuilder =
         [](Operation *module,
            llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
@@ -384,8 +389,8 @@ std::string getQIRLL(const std::string &name, MlirModule module,
   return str;
 }
 
-void bindAltLaunchKernel(py::module &mod) {
-  jitCache = std::make_unique<JITExecutionCache>();
+void bindAltLaunchKernel(cudaq::LinkedLibraryHolder &holder, py::module &mod) {
+  jitCache = std::make_unique<JITExecutionCache>(holder.availableQuakeExtensionModules);
 
   auto callableArgHandler = [](cudaq::OpaqueArguments &argData,
                                py::object &arg) {
