@@ -317,6 +317,16 @@ void __quantum__qis__cphase(double d, Qubit *q, Qubit *r) {
   nvqir::getCircuitSimulatorInternal()->r1(d, ctrls, rI);
 }
 
+Qubit *__quantum__rt__array_get_qubit_element(Array *arr, int64_t idx) {
+  return *reinterpret_cast<Qubit **>((*arr)[idx]);
+}
+
+void __quantum__rt__array_set_qubit_element(Array *arr, int64_t idx, Qubit *q) {
+  *reinterpret_cast<Qubit **>((*arr)[idx]) = q;
+}
+
+Result *llvm_qir_getResultPtr(Result *r) { return r; }
+
 void __quantum__qis__phased_rx(double theta, double phi, Qubit *q) {
   auto qI = qubitToSizeT(q);
   std::complex<double> i(0, 1.);

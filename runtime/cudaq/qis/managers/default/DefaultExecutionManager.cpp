@@ -15,11 +15,15 @@
 #include "cudaq/utils/cudaq_utils.h"
 #include <complex>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <map>
 #include <queue>
 #include <sstream>
 #include <stack>
+
+#include "nlohmann/json.hpp"
 
 #include "nvqir/CircuitSimulator.h"
 
@@ -28,6 +32,9 @@ CircuitSimulator *getCircuitSimulatorInternal();
 }
 
 namespace {
+
+using GenQuakeExtUnitaryFunctor = void (*)(double *, std::size_t,
+                                           std::complex<double> *);
 
 /// The DefaultExecutionManager will implement allocation, deallocation, and
 /// quantum instruction application via calls to the current CircuitSimulator
@@ -50,6 +57,8 @@ private:
     allocateQudits(requestedAllocations);
     requestedAllocations.clear();
   }
+
+  std::map<std::string, GenQuakeExtUnitaryFunctor> quakeExtUnitaryFunctors;
 
 protected:
   void allocateQudit(const cudaq::QuditInfo &q) override {
@@ -144,6 +153,24 @@ protected:
                 simulator()->applyExpPauli(parameters[0], localC, localT, op);
               })
         .Default([&]() {
+          auto iter = quakeExtUnitaryFunctors.find(gateName);
+          if (iter != quakeExtUnitaryFunctors.end()) {
+            std::size_t size = (1UL << targets.size());
+            std::vector<std::complex<double>> data(size * size);
+            iter->second(parameters.data(), parameters.size(), data.data());
+            if (cudaq::details::should_log(cudaq::details::LogLevel::info)) {
+              std::string dataStr = "";
+              for (auto &el : data)
+                dataStr += "(" + std::to_string(el.real()) + ", " +
+                           std::to_string(el.imag()) + ") ";
+
+              cudaq::info("Found quake_ext op {} with {} elements", gateName,
+                          dataStr);
+            }
+            simulator()->applyCustomOperation(data, localC, localT);
+            return;
+          }
+
           throw std::runtime_error("[DefaultExecutionManager] invalid gate "
                                    "application requested " +
                                    gateName + ".");
@@ -223,7 +250,44 @@ public:
   DefaultExecutionManager() {
     cudaq::info("[DefaultExecutionManager] Creating the {} backend.",
                 simulator()->name());
+
+    // Need to know of any quake_ext ops.
+    std::string libSuffix;
+    cudaq::__internal__::CUDAQLibraryData data;
+#if defined(__APPLE__) && defined(__MACH__)
+    libSuffix = "dylib";
+    cudaq::__internal__::getCUDAQLibraryPath(&data);
+#else
+    libSuffix = "so";
+    dl_iterate_phdr(cudaq::__internal__::getCUDAQLibraryPath, &data);
+#endif
+
+    std::filesystem::path nvqirLibPath{data.path};
+    auto cudaqLibPath = nvqirLibPath.parent_path();
+    auto cudaqInstallPath = cudaqLibPath.parent_path();
+    auto cudaqIRDLPath = cudaqInstallPath / "extensions" / "irdl";
+    for (const auto &entry :
+         std::filesystem::directory_iterator(cudaqIRDLPath)) {
+      if (entry.path().extension().string() == ".json") {
+        std::ifstream t(entry.path());
+        std::string str((std::istreambuf_iterator<char>(t)),
+                        std::istreambuf_iterator<char>());
+        auto json = nlohmann::json::parse(str);
+        for (auto it = json.begin(); it != json.end(); ++it) {
+
+          auto libName = "lib" + entry.path().stem().string() + "." + libSuffix;
+          auto libLoc = cudaqInstallPath / "extensions" / "unitaries" / libName;
+          auto handle = dlopen(libLoc.string().c_str(), RTLD_LAZY);
+          auto generatorName = it.key() + "_generator";
+          GenQuakeExtUnitaryFunctor fcn =
+              (GenQuakeExtUnitaryFunctor)(intptr_t)dlsym(handle,
+                                                         generatorName.c_str());
+          quakeExtUnitaryFunctors.insert({it.key(), fcn});
+        }
+      }
+    }
   }
+
   virtual ~DefaultExecutionManager() = default;
 
   void resetQudit(const cudaq::QuditInfo &q) override {

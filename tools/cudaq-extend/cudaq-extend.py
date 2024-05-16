@@ -94,22 +94,16 @@ visitor.visit(astModule)
 
 cppTemplate = '''
 #include <vector>
-struct CComplex {{
-  double real = 0.0;
-  double imag = 0.0;
-  CComplex() = default;
-  CComplex(double r) : real(r){{ }}
-}};
+#include <complex>
 
-using unitary = std::vector<CComplex>;
+using unitary = std::vector<std::complex<double>>;
 auto internal_call_lambda = {}
 
 extern "C" void {}(const double *params, std::size_t numParams,
-                           CComplex **output) {{
+                           std::complex<double> *output) {{
   std::vector<double> input(params, params + numParams);
   auto tmpOutput = internal_call_lambda(input);
-  *output = new CComplex[tmpOutput.size()];
-  std::copy(tmpOutput.begin(), tmpOutput.end(), *output);
+  for (int i = 0; i < tmpOutput.size(); i++) output[i] = tmpOutput[i];
   return;
 }}
 '''

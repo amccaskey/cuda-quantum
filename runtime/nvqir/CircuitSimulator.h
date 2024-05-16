@@ -1022,7 +1022,8 @@ public:
                                                        element.imag());
                      }
                    });
-    cudaq::info(gateToString("custom_unitary", controls, {}, targets));
+    if (cudaq::details::should_log(cudaq::details::LogLevel::info))
+      cudaq::info(gateToString("custom_unitary", controls, {}, targets));
     enqueueGate("custom", actual, controls, targets, {});
   }
 

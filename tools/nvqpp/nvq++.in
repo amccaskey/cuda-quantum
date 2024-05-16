@@ -234,19 +234,28 @@ if ${IS_RELOCATABLE_INSTALL}; then
 	CLANG_RESOURCE_DIR="-resource-dir ${install_dir}/lib/clang/@CUDAQ_LLVM_VERSION@"
 fi
 
+QUAKE_EXT_LIBRARY_DIR=${install_dir}/extensions/unitaries
 CUDAQ_IS_APPLE=@CUDAQ_IS_APPLE@
 LINKER_PATH=
 NVQPP_LD_PATH=${NVQPP_LD_PATH:-"@NVQPP_LD_PATH@"}
 if [ -f "$NVQPP_LD_PATH" ]; then
 	LINKER_PATH="--ld-path=${NVQPP_LD_PATH}"
 fi
-LINKER_FLAGS="${LINKER_FLAGS} -Wl,-rpath,${install_dir}/lib -Wl,-rpath,${install_dir}/lib/plugins -Wl,-rpath,${PWD}"
+LINKER_FLAGS="${LINKER_FLAGS} -Wl,-rpath,${install_dir}/lib -Wl,-rpath,${install_dir}/lib/plugins -Wl,-rpath,${PWD} -Wl,-rpath,${QUAKE_EXT_LIBRARY_DIR}"
 
 LIBRARY_MODE_EXECUTION_MANAGER="default"
 PLATFORM_LIBRARY="default"
 LLVM_QUANTUM_TARGET="qir"
-LINKDIRS="-L${install_dir}/lib -L${install_dir}/lib/plugins @CUDAQ_CXX_NVQPP_LINK_STR@"
-LINKLIBS="-lcudaq -lcudaq-common -lcudaq-mlir-runtime -lcudaq-builder -lcudaq-ensmallen -lcudaq-nlopt -lcudaq-spin -L ${install_dir}/extensions/unitaries -lexternal_ops"
+LINKDIRS="-L${install_dir}/lib -L${install_dir}/lib/plugins -L${QUAKE_EXT_LIBRARY_DIR} @CUDAQ_CXX_NVQPP_LINK_STR@"
+LINKLIBS="-lcudaq -lcudaq-common -lcudaq-mlir-runtime -lcudaq-builder -lcudaq-ensmallen -lcudaq-nlopt -lcudaq-spin"
+
+# Add quake_ext libraries to the link line
+for lib in "$QUAKE_EXT_LIBRARY_DIR"/*.so; do 
+  if [ -e "$lib" ]; then 
+  	LIB_NAME=$(basename "$lib" | sed 's/^lib//; s/\.so.*$//')
+	LINKLIBS="$LINKLIBS -l$LIB_NAME"
+  fi
+done
 
 # Add any plugin libraries to the link stage
 CUDAQ_PLUGIN_DIR=${install_dir}/lib/plugins
@@ -736,7 +745,11 @@ for i in ${SRCS}; do
 		run ${install_dir}/bin/fixup-linkage ${file}.qke ${file}.pre.ll ${file}.ll
 
 		# Lower our LLVM to object files
-		run cat ${QUAKELL_FILE}
+		# FIXME short term workaround for target type work
+		run sed -i 's/target("qir#Qubit")/ptr/g' ${QUAKELL_FILE}
+		run sed -i 's/target("qir#Array")/ptr/g' ${QUAKELL_FILE}
+		run sed -i 's/target("qir#Result")/ptr/g' ${QUAKELL_FILE}
+		run sed -i 's/llvm.qir.getResultPtr/llvm_qir_getResultPtr/g' ${QUAKELL_FILE}
 		run ${LLC} --relocation-model=pic --filetype=obj ${LLC_FLAGS} ${QUAKELL_FILE} -o ${file}.qke.o
 		QUAKE_OBJ="${file}.qke.o"
 	else

@@ -191,10 +191,10 @@ public:
     FlatSymbolRefAttr symbolRef = cudaq::opt::factory::createLLVMFunctionSymbol(
         cudaq::opt::QIRArrayCreateArray, qirArrayTy,
         {rewriter.getI32Type(), rewriter.getI64Type()}, parentModule);
-    FlatSymbolRefAttr getEleSymbolRef =
-        cudaq::opt::factory::createLLVMFunctionSymbol(
-            cudaq::opt::QIRArrayGetElementPtr1d, qirQubitTy,
-            {qirArrayTy, rewriter.getI64Type()}, parentModule);
+    // FlatSymbolRefAttr getEleSymbolRef =
+    //     cudaq::opt::factory::createLLVMFunctionSymbol(
+    //         cudaq::opt::QIRArrayGetElementPtr1d, qirQubitTy,
+    //         {qirArrayTy, rewriter.getI64Type()}, parentModule);
     FlatSymbolRefAttr setEleSymbolRef =
         cudaq::opt::factory::createLLVMFunctionSymbol(
             cudaq::opt::QIRArraySetElementAt, LLVM::LLVMVoidType::get(context),
@@ -210,11 +210,10 @@ public:
       auto createCall = rewriter.create<LLVM::CallOp>(
           loc, qirArrayTy, symbolRef, ArrayRef<Value>{eight, one});
       auto result = createCall.getResult();
-      auto call = rewriter.create<LLVM::CallOp>(
-          loc, qirQubitTy, getEleSymbolRef, ArrayRef<Value>{result, zero});
-      rewriter.create<LLVM::CallOp>(
-          loc, TypeRange{}, setEleSymbolRef,
-          ArrayRef<Value>{result, zero, call.getResult()});
+      // auto call = rewriter.create<LLVM::CallOp>(
+      //     loc, qirQubitTy, getEleSymbolRef, ArrayRef<Value>{result, zero});
+      rewriter.create<LLVM::CallOp>(loc, TypeRange{}, setEleSymbolRef,
+                                    ArrayRef<Value>{result, zero, v});
       return result;
     };
 
@@ -1770,20 +1769,23 @@ public:
     auto complexPtrTy = cudaq::cc::PointerType::get(complexTy);
     auto powTwo = (1UL << numTargets);
     Value numElementsVal =
-        rewriter.create<arith::ConstantIntOp>(loc, powTwo*powTwo, 64);
+        rewriter.create<arith::ConstantIntOp>(loc, powTwo * powTwo, 64);
     auto unitaryData =
         rewriter.create<cudaq::cc::AllocaOp>(loc, complexTy, numElementsVal);
 
-    {
+    if (!parentModule.lookupSymbol(generateFuncName)) {
       auto ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(parentModule.getBody());
       auto ftype = FunctionType::get(
           context, {f64PtrTy, rewriter.getI64Type(), complexPtrTy}, {});
       auto func = rewriter.create<func::FuncOp>(loc, generateFuncName, ftype);
-
       rewriter.restoreInsertionPoint(ip);
       rewriter.create<func::CallOp>(
           loc, func, ValueRange{paramsPtr, numParametersVal, unitaryData});
+    } else {
+      rewriter.create<func::CallOp>(
+          loc, generateFuncName, TypeRange{},
+          ValueRange{paramsPtr, numParametersVal, unitaryData});
     }
 
     // concatenate targets
@@ -1801,7 +1803,7 @@ public:
     if (controls.empty()) {
       // make an empty array
       Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
-      Value zero32 = rewriter.create<arith::ConstantIntOp>(loc, 0, 32);
+      Value zero32 = rewriter.create<arith::ConstantIntOp>(loc, 8, 32);
 
       FlatSymbolRefAttr symbolRef =
           cudaq::opt::factory::createLLVMFunctionSymbol(
@@ -1818,19 +1820,25 @@ public:
       concatControls = rewriter.create<quake::ConcatOp>(
           loc, quake::VeqType::getUnsized(context), controls);
 
-    auto ip = rewriter.saveInsertionPoint();
-    rewriter.setInsertionPointToStart(parentModule.getBody());
-    auto ftype =
-        FunctionType::get(context,
-                          {complexPtrTy, cudaq::opt::getArrayType(context),
-                           cudaq::opt::getArrayType(context)},
-                          {});
-    auto func = rewriter.create<func::FuncOp>(
-        loc, "__quantum__qis__quake_ext_op", ftype);
-    rewriter.restoreInsertionPoint(ip);
+    if (!parentModule.lookupSymbol("__quantum__qis__quake_ext_op")) {
+      auto ip = rewriter.saveInsertionPoint();
+      rewriter.setInsertionPointToStart(parentModule.getBody());
+      auto ftype =
+          FunctionType::get(context,
+                            {complexPtrTy, cudaq::opt::getArrayType(context),
+                             cudaq::opt::getArrayType(context)},
+                            {});
+      auto func = rewriter.create<func::FuncOp>(
+          loc, "__quantum__qis__quake_ext_op", ftype);
+      rewriter.restoreInsertionPoint(ip);
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(
-        op, func, ValueRange{unitaryData, concatControls, concatTargets});
+      rewriter.replaceOpWithNewOp<func::CallOp>(
+          op, func, ValueRange{unitaryData, concatControls, concatTargets});
+    } else {
+      rewriter.replaceOpWithNewOp<func::CallOp>(
+          op, "__quantum__qis__quake_ext_op", TypeRange{},
+          ValueRange{unitaryData, concatControls, concatTargets});
+    }
 
     return success();
   }
