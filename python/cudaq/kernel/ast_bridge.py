@@ -7,7 +7,8 @@
 # ============================================================================ #
 import ast
 import graphlib
-import sys, os
+import sys, os, json
+from pathlib import Path
 from typing import Callable
 from collections import deque
 import numpy as np
@@ -17,7 +18,11 @@ from ..mlir.ir import *
 from ..mlir.passmanager import *
 from ..mlir.dialects import quake, cc
 from ..mlir.dialects import builtin, func, arith, math, complex
+<<<<<<< HEAD
 from ..mlir._mlir_libs._quakeDialects import cudaq_runtime, load_intrinsic, register_all_dialects
+=======
+from ..mlir._mlir_libs._quakeDialects import cudaq_runtime, load_intrinsic, loadIRDLOperations
+>>>>>>> bd5f166ab (start on python quake_ext support)
 
 # This file implements the CUDA-Q Python AST to MLIR conversion.
 # It provides a `PyASTBridge` class that implements the `ast.NodeVisitor` type
@@ -149,6 +154,28 @@ class PyASTBridge(ast.NodeVisitor):
         self.subscriptPushPointerValue = False
         self.verbose = 'verbose' in kwargs and kwargs['verbose']
         self.currentNode = None
+
+        self.quakeExtOps = {}
+        cudaq_install_path = Path(__file__).resolve().parent.parent
+        while not os.path.exists(
+                str(cudaq_install_path) + os.path.sep + 'extensions'):
+            if cudaq_install_path.parent == None:
+                break
+            cudaq_install_path = cudaq_install_path.parent
+
+        if os.path.exists(str(cudaq_install_path) + os.path.sep + 'extensions'):
+            irdlDir = str(cudaq_install_path
+                         ) + os.path.sep + 'extensions' + os.path.sep + 'irdl'
+            json_files = [j for j in os.listdir(irdlDir) if j.endswith('.json')]
+            for j in json_files:
+                with open(irdlDir + os.path.sep + j, 'r') as f:
+                    data = json.load(f)
+                    for k, v in data.items():
+                        self.quakeExtOps[k] = v
+            
+            loadIRDLOperations(self.ctx, str(cudaq_install_path))
+
+        print(self.quakeExtOps)
 
     def emitFatalError(self, msg, astNode=None):
         """
@@ -1507,6 +1534,31 @@ class PyASTBridge(ast.NodeVisitor):
                         params[idx] = arith.SIToFPOp(self.getFloatType(),
                                                      val).result
                 self.__applyQuantumOperation(node.func.id, params, qubitTargets)
+                
+            if node.func.id in self.quakeExtOps:
+                quakeExtOp = self.quakeExtOps[node.func.id]
+                valueStackSize = len(self.valueStack)
+                operandsList = [self.popValue() for _ in range(valueStackSize)]
+                numRequired = quakeExtOp['num_targets'] + quakeExtOp[
+                    'num_parameters']
+                if len(operandsList) != numRequired:
+                    self.emitFatalError(
+                        f'invalid arguments passed to {node.func.id} - {len(operandsList)} args provided but {numRequired}'
+                    )
+                operandsList.reverse()
+                attributes = {
+                    'num_targets':
+                        self.getIntegerAttr(self.getIntegerType(),
+                                            quakeExtOp['num_targets']),
+                    'num_parameters':
+                        self.getIntegerAttr(self.getIntegerType(),
+                                            quakeExtOp['num_parameters'])
+                }
+                Operation.create(name=f'quake_ext.{node.func.id}',
+                                 results=[],
+                                 operands=operandsList,
+                                 attributes=attributes)
+                print(self.module)
                 return
 
             if node.func.id in globalKernelRegistry:
@@ -3342,7 +3394,7 @@ def compile_to_mlir(astModule, metadata, **kwargs):
                            context=bridge.ctx)
 
     try:
-        pm.run(bridge.module)
+        pm.run(bridge.module.operation)
     except:
         raise RuntimeError("could not compile code for '{}'.".format(
             bridge.name))
