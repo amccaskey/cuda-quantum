@@ -7,6 +7,9 @@
  ******************************************************************************/
 
 #include "mlir/Bindings/Python/PybindAdaptors.h"
+#include "mlir/Dialect/IRDL/IR/IRDL.h"
+#include "mlir/Dialect/IRDL/IRDLLoading.h"
+#include "mlir/Parser/Parser.h"
 
 #include "cudaq/Optimizer/Builder/Intrinsics.h"
 #include "cudaq/Optimizer/CAPI/Dialects.h"
@@ -16,7 +19,9 @@
 #include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
 
+#include <filesystem>
 #include <fmt/core.h>
+#include <fstream>
 #include <pybind11/stl.h>
 
 namespace py = pybind11;
@@ -222,6 +227,40 @@ void registerCCDialectAndTypes(py::module &m) {
           });
 }
 
+void loadIRDLDialects(mlir::MLIRContext &ctx,
+                      const std::filesystem::path &installPath) {
+  using namespace mlir;
+  DialectRegistry registry;
+  registry.insert<irdl::IRDLDialect>();
+  ctx.appendDialectRegistry(registry);
+
+  auto irdlDirectory = installPath / "extensions" / "irdl";
+  if (!std::filesystem::exists(irdlDirectory))
+    return;
+
+  std::string irdlContents = "module {\nirdl.dialect @quake_ext {\n";
+  for (const auto &entry : std::filesystem::directory_iterator(irdlDirectory)) {
+    std::ifstream t(entry.path());
+    std::string str((std::istreambuf_iterator<char>(t)),
+                    std::istreambuf_iterator<char>());
+    if (entry.path().extension().string() == ".irdl")
+      irdlContents += str;
+  }
+
+  irdlContents += "}\n}";
+
+  llvm::outs() << "IRDL Contents:\n" << irdlContents << "\n";
+
+  // Parse the input file.
+  OwningOpRef<ModuleOp> module(parseSourceString<ModuleOp>(irdlContents, &ctx));
+
+  // Load IRDL dialects.
+  if (failed(irdl::loadDialects(module.get())))
+    return;
+
+  return;
+}
+
 void bindRegisterDialects(py::module &mod) {
   registerQuakeDialectAndTypes(mod);
   registerCCDialectAndTypes(mod);
@@ -232,5 +271,11 @@ void bindRegisterDialects(py::module &mod) {
     if (failed(builder.loadIntrinsic(unwrapped, name)))
       unwrapped.emitError("failed to load intrinsic " + name);
   });
+
+  mod.def("loadIRDLOperations",
+          [](MlirContext ctx, std::string installLocation) {
+            auto context = unwrap(ctx);
+            loadIRDLDialects(*context, installLocation);
+          });
 }
 } // namespace cudaq
