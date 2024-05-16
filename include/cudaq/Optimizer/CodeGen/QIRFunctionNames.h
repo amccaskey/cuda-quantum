@@ -73,19 +73,23 @@ constexpr static const char QIRRecordOutput[] =
 
 inline mlir::Type getQuantumTypeByName(mlir::StringRef type,
                                        mlir::MLIRContext *context) {
-  return mlir::LLVM::LLVMTargetExtType::get(context, type, {}, {});
+  return mlir::LLVM::LLVMStructType::getOpaque(type, context);
+  //   return mlir::LLVM::LLVMTargetExtType::get(context, type, {}, {});
 }
 
 inline mlir::Type getQubitType(mlir::MLIRContext *context) {
-  return getQuantumTypeByName("qir#Qubit", context);
+  return mlir::LLVM::LLVMPointerType::get(context);
+  //   return getQuantumTypeByName("qir#Qubit", context);
 }
 
 inline mlir::Type getArrayType(mlir::MLIRContext *context) {
-  return getQuantumTypeByName("qir#Array", context);
+  return mlir::LLVM::LLVMPointerType::get(context);
+  //   return getQuantumTypeByName("qir#Array", context);
 }
 
 inline mlir::Type getResultType(mlir::MLIRContext *context) {
-  return getQuantumTypeByName("qir#Result", context);
+  return mlir::LLVM::LLVMPointerType::get(context);
+  //   return getQuantumTypeByName("qir#Result", context);
 }
 
 void initializeTypeConversions(mlir::LLVMTypeConverter &typeConverter);

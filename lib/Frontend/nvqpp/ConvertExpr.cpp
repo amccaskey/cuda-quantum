@@ -1943,7 +1943,20 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
                                    iter->second.num_parameters)));
       }
 
-      OperationState state(loc, "quake_ext." + funcName.str(), args,
+      SmallVector<Value> processedValues;
+      for (auto& arg : args) {
+        if (auto ptrTy = dyn_cast<cudaq::cc::PointerType>(arg.getType())) {
+          auto eleTy = ptrTy.getElementType();
+          if (isa<FloatType>(eleTy)) {
+            Value loaded = builder.create<cudaq::cc::LoadOp>(loc, arg);
+            processedValues.push_back(loaded);
+            continue;
+          }
+        }
+        processedValues.push_back(arg);
+      }
+
+      OperationState state(loc, "quake_ext." + funcName.str(), processedValues,
                            TypeRange(), attributes);
       builder.create(state);
       return true;

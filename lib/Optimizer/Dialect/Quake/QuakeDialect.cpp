@@ -28,6 +28,6 @@ void quake::QuakeDialect::initialize() {
 #define GET_OP_LIST
 #include "cudaq/Optimizer/Dialect/Quake/QuakeOps.cpp.inc"
       >();
-  declarePromisedInterface<mlir::ConvertToLLVMPatternInterface, QuakeDialect>();
+  declarePromisedInterface<QuakeDialect, mlir::ConvertToLLVMPatternInterface>();
   addInterfaces<QuakeInlinerInterface>();
 }

@@ -365,8 +365,9 @@ void __quantum__qis__quake_ext_op(std::complex<double> *unitary,
                                   Array *controls, Array *targets) {
   auto controlsQ = arrayToVectorSizeT(controls);
   auto targetsQ = arrayToVectorSizeT(targets);
-  std::vector<std::complex<double>> matrix(
-      unitary, unitary + (int)std::pow(2, targetsQ.size()));
+  std::size_t twoPowN = (1UL << targetsQ.size());
+  std::vector<std::complex<double>> matrix(unitary,
+                                           unitary + (int)twoPowN * twoPowN);
   nvqir::getCircuitSimulatorInternal()->applyCustomOperation(matrix, controlsQ,
                                                              targetsQ);
 }

@@ -32,6 +32,6 @@ void cudaq::cc::CCDialect::initialize() {
 #include "cudaq/Optimizer/Dialect/CC/CCOps.cpp.inc"
       >();
   registerAttrs();
-  declarePromisedInterface<mlir::ConvertToLLVMPatternInterface, CCDialect>();
+  declarePromisedInterface<CCDialect, mlir::ConvertToLLVMPatternInterface>();
   addInterfaces<CCInlinerInterface>();
 }

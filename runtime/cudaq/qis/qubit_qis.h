@@ -1048,13 +1048,9 @@ std::vector<T> slice_vector(std::vector<T> &original, std::size_t start,
   return ret;
 }
 
-<<<<<<< HEAD
-} // namespace cudaq
-=======
 } // namespace cudaq
 
 
 #ifdef CUDAQ_HAS_QUAKE_EXT_INCLUDES
 #include "quake_ext.h"
 #endif
->>>>>>> 4769c3a45 (clean up, automate including generated headers)
