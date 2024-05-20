@@ -465,6 +465,12 @@ int main(int argc, char **argv) {
   for (auto &def : macroDefines)
     clArgs.push_back("-D" + def);
 
+  if (!metadata.empty()) {
+    clArgs.push_back("-DCUDAQ_HAS_QUAKE_EXT_INCLUDES");
+    auto extensionsPath = cudaqInstallPath / "extensions" / "headers";
+    clArgs.push_back("-I" + extensionsPath.string());
+  }
+
   // Pass verify mode if requested.
   if (verifyMode) {
     clArgs.push_back("-Xclang");

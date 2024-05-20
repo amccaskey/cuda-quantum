@@ -10,7 +10,7 @@
 
 #include "common/Logger.h"
 #include "cudaq/qis/managers/BasicExecutionManager.h"
-#include "cudaq/qis/qudit.h"
+#include "cudaq/qis/qubit_qis.h"
 #include "cudaq/spin_op.h"
 #include "cudaq/utils/cudaq_utils.h"
 #include <complex>
@@ -153,6 +153,12 @@ protected:
                 simulator()->applyExpPauli(parameters[0], localC, localT, op);
               })
         .Default([&]() {
+          if (registeredOperations.count(gateName)) {
+            auto data = registeredOperations[gateName]->unitary(parameters);
+            simulator()->applyCustomOperation(data, localC, localT);
+            return;
+          }
+
           auto iter = quakeExtUnitaryFunctors.find(gateName);
           if (iter != quakeExtUnitaryFunctors.end()) {
             std::size_t size = (1UL << targets.size());

@@ -55,7 +55,8 @@ template <typename T>
 concept IsQubitType = std::is_same_v<std::remove_cvref_t<T>, cudaq::qubit>;
 
 template <typename T>
-concept IsQvectorType = std::is_same_v<std::remove_cvref_t<T>, cudaq::qvector<>>;
+concept IsQvectorType =
+    std::is_same_v<std::remove_cvref_t<T>, cudaq::qvector<>>;
 
 inline void segmentParameters(std::vector<double> &params,
                               std::vector<QuditInfo> &qubits) {}
@@ -79,7 +80,7 @@ void segmentParameters(std::vector<double> &params,
 
 template <typename mod = base, typename... GeneralArgs>
 void applyQuakeExtOperation(const std::string &gateName, std::size_t numTargets,
-                    GeneralArgs &&...args) {
+                            GeneralArgs &&...args) {
 
   std::vector<double> parameters;
   std::vector<QuditInfo> qubits;
@@ -1050,7 +1051,35 @@ std::vector<T> slice_vector(std::vector<T> &original, std::size_t start,
 
 } // namespace cudaq
 
-
 #ifdef CUDAQ_HAS_QUAKE_EXT_INCLUDES
 #include "quake_ext.h"
 #endif
+
+#define CUDAQ_EXTEND_OPERATIONS(NAME, NUMT, NUMP, ...)                         \
+  namespace cudaq {                                                            \
+  struct CONCAT(NAME, _operation) : public ::cudaq::quantum_operation {        \
+    std::size_t numTargets = NUMT;                                             \
+    std::size_t numParameters = NUMP;                                          \
+    std::vector<std::complex<double>>                                          \
+    unitary(const std::vector<double> &parameters) const override {            \
+      return __VA_ARGS__;                                                      \
+    }                                                                          \
+  };                                                                           \
+  template <typename mod = base, typename... GeneralArgs>                      \
+  void NAME(GeneralArgs &&...args) {                                           \
+    cudaq::getExecutionManager()->registerOperation<CONCAT(NAME, _operation)>( \
+        #NAME);                                                                \
+    applyQuakeExtOperation<mod>(#NAME, NUMT,                                   \
+                                std::forward<GeneralArgs>(args)...);           \
+  }                                                                            \
+  }                                                                            \
+  extern "C" void CONCAT(NAME, _generator)(const double *params,               \
+                                           std::size_t numParams,              \
+                                           std::complex<double> *output) {     \
+    std::vector<double> input(params, params + numParams);                     \
+    cudaq::CONCAT(NAME, _operation) op;                                        \
+    auto tmpOutput = op.unitary(input);                                        \
+    for (int i = 0; i < tmpOutput.size(); i++)                                 \
+      output[i] = tmpOutput[i];                                                \
+    return;                                                                    \
+  }

@@ -17,6 +17,11 @@
 namespace cudaq {
 class ExecutionContext;
 using SpinMeasureResult = std::pair<double, sample_result>;
+struct quantum_operation {
+  virtual std::vector<std::complex<double>>
+  unitary(const std::vector<double> &parameters) const = 0;
+  virtual ~quantum_operation() {}
+};
 
 /// A QuditInfo is a type encoding the number of \a levels and the \a id of the
 /// qudit to the ExecutionManager.
@@ -92,8 +97,19 @@ protected:
   /// Internal - At qudit deallocation, return the qudit index
   void returnIndex(std::size_t idx) { tracker.returnIndex(idx); }
 
+  std::unordered_map<std::string, std::unique_ptr<cudaq::quantum_operation>>
+      registeredOperations;
+
 public:
   ExecutionManager() = default;
+
+  template <typename T>
+  void registerOperation(const std::string &name) {
+    auto iter = registeredOperations.find(name);
+    if (iter != registeredOperations.end())
+      return;
+    registeredOperations.insert({name, std::make_unique<T>()});
+  }
 
   /// Allocates a qudit and returns its identifier (index).
   virtual std::size_t allocateQudit(std::size_t quditLevels = 2) = 0;
@@ -149,7 +165,7 @@ public:
   virtual void synchronize() = 0;
 
   /// Flush the gate queue (needed for accurate timing information)
-  virtual void flushGateQueue(){};
+  virtual void flushGateQueue() {};
 
   virtual ~ExecutionManager() = default;
 };

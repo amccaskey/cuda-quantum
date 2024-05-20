@@ -1958,7 +1958,7 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
 
       OperationState state(loc, "quake_ext." + funcName.str(), processedValues,
                            TypeRange(), attributes);
-      builder.create(state);
+      op = builder.create(state);
       return true;
     }
 
