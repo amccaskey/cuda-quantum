@@ -903,6 +903,7 @@ def R1Op : OneTargetParamOp<"r1", [Rotation]> {
      └───────┘
     ```
   }];
+  let hasCanonicalizer = 1;
 }
 
 def RxOp : OneTargetParamOp<"rx", [Rotation]> {
@@ -1118,6 +1119,18 @@ def ZOp : OneTargetOp<"z", [Hermitian]> {
      └───┘
     ```
   }];
+}
+
+def CustomUnitarySymbolOp
+    : QuakeOperator<"unitary"> {
+  let summary = "Custom unitary from symbol ref";
+  let description = "desc"; 
+  // let regions = (region SizedRegion<1>:$unitaryGenerator);
+  // let assemblyFormat = [{
+  //   $unitaryGenerator ( `<` `adj` $is_adj^ `>` )? ( `(` $parameters^ `)` )?
+  //   (`[` $controls^ (`neg` $negated_qubit_controls^ )? `]`)?
+  //   $targets `:` functional-type(operands, results) attr-dict
+  // }]; 
 }
 
 #endif // CUDAQ_OPTIMIZER_DIALECT_QUAKE_OPS

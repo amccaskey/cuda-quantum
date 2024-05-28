@@ -7,6 +7,7 @@
  ******************************************************************************/
 
 #include "cudaq/Optimizer/Dialect/Quake/QuakeOps.h"
+#include "cudaq/Optimizer/Dialect/CC/CCOps.h"
 #include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -780,11 +781,62 @@ struct MergeRotationPattern : public OpRewritePattern<OP> {
     return success();
   }
 };
+
+// %4 = Something that returns float value
+// %5 = cc.alloca f64
+// cc.store %4, %5 : !cc.ptr<f64>
+// %6 = cc.load %5 : !cc.ptr<f64>
+// quake.ry (%6) %1 : (f64, !quake.ref) -> ()
+//
+// to
+//
+// quake.ry(%4) ...
+template <typename OP>
+class RewritePassByReferenceRotations : public OpRewritePattern<OP> {
+  using Base = OpRewritePattern<OP>;
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(OP rotate,
+                                PatternRewriter &rewriter) const override {
+    auto param = rotate.getParameter();
+    auto maybeLoadOp = param.template getDefiningOp<cudaq::cc::LoadOp>();
+    if (!maybeLoadOp)
+      return failure();
+
+    auto maybeAllocaOp =
+        maybeLoadOp.getPtrvalue().template getDefiningOp<cudaq::cc::AllocaOp>();
+    if (!maybeAllocaOp)
+      return failure();
+
+    std::size_t userCount = 0;
+    cudaq::cc::StoreOp maybeStoreOp;
+    for (auto user : maybeAllocaOp->getUsers()) {
+      maybeStoreOp = dyn_cast<cudaq::cc::StoreOp>(user);
+      userCount++;
+    }
+
+    // Only consider patterns where the alloca result is used
+    // by the store and the load
+    if (userCount != 2 || !maybeStoreOp)
+      return failure();
+
+    auto paramValue = maybeStoreOp.getValue();
+    rewriter.replaceOpWithNewOp<OP>(
+        rotate, rotate.getResultTypes(), rotate.getIsAdjAttr(),
+        ValueRange{paramValue}, rotate.getControls(), rotate.getTargets(),
+        rotate.getNegatedQubitControlsAttr());
+    maybeAllocaOp->dropAllUses();
+    rewriter.eraseOp(maybeStoreOp);
+    rewriter.eraseOp(maybeAllocaOp);
+    return success();
+  }
+};
 } // namespace
 
 void quake::RxOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                               MLIRContext *context) {
-  patterns.add<MergeRotationPattern<quake::RxOp>>(context);
+  patterns.add<MergeRotationPattern<quake::RxOp>,
+               RewritePassByReferenceRotations<quake::RxOp>>(context);
 }
 
 void quake::RyOp::getOperatorMatrix(Matrix &matrix) {
@@ -802,7 +854,8 @@ void quake::RyOp::getOperatorMatrix(Matrix &matrix) {
 
 void quake::RyOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                               MLIRContext *context) {
-  patterns.add<MergeRotationPattern<quake::RyOp>>(context);
+  patterns.add<MergeRotationPattern<quake::RyOp>,
+               RewritePassByReferenceRotations<quake::RyOp>>(context);
 }
 
 void quake::RzOp::getOperatorMatrix(Matrix &matrix) {
@@ -821,7 +874,13 @@ void quake::RzOp::getOperatorMatrix(Matrix &matrix) {
 
 void quake::RzOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                               MLIRContext *context) {
-  patterns.add<MergeRotationPattern<quake::RzOp>>(context);
+  patterns.add<MergeRotationPattern<quake::RzOp>,
+               RewritePassByReferenceRotations<quake::RzOp>>(context);
+}
+
+void quake::R1Op::getCanonicalizationPatterns(RewritePatternSet &patterns,
+                                              MLIRContext *context) {
+  patterns.add<RewritePassByReferenceRotations<quake::R1Op>>(context);
 }
 
 void quake::SOp::getOperatorMatrix(Matrix &matrix) {
@@ -903,6 +962,9 @@ void quake::ZOp::getOperatorMatrix(Matrix &matrix) {
   matrix.assign({1, 0, 0, -1});
 }
 
+void quake::CustomUnitarySymbolOp::getOperatorMatrix(Matrix& matrix) {
+  
+}
 //===----------------------------------------------------------------------===//
 
 /// Never inline a `quake.apply` of a variant form of a kernel. The apply
@@ -982,7 +1044,7 @@ void quake::getOperatorEffectsImpl(EffectsVectorImpl &effects,
 // but not having a way to define them in the ODS.
 // clang-format off
 #define GATE_OPS(MACRO) MACRO(XOp) MACRO(YOp) MACRO(ZOp) MACRO(HOp) MACRO(SOp) \
-  MACRO(TOp) MACRO(SwapOp) MACRO(U2Op) MACRO(U3Op)                             \
+  MACRO(TOp) MACRO(SwapOp) MACRO(U2Op) MACRO(U3Op) MACRO(CustomUnitarySymbolOp)                            \
   MACRO(R1Op) MACRO(RxOp) MACRO(RyOp) MACRO(RzOp) MACRO(PhasedRxOp)
 #define MEASURE_OPS(MACRO) MACRO(MxOp) MACRO(MyOp) MACRO(MzOp)
 #define QUANTUM_OPS(MACRO) MACRO(ResetOp) GATE_OPS(MACRO) MEASURE_OPS(MACRO)
