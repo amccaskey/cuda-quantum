@@ -127,25 +127,11 @@ template <typename A, typename P = void>
 bool buildOp(OpBuilder &builder, Location loc, ValueRange operands,
              SmallVector<Value> &negations,
              llvm::function_ref<void()> reportNegateError,
-             llvm::function_ref<void()> reportParameterLoadError,
              bool isAdjoint = false, bool isControl = false,
              size_t paramCount = 1, bool isCustom = false) {
   if constexpr (std::is_same_v<P, Param>) {
     assert(operands.size() >= 2 && "must be at least 2 operands");
-    SmallVector<Value> params;
-    for (auto param : operands.take_front(paramCount)) {
-      auto paramType = param.getType();
-      if (auto ptrTy = dyn_cast<cudaq::cc::PointerType>(paramType)) {
-        if (!isa<FloatType>(ptrTy.getElementType())) {
-          // raise an error
-          reportParameterLoadError();
-        }
-        // it is a float type, load it
-        params.push_back(builder.create<cudaq::cc::LoadOp>(loc, param));
-        continue;
-      }
-      params.push_back(param);
-    }
+    auto params = operands.take_front(paramCount);
     auto [target, ctrls] = maybeUnpackOperands(
         builder, loc, operands.drop_front(paramCount), isControl);
     for (auto v : target)
@@ -191,12 +177,12 @@ bool buildOp(OpBuilder &builder, Location loc, ValueRange operands,
         builder.create<A>(loc, isAdjoint, ValueRange(), ctrls, target, negs);
         return true;
       }
-      if (ctrls.empty()) {
+      if (ctrls.empty())
         // May have multiple targets, but no controls, op(q, r, s, ...)
         for (auto t : target)
           builder.create<A>(loc, isAdjoint, ValueRange(), ValueRange(), t,
                             negs);
-      } else {
+      else {
         assert(target.size() == 1 &&
                "can only have a single target with control qubits.");
         builder.create<A>(loc, isAdjoint, ValueRange(), ctrls, target, negs);
@@ -1492,72 +1478,61 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
     auto reportNegateError = [&]() {
       reportClangError(x, mangler, "target qubit cannot be negated");
     };
-    auto reportParameterLoadError = [&]() {
-      reportClangError(x, mangler, "invalid rotation parameter type");
-    };
     if (funcName.equals("h"))
       return buildOp<quake::HOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false, isControl);
+                                 reportNegateError, /*adjoint=*/false,
+                                 isControl);
     if (funcName.equals("ch"))
       return buildOp<quake::HOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false,
+                                 reportNegateError, /*adjoint=*/false,
                                  /*control=*/true);
     if (funcName.equals("x"))
       return buildOp<quake::XOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false, isControl);
+                                 reportNegateError, /*adjoint=*/false,
+                                 isControl);
     if (funcName.equals("cnot") || funcName.equals("cx") ||
         funcName.equals("ccx"))
       return buildOp<quake::XOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false,
+                                 reportNegateError, /*adjoint=*/false,
                                  /*control=*/true);
     if (funcName.equals("y"))
       return buildOp<quake::YOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false, isControl);
+                                 reportNegateError, /*adjoint=*/false,
+                                 isControl);
     if (funcName.equals("cy"))
       return buildOp<quake::YOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false,
+                                 reportNegateError, /*adjoint=*/false,
                                  /*control=*/true);
     if (funcName.equals("z"))
       return buildOp<quake::ZOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false, isControl);
+                                 reportNegateError, /*adjoint=*/false,
+                                 isControl);
     if (funcName.equals("cz"))
       return buildOp<quake::ZOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/false,
+                                 reportNegateError, /*adjoint=*/false,
                                  /*control=*/true);
     if (funcName.equals("s"))
       return buildOp<quake::SOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 isAdjoint, isControl);
+                                 reportNegateError, isAdjoint, isControl);
     if (funcName.equals("cs"))
       return buildOp<quake::SOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 isAdjoint,
+                                 reportNegateError, isAdjoint,
                                  /*control=*/true);
     if (funcName.equals("sdg"))
       return buildOp<quake::SOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/true, isControl);
+                                 reportNegateError, /*adjoint=*/true,
+                                 isControl);
     if (funcName.equals("t"))
       return buildOp<quake::TOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 isAdjoint, isControl);
+                                 reportNegateError, isAdjoint, isControl);
     if (funcName.equals("ct"))
       return buildOp<quake::TOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 isAdjoint,
+                                 reportNegateError, isAdjoint,
                                  /*control=*/true);
     if (funcName.equals("tdg"))
       return buildOp<quake::TOp>(builder, loc, args, negations,
-                                 reportNegateError, reportParameterLoadError,
-                                 /*adjoint=*/true, isControl);
+                                 reportNegateError, /*adjoint=*/true,
+                                 isControl);
 
     if (funcName.equals("reset")) {
       if (!negations.empty())
@@ -1580,46 +1555,42 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
       return true;
     }
     if (funcName.equals("p") || funcName.equals("r1"))
-      return buildOp<quake::R1Op, Param>(
-          builder, loc, args, negations, reportNegateError,
-          reportParameterLoadError, isAdjoint, isControl);
+      return buildOp<quake::R1Op, Param>(builder, loc, args, negations,
+                                         reportNegateError, isAdjoint,
+                                         isControl);
     if (funcName.equals("cr1"))
       return buildOp<quake::R1Op, Param>(builder, loc, args, negations,
-                                         reportNegateError,
-                                         reportParameterLoadError, isAdjoint,
+                                         reportNegateError, isAdjoint,
                                          /*control=*/true);
     if (funcName.equals("rx"))
-      return buildOp<quake::RxOp, Param>(
-          builder, loc, args, negations, reportNegateError,
-          reportParameterLoadError, isAdjoint, isControl);
+      return buildOp<quake::RxOp, Param>(builder, loc, args, negations,
+                                         reportNegateError, isAdjoint,
+                                         isControl);
     if (funcName.equals("crx"))
       return buildOp<quake::RxOp, Param>(builder, loc, args, negations,
-                                         reportNegateError,
-                                         reportParameterLoadError, isAdjoint,
+                                         reportNegateError, isAdjoint,
                                          /*control=*/true);
     if (funcName.equals("ry"))
-      return buildOp<quake::RyOp, Param>(
-          builder, loc, args, negations, reportNegateError,
-          reportParameterLoadError, isAdjoint, isControl);
+      return buildOp<quake::RyOp, Param>(builder, loc, args, negations,
+                                         reportNegateError, isAdjoint,
+                                         isControl);
     if (funcName.equals("cry"))
       return buildOp<quake::RyOp, Param>(builder, loc, args, negations,
-                                         reportNegateError,
-                                         reportParameterLoadError, isAdjoint,
+                                         reportNegateError, isAdjoint,
                                          /*control=*/true);
     if (funcName.equals("rz"))
-      return buildOp<quake::RzOp, Param>(
-          builder, loc, args, negations, reportNegateError,
-          reportParameterLoadError, isAdjoint, isControl);
+      return buildOp<quake::RzOp, Param>(builder, loc, args, negations,
+                                         reportNegateError, isAdjoint,
+                                         isControl);
     if (funcName.equals("crz"))
       return buildOp<quake::RzOp, Param>(builder, loc, args, negations,
-                                         reportNegateError,
-                                         reportParameterLoadError, isAdjoint,
+                                         reportNegateError, isAdjoint,
                                          /*control=*/true);
 
     if (funcName.equals("u3"))
-      return buildOp<quake::U3Op, Param>(
-          builder, loc, args, negations, reportNegateError,
-          reportParameterLoadError, isAdjoint, isControl, /*paramCount=*/3);
+      return buildOp<quake::U3Op, Param>(builder, loc, args, negations,
+                                         reportNegateError, isAdjoint,
+                                         isControl, /*paramCount=*/3);
 
     // See if this is a custom unitary.
     std::string maybeUnitaryGenerator = funcName.str() + "_generator";
@@ -1638,9 +1609,9 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
         }
         return count;
       }();
-      buildOp<quake::CustomUnitarySymbolOp>(
-          builder, loc, args, negations, reportNegateError,
-          reportParameterLoadError, isAdjoint, isControl, paramCount, true);
+      buildOp<quake::CustomUnitarySymbolOp>(builder, loc, args, negations,
+                                            reportNegateError, isAdjoint,
+                                            isControl, paramCount, true);
       auto &customUnitary = builder.getBlock()->back();
       auto srefAttr = SymbolRefAttr::get(
           StringAttr::get(builder.getContext(), maybeUnitaryGenerator));
@@ -1672,7 +1643,7 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
                       x, mangler, "cannot negate an entire register of qubits");
                 } else {
                   SmallVector<Value> dummy;
-                  buildOp<quake::XOp>(builder, loc, v, dummy, []() {}, []() {});
+                  buildOp<quake::XOp>(builder, loc, v, dummy, []() {});
                 }
               }
           } else if (isa<quake::VeqType>(ctrlValues.getType())) {
@@ -1683,8 +1654,7 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
             assert(isa<quake::RefType>(ctrlValues.getType()));
             assert(negations.size() == 1 && negations[0] == ctrlValues);
             SmallVector<Value> dummy;
-            buildOp<quake::XOp>(
-                builder, loc, ctrlValues, dummy, []() {}, []() {});
+            buildOp<quake::XOp>(builder, loc, ctrlValues, dummy, []() {});
           }
         }
       };
