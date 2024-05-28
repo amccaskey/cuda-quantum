@@ -10,6 +10,8 @@
 
 #include "mlir/IR/OpImplementation.h"
 
+using namespace mlir;
+
 namespace quake {
 mlir::LogicalResult verifyWireArityAndCoarity(mlir::Operation *op);
 

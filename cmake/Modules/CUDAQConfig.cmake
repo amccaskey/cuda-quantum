@@ -52,3 +52,13 @@ add_library(cudaq::cudaq-builder SHARED IMPORTED)
 set_target_properties(cudaq::cudaq-builder PROPERTIES
   IMPORTED_LOCATION "${CUDAQ_LIBRARY_DIR}/libcudaq-builder${CMAKE_SHARED_LIBRARY_SUFFIX}"
   IMPORTED_SONAME "libcudaq-builder${CMAKE_SHARED_LIBRARY_SUFFIX}")
+
+function(add_cudaq_plugin plugin_name plugin_sources) 
+  list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+  list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+  include(AddLLVM)
+  include(AddMLIR)
+  add_llvm_pass_plugin(${plugin_name} ${plugin_sources})
+  target_include_directories(${plugin_name} PRIVATE ${MLIR_INCLUDE_DIRS} ${CUDAQ_INCLUDE_DIR})
+  target_link_libraries(${plugin_name} PRIVATE ${CUDAQ_LIBRARY_DIR}/libQuakeDialect.a ${CUDAQ_LIBRARY_DIR}/libCCDialect.a)
+endfunction()

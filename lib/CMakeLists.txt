@@ -11,3 +11,14 @@ if (NOT CUDAQ_DISABLE_CPP_FRONTEND)
 endif()
 add_subdirectory(Optimizer)
 add_subdirectory(Support)
+
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/cudaq
+  DESTINATION include/
+  FILES_MATCHING PATTERN "*.h"
+)
+
+install(DIRECTORY ${CMAKE_BINARY_DIR}/include/cudaq
+  DESTINATION include/
+  FILES_MATCHING PATTERN "*.h.inc"
+  PATTERN "CMakeFiles" EXCLUDE
+)
