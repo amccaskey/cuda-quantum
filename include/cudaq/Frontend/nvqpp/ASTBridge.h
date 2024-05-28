@@ -647,6 +647,7 @@ public:
     // The mangler is constructed and owned by `this`.
     clang::ItaniumMangleContext *mangler;
 
+    // Keep track of user custom operation names. 
     llvm::SmallVector<llvm::StringRef> customOperationNames; 
     
     /// Add a placeholder definition to the module in \p visitor for the

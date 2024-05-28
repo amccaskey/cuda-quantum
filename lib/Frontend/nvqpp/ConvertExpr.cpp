@@ -173,6 +173,9 @@ bool buildOp(OpBuilder &builder, Location loc, ValueRange operands,
           reportNegateError();
       auto negs =
           negatedControlsAttribute(builder.getContext(), ctrls, negations);
+      
+      // FIXME we'll need to know how many targets this 
+      // custom operation is on 
       if (isCustom) {
         builder.create<A>(loc, isAdjoint, ValueRange(), ctrls, target, negs);
         return true;
