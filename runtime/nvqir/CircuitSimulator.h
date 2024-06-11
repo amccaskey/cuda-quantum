@@ -1175,7 +1175,8 @@ public:
                                controls, {}, targets) +
                       " = {}",
                   matrix);
-    enqueueGate("custom", actual, controls, targets, {});
+    enqueueGate(customName.empty() ? "unknown op" : customName.data(), actual,
+                controls, targets, {});
   }
 
   template <typename QuantumOperation>
