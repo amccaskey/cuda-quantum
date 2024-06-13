@@ -23,6 +23,7 @@ add_library(${LIBRARY_NAME}
                 spin/matrix.cpp
                 qis/execution_manager.cpp 
                 qis/managers/default/DefaultExecutionManager.cpp
+                qis/state.cpp
                 utils/cudaq_utils.cpp 
                 utils/Logger.cpp
                 utils/MeasureCounts.cpp 

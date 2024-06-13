@@ -7,22 +7,27 @@
  ******************************************************************************/
 
 #include "state.h"
+#include "cudaq/host_config.h"
+#include "cudaq/simulators/CircuitSimulator.h"
 #include "cudaq/utils/EigenDense.h"
 #include "cudaq/utils/FmtCore.h"
 #include "cudaq/utils/Logger.h"
-#include "cudaq/simulators.h"
 #include <iostream>
+
+extern "C" {
+extern target_config __nvqpp__get_target_config();
+}
 
 namespace cudaq {
 
 std::mutex deleteStateMutex;
 
 state state::from_data(const state_data &data) {
-  auto *simulator = cudaq::get_simulator();
-  if (!simulator)
-    throw std::runtime_error(
-        "[state::from_data] Could not find valid simulator backend.");
-
+  auto config = __nvqpp__get_target_config();
+  if (!cudaq::CircuitSimulator::is_registered(config.simulator))
+    throw std::runtime_error("[state] invalid CircuitSimulator requested (" +
+                             std::string(config.simulator) + ")");
+  auto simulator = cudaq::CircuitSimulator::get(config.simulator);
   return state(simulator->createStateFromData(data).release());
 }
 

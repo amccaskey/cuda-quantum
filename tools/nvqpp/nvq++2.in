@@ -688,7 +688,7 @@ if [ ! -z "$CUDAQ_OPT_EXTRA_PASSES" ]; then
 	OPT_PASSES=$(add_pass_to_pipeline "${OPT_PASSES}" "$CUDAQ_OPT_EXTRA_PASSES")
 fi
 
-OPT_PASSES="builtin.module(${OPT_PASSES})"
+OPT_PASSES="builtin.module(${OPT_PASSES},func.func(add-dealloc),lower-quake,func.func(lower-to-cfg),cse,canonicalize,cc-to-llvm)"
 
 if ${SHOW_VERSION} && [ -z "$SRCS" ] && [ -z "$OBJS" ]; then
 	# If version is requested and no source files were provided, log the version string.
