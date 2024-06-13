@@ -30,3 +30,22 @@ install(PROGRAMS ${CUDAQ_BINARY_DIR}/bin/nvq++
         DESTINATION bin)
 install(FILES backendConfig.cpp DESTINATION targets/)
 file(COPY backendConfig.cpp DESTINATION ${CMAKE_BINARY_DIR}/targets/)
+
+
+
+add_custom_target(nvq++2)
+
+configure_file("nvq++2.in"
+               "${CUDAQ_BINARY_DIR}/bin/nvq++2" 
+               FILE_PERMISSIONS
+	        OWNER_READ OWNER_WRITE OWNER_EXECUTE
+	        GROUP_READ GROUP_EXECUTE
+	        WORLD_READ WORLD_EXECUTE
+               @ONLY)
+
+install(PROGRAMS ${CUDAQ_BINARY_DIR}/bin/nvq++2
+        DESTINATION bin)
+install(FILES backendConfig.cpp DESTINATION targets/)
+file(COPY backendConfig.cpp DESTINATION ${CMAKE_BINARY_DIR}/targets/)
+install(FILES target_config_template.cpp DESTINATION targets/)
+file(COPY target_config_template.cpp DESTINATION ${CMAKE_BINARY_DIR}/targets/)
