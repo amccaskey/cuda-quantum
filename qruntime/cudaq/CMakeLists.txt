@@ -17,6 +17,7 @@ add_link_options(-Wl,--no-as-needed)
 # Create the CUDA-Q Library
 add_library(${LIBRARY_NAME} 
          SHARED cudaq.cpp 
+                distributed/mpi_plugin.cpp
                 simulators/qpp/QppCircuitSimulator.cpp
                 spin/spin_op.cpp
                 spin/matrix.cpp
@@ -103,11 +104,11 @@ install(EXPORT cudaq2-targets
 add_subdirectory(simulators/targets)
 # Install CUDAQ MPI interface header, reference implementation, and build script
 # for manual activation on a local system if needed.
-# install(
-#   FILES
-#       distributed/distributed_capi.h
-#       distributed/builtin/mpi_comm_impl.cpp
-#       distributed/builtin/activate_custom_mpi.sh
-#   DESTINATION distributed_interfaces
-#   PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
-# )
+install(
+  FILES
+      distributed/distributed_capi.h
+      distributed/builtin/mpi_comm_impl.cpp
+      distributed/builtin/activate_custom_mpi.sh
+  DESTINATION distributed_interfaces
+  PERMISSIONS OWNER_WRITE OWNER_READ GROUP_READ WORLD_READ
+)

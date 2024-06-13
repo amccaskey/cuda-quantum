@@ -289,8 +289,8 @@ void finalize();
 } // namespace cudaq
 
 // Users should get sample by default
-// #include "cudaq/algorithms/sample.h"
+#include "cudaq/algorithms/sample.h"
 // // Users should get observe by default
-// #include "cudaq/algorithms/observe.h"
+#include "cudaq/algorithms/observe.h"
 // // Users should get get_state by default
-// #include "cudaq/algorithms/get_state.h"
+#include "cudaq/algorithms/get_state.h"

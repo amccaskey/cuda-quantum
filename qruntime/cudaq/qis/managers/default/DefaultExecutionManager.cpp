@@ -278,6 +278,13 @@ public:
   static std::unique_ptr<ExecutionManager> create() {
     return std::make_unique<DefaultExecutionManager>();
   }
+
+  void tearDownBeforeMPIFinalize() override {
+    simulator->tearDownBeforeMPIFinalize();
+  }
+  void setRandomSeed(std::size_t seed) override {
+    simulator->setRandomSeed(seed);
+  }
 };
 
 } // namespace

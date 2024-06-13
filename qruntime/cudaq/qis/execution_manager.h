@@ -187,6 +187,12 @@ public:
     registeredOperations.insert({name, std::make_unique<T>()});
   }
 
+  virtual void tearDownBeforeMPIFinalize() {
+    // do nothing
+  }
+  virtual void setRandomSeed(std::size_t seed) {
+    // do nothing
+  }
   virtual ~ExecutionManager() = default;
 };
 

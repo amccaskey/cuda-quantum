@@ -40,4 +40,10 @@ ExecutionManager *getExecutionManager() {
                            std::string(config.executionManager) + ")");
 }
 
+void tearDownBeforeMPIFinalize() {
+  cudaq::getExecutionManager()->tearDownBeforeMPIFinalize();
+}
+void setRandomSeed(std::size_t seed) {
+  cudaq::getExecutionManager()->setRandomSeed(seed);
+}
 } // namespace cudaq

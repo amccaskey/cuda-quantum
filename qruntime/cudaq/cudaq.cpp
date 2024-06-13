@@ -13,9 +13,9 @@
 #ifdef CUDAQ_HAS_CUDA
 #include "cuda_runtime_api.h"
 #endif
-// #include "cudaq/platform.h"
+#include "cudaq/platform.h"
 #include "cudaq/utils/registry.h"
-// #include "distributed/mpi_plugin.h"
+#include "distributed/mpi_plugin.h"
 #include <dlfcn.h>
 #include <filesystem>
 #include <map>
@@ -26,180 +26,180 @@
 #include <vector>
 #include <thread>
 #include <mutex>
-namespace nvqir {
+namespace cudaq {
 void tearDownBeforeMPIFinalize();
 void setRandomSeed(std::size_t);
-} // namespace nvqir
+} // namespace cudaq
 
-// namespace cudaq::mpi {
-// cudaq::MPIPlugin *getMpiPlugin(bool unsafe) {
-//   // Locate and load the MPI comm plugin.
-//   // Rationale: we don't want to explicitly link `libcudaq.so` against any
-//   // specific MPI implementation for compatibility. Rather, MPI functionalities
-//   // are encapsulated inside a runtime-loadable plugin.
-//   static std::unique_ptr<cudaq::MPIPlugin> g_plugin;
-//   if (!g_plugin) {
-//     // Search priority:
-//     //  (1) Environment variable take precedence (e.g., by running the
-//     // activation script)
-//     //  (2) Previously-activated custom plugin at its default location
-//     //  (3) Built-in comm plugin (e.g., docker container or build from source
-//     // with MPI)
-//     const char *mpiLibPath = std::getenv("CUDAQ_MPI_COMM_LIB");
-//     if (mpiLibPath) {
-//       // The user has set the environment variable.
-//       cudaq::info("Load MPI comm plugin from CUDAQ_MPI_COMM_LIB environment "
-//                   "variable at '{}'",
-//                   mpiLibPath);
-//       g_plugin = std::make_unique<cudaq::MPIPlugin>(mpiLibPath);
-//     } else {
-//       // Try locate MPI plugins in the install directory
-//       std::filesystem::path cudaqLibPath{cudaq::getCUDAQLibraryPath()};
-//       // First, look for the previously-activated plugin in the
-//       // `distributed_interfaces/` directory.
-//       const auto distributedInterfacesDir =
-//           cudaqLibPath.parent_path().parent_path() / "distributed_interfaces";
-//       // Note: this file name must match the one defined in
-//       // `activate_custom_mpi.sh`.
-//       constexpr std::string_view activatedInterfaceLibFilename =
-//           "libcudaq_distributed_interface_mpi.so";
-//       const auto activatedInterfaceLibFile =
-//           distributedInterfacesDir / activatedInterfaceLibFilename;
-//       if (std::filesystem::exists(activatedInterfaceLibFile)) {
-//         cudaq::info("Load MPI comm plugin from '{}'",
-//                     activatedInterfaceLibFile.c_str());
-//         g_plugin = std::make_unique<cudaq::MPIPlugin>(
-//             activatedInterfaceLibFile.c_str());
-//       } else {
-//         const auto pluginsPath = cudaqLibPath.parent_path() / "plugins";
-// #if defined(__APPLE__) && defined(__MACH__)
-//         const std::string libSuffix = "dylib";
-// #else
-//         const std::string libSuffix = "so";
-// #endif
-//         // The builtin (native) plugin if present
-//         const auto pluginLibFile =
-//             pluginsPath / fmt::format("libcudaq-comm-plugin.{}", libSuffix);
-//         if (std::filesystem::exists(pluginLibFile) &&
-//             cudaq::MPIPlugin::isValidInterfaceLib(pluginLibFile.c_str())) {
-//           cudaq::info("Load builtin MPI comm plugin at '{}'",
-//                       pluginLibFile.c_str());
-//           g_plugin = std::make_unique<cudaq::MPIPlugin>(pluginLibFile.c_str());
-//         }
-//       }
-//     }
-//   }
-//   if (!g_plugin) {
-//     if (unsafe)
-//       return nullptr;
-//     else
-//       throw std::runtime_error(
-//           "No MPI support can be found when attempted to use cudaq::mpi APIs. "
-//           "Please refer to the documentation for instructions to activate MPI "
-//           "support.");
-//   }
+namespace cudaq::mpi {
+cudaq::MPIPlugin *getMpiPlugin(bool unsafe) {
+  // Locate and load the MPI comm plugin.
+  // Rationale: we don't want to explicitly link `libcudaq.so` against any
+  // specific MPI implementation for compatibility. Rather, MPI functionalities
+  // are encapsulated inside a runtime-loadable plugin.
+  static std::unique_ptr<cudaq::MPIPlugin> g_plugin;
+  if (!g_plugin) {
+    // Search priority:
+    //  (1) Environment variable take precedence (e.g., by running the
+    // activation script)
+    //  (2) Previously-activated custom plugin at its default location
+    //  (3) Built-in comm plugin (e.g., docker container or build from source
+    // with MPI)
+    const char *mpiLibPath = std::getenv("CUDAQ_MPI_COMM_LIB");
+    if (mpiLibPath) {
+      // The user has set the environment variable.
+      cudaq::info("Load MPI comm plugin from CUDAQ_MPI_COMM_LIB environment "
+                  "variable at '{}'",
+                  mpiLibPath);
+      g_plugin = std::make_unique<cudaq::MPIPlugin>(mpiLibPath);
+    } else {
+      // Try locate MPI plugins in the install directory
+      std::filesystem::path cudaqLibPath{cudaq::getCUDAQLibraryPath()};
+      // First, look for the previously-activated plugin in the
+      // `distributed_interfaces/` directory.
+      const auto distributedInterfacesDir =
+          cudaqLibPath.parent_path().parent_path() / "distributed_interfaces";
+      // Note: this file name must match the one defined in
+      // `activate_custom_mpi.sh`.
+      constexpr std::string_view activatedInterfaceLibFilename =
+          "libcudaq_distributed_interface_mpi.so";
+      const auto activatedInterfaceLibFile =
+          distributedInterfacesDir / activatedInterfaceLibFilename;
+      if (std::filesystem::exists(activatedInterfaceLibFile)) {
+        cudaq::info("Load MPI comm plugin from '{}'",
+                    activatedInterfaceLibFile.c_str());
+        g_plugin = std::make_unique<cudaq::MPIPlugin>(
+            activatedInterfaceLibFile.c_str());
+      } else {
+        const auto pluginsPath = cudaqLibPath.parent_path() / "plugins";
+#if defined(__APPLE__) && defined(__MACH__)
+        const std::string libSuffix = "dylib";
+#else
+        const std::string libSuffix = "so";
+#endif
+        // The builtin (native) plugin if present
+        const auto pluginLibFile =
+            pluginsPath / fmt::format("libcudaq-comm-plugin.{}", libSuffix);
+        if (std::filesystem::exists(pluginLibFile) &&
+            cudaq::MPIPlugin::isValidInterfaceLib(pluginLibFile.c_str())) {
+          cudaq::info("Load builtin MPI comm plugin at '{}'",
+                      pluginLibFile.c_str());
+          g_plugin = std::make_unique<cudaq::MPIPlugin>(pluginLibFile.c_str());
+        }
+      }
+    }
+  }
+  if (!g_plugin) {
+    if (unsafe)
+      return nullptr;
+    else
+      throw std::runtime_error(
+          "No MPI support can be found when attempted to use cudaq::mpi APIs. "
+          "Please refer to the documentation for instructions to activate MPI "
+          "support.");
+  }
 
-//   return g_plugin.get();
-// };
+  return g_plugin.get();
+};
 
-// bool available() {
-//   auto *commPlugin = getMpiPlugin(/*unsafe=*/true);
-//   return commPlugin != nullptr;
-// }
+bool available() {
+  auto *commPlugin = getMpiPlugin(/*unsafe=*/true);
+  return commPlugin != nullptr;
+}
 
-// void initialize() {
-//   auto *commPlugin = getMpiPlugin();
-//   commPlugin->initialize();
-// }
+void initialize() {
+  auto *commPlugin = getMpiPlugin();
+  commPlugin->initialize();
+}
 
-// void initialize(int argc, char **argv) {
-//   auto *commPlugin = getMpiPlugin();
-//   commPlugin->initialize(argc, argv);
-//   const auto pid = commPlugin->rank();
-//   const auto np = commPlugin->num_ranks();
-//   if (pid == 0)
-//     cudaq::info("MPI Initialized, nRanks = {}", np);
-// }
+void initialize(int argc, char **argv) {
+  auto *commPlugin = getMpiPlugin();
+  commPlugin->initialize(argc, argv);
+  const auto pid = commPlugin->rank();
+  const auto np = commPlugin->num_ranks();
+  if (pid == 0)
+    cudaq::info("MPI Initialized, nRanks = {}", np);
+}
 
-// int rank() {
-//   auto *commPlugin = getMpiPlugin();
-//   return commPlugin->rank();
-// }
+int rank() {
+  auto *commPlugin = getMpiPlugin();
+  return commPlugin->rank();
+}
 
-// int num_ranks() {
-//   auto *commPlugin = getMpiPlugin();
-//   return commPlugin->num_ranks();
-// }
+int num_ranks() {
+  auto *commPlugin = getMpiPlugin();
+  return commPlugin->num_ranks();
+}
 
-// bool is_initialized() {
-//   // Allow to probe is_initialized even without MPI support (hence unsafe =
-//   // true)
-//   auto *commPlugin = getMpiPlugin(true);
-//   // If no MPI plugin is available, returns false (MPI is not initialized)
-//   if (!commPlugin)
-//     return false;
+bool is_initialized() {
+  // Allow to probe is_initialized even without MPI support (hence unsafe =
+  // true)
+  auto *commPlugin = getMpiPlugin(true);
+  // If no MPI plugin is available, returns false (MPI is not initialized)
+  if (!commPlugin)
+    return false;
 
-//   return commPlugin->is_initialized();
-// }
+  return commPlugin->is_initialized();
+}
 
-// namespace details {
+namespace details {
 
-// #define CUDAQ_ALL_REDUCE_IMPL(TYPE, BINARY, REDUCE_OP)                         \
-//   TYPE allReduce(const TYPE &local, const BINARY<TYPE> &) {                    \
-//     static_assert(std::is_floating_point<TYPE>::value,                         \
-//                   "all_reduce argument must be a floating point number");      \
-//     std::vector<double> result(1);                                             \
-//     std::vector<double> localVec{static_cast<double>(local)};                  \
-//     auto *commPlugin = getMpiPlugin();                                         \
-//     commPlugin->all_reduce(result, localVec, REDUCE_OP);                       \
-//     return static_cast<TYPE>(result.front());                                  \
-//   }
+#define CUDAQ_ALL_REDUCE_IMPL(TYPE, BINARY, REDUCE_OP)                         \
+  TYPE allReduce(const TYPE &local, const BINARY<TYPE> &) {                    \
+    static_assert(std::is_floating_point<TYPE>::value,                         \
+                  "all_reduce argument must be a floating point number");      \
+    std::vector<double> result(1);                                             \
+    std::vector<double> localVec{static_cast<double>(local)};                  \
+    auto *commPlugin = getMpiPlugin();                                         \
+    commPlugin->all_reduce(result, localVec, REDUCE_OP);                       \
+    return static_cast<TYPE>(result.front());                                  \
+  }
 
-// CUDAQ_ALL_REDUCE_IMPL(float, std::plus, SUM)
-// CUDAQ_ALL_REDUCE_IMPL(float, std::multiplies, PROD)
+CUDAQ_ALL_REDUCE_IMPL(float, std::plus, SUM)
+CUDAQ_ALL_REDUCE_IMPL(float, std::multiplies, PROD)
 
-// CUDAQ_ALL_REDUCE_IMPL(double, std::plus, SUM)
-// CUDAQ_ALL_REDUCE_IMPL(double, std::multiplies, PROD)
+CUDAQ_ALL_REDUCE_IMPL(double, std::plus, SUM)
+CUDAQ_ALL_REDUCE_IMPL(double, std::multiplies, PROD)
 
-// } // namespace details
+} // namespace details
 
-// #define CUDAQ_ALL_GATHER_IMPL(TYPE)                                            \
-//   void all_gather(std::vector<TYPE> &global, const std::vector<TYPE> &local) { \
-//     auto *commPlugin = getMpiPlugin();                                         \
-//     commPlugin->all_gather(global, local);                                     \
-//   }
+#define CUDAQ_ALL_GATHER_IMPL(TYPE)                                            \
+  void all_gather(std::vector<TYPE> &global, const std::vector<TYPE> &local) { \
+    auto *commPlugin = getMpiPlugin();                                         \
+    commPlugin->all_gather(global, local);                                     \
+  }
 
-// CUDAQ_ALL_GATHER_IMPL(double)
-// CUDAQ_ALL_GATHER_IMPL(int)
+CUDAQ_ALL_GATHER_IMPL(double)
+CUDAQ_ALL_GATHER_IMPL(int)
 
-// void broadcast(std::vector<double> &data, int rootRank) {
-//   auto *commPlugin = getMpiPlugin();
-//   commPlugin->broadcast(data, rootRank);
-// }
+void broadcast(std::vector<double> &data, int rootRank) {
+  auto *commPlugin = getMpiPlugin();
+  commPlugin->broadcast(data, rootRank);
+}
 
-// void broadcast(std::string &data, int rootRank) {
-//   auto *commPlugin = getMpiPlugin();
-//   commPlugin->broadcast(data, rootRank);
-// }
+void broadcast(std::string &data, int rootRank) {
+  auto *commPlugin = getMpiPlugin();
+  commPlugin->broadcast(data, rootRank);
+}
 
-// void finalize() {
-//   if (rank() == 0)
-//     cudaq::info("Finalizing MPI.");
+void finalize() {
+  if (rank() == 0)
+    cudaq::info("Finalizing MPI.");
 
-//   // Inform the simulator that we are
-//   // about to run MPI Finalize
-//   nvqir::tearDownBeforeMPIFinalize();
-//   auto *commPlugin = getMpiPlugin();
-//   if (!commPlugin->is_finalized())
-//     commPlugin->finalize();
-// }
+  // Inform the simulator that we are
+  // about to run MPI Finalize
+  cudaq::tearDownBeforeMPIFinalize();
+  auto *commPlugin = getMpiPlugin();
+  if (!commPlugin->is_finalized())
+    commPlugin->finalize();
+}
 
-// } // namespace cudaq::mpi
+} // namespace cudaq::mpi
 
 namespace cudaq::__internal__ {
 std::map<std::string, std::string> runtime_registered_mlir;
 std::string demangle_kernel(const char *name) {
-  return "";//quantum_platform::demangle(name);
+  return quantum_platform::demangle(name);
 }
 bool globalFalse = false;
 } // namespace cudaq::__internal__
@@ -277,16 +277,12 @@ bool cudaq::__internal__::isLibraryMode(const std::string &kernelname) {
 
 //===----------------------------------------------------------------------===//
 
-namespace nvqir {
-void setRandomSeed(std::size_t);
-}
-
 namespace cudaq {
 
 void set_target_backend(const char *backend) {
   std::string backendName(backend);
-  // auto &platform = cudaq::get_platform();
-  // platform.setTargetBackend(backendName);
+  auto &platform = cudaq::get_platform();
+  platform.setTargetBackend(backendName);
 }
 
 KernelArgsCreator getArgsCreator(const std::string &kernelName) {
@@ -345,25 +341,25 @@ bool kernelHasConditionalFeedback(const std::string &kernelName) {
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
 void set_shots(const std::size_t nShots) {
-  // auto &platform = cudaq::get_platform();
-  // platform.set_shots(nShots);
+  auto &platform = cudaq::get_platform();
+  platform.set_shots(nShots);
 }
 void clear_shots(const std::size_t nShots) {
-  // auto &platform = cudaq::get_platform();
-  // platform.clear_shots();
+  auto &platform = cudaq::get_platform();
+  platform.clear_shots();
 }
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif
 
 void set_noise(const cudaq::noise_model &model) {
-  // auto &platform = cudaq::get_platform();
-  // platform.set_noise(&model);
+  auto &platform = cudaq::get_platform();
+  platform.set_noise(&model);
 }
 
 void unset_noise() {
-  // auto &platform = cudaq::get_platform();
-  // platform.set_noise(nullptr);
+  auto &platform = cudaq::get_platform();
+  platform.set_noise(nullptr);
 }
 
 thread_local static std::size_t cudaq_random_seed = 0;
@@ -373,10 +369,10 @@ thread_local static std::size_t cudaq_random_seed = 0;
 /// will not be repeatable for those operations.
 void set_random_seed(std::size_t seed) {
   cudaq_random_seed = seed;
-  // nvqir::setRandomSeed(seed);
-  // auto &platform = cudaq::get_platform();
+  cudaq::setRandomSeed(seed);
+  auto &platform = cudaq::get_platform();
   // Notify the platform that a new random seed value is set.
-  // platform.onRandomSeedSet(seed);
+  platform.onRandomSeedSet(seed);
 }
 
 std::size_t get_random_seed() { return cudaq_random_seed; }
