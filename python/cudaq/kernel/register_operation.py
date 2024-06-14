@@ -5,9 +5,8 @@ from .ast_bridge import CapturedDataStorage, PyASTBridge
 
 class PyRegisterOpDecorator(object):
 
-    def __init__(self, function, *args, num_targets=None, num_params=None):
+    def __init__(self, function, num_targets=None, num_params=None):
         self.kernelFunction = function
-        print('args: ', *args)
 
         src = inspect.getsource(self.kernelFunction)
 
@@ -23,20 +22,12 @@ class PyRegisterOpDecorator(object):
         print(bridge.module)
 
 
-def register_operation(function=None, *args, **kwargs):
-    """
-    The `cudaq.kernel` represents the CUDA-Q language function 
-    attribute that programmers leverage to indicate the following function 
-    is a CUDA-Q kernel and should be compile and executed on 
-    an available quantum coprocessor.
-
-    Verbose logging can be enabled via `verbose=True`. 
-    """
+def register_operation(function=None, **kwargs):
     if function:
-        return PyRegisterOpDecorator(function, *args)
+        return PyRegisterOpDecorator(function)
     else:
 
         def wrapper(function):
-            return PyRegisterOpDecorator(function, *args, **kwargs)
+            return PyRegisterOpDecorator(function, **kwargs)
 
         return wrapper

@@ -203,7 +203,6 @@ def mlirTypeFromAnnotation(annotation, ctx, raiseError=False):
 
 
 def mlirTypeFromPyType(argType, ctx, **kwargs):
-    print("HELLO: ", argType, argType in [list])
     if argType == int:
         return IntegerType.get_signless(64, ctx)
     if argType in [float, np.float64]:
