@@ -203,6 +203,7 @@ def mlirTypeFromAnnotation(annotation, ctx, raiseError=False):
 
 
 def mlirTypeFromPyType(argType, ctx, **kwargs):
+    print("HELLO: ", argType, argType in [list])
     if argType == int:
         return IntegerType.get_signless(64, ctx)
     if argType in [float, np.float64]:
@@ -276,6 +277,8 @@ def mlirTypeFromPyType(argType, ctx, **kwargs):
         return quake.RefType.get(ctx)
     if argType == pauli_word:
         return cc.CharspanType.get(ctx)
+    if argType == list[complex]: # FIXME could be List
+        return cc.StdvecType.get(ctx,  mlirTypeFromPyType(complex, ctx))
 
     if 'argInstance' in kwargs:
         argInstance = kwargs['argInstance']
