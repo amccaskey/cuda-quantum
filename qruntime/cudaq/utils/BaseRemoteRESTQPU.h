@@ -7,12 +7,12 @@
  ******************************************************************************/
 
 #pragma once
-#include "common/ExecutionContext.h"
-#include "common/Executor.h"
-#include "common/FmtCore.h"
-#include "common/Logger.h"
-#include "common/RestClient.h"
-#include "common/RuntimeMLIR.h"
+#include "cudaq/utils/ExecutionContext.h"
+#include "cudaq/utils/Executor.h"
+#include "cudaq/utils/FmtCore.h"
+#include "cudaq/utils/Logger.h"
+#include "cudaq/utils/RestClient.h"
+#include "cudaq/utils/RuntimeMLIR.h"
 #include "cudaq.h"
 #include "cudaq/Frontend/nvqpp/AttributeNames.h"
 #include "cudaq/Optimizer/CodeGen/OpenQASMEmitter.h"

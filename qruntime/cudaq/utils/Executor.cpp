@@ -7,7 +7,7 @@
  ******************************************************************************/
 
 #include "Executor.h"
-#include "common/Logger.h"
+#include "cudaq/utils/Logger.h"
 
 namespace cudaq {
 details::future

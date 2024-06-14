@@ -13,10 +13,34 @@ set(INTERFACE_POSITION_INDEPENDENT_CODE ON)
 add_library(target_config_empty OBJECT target_config.cpp)
 set (CMAKE_ENABLE_EXPORTS TRUE)
 
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+set(CUDAQ_MLIR_LIBS ${dialect_libs}
+                    ${conversion_libs}
+                    CCDialect
+                    QuakeDialect
+                    OptCodeGen
+                    OptTransforms
+                    MLIRTranslateLib
+                    MLIRIR
+                    MLIRParser
+                    MLIRPass
+                    MLIRTranslateLib
+                    MLIRSupport
+                    MLIROptLib
+                    MLIRExecutionEngine
+                    MLIRTransforms
+                    MLIRTargetLLVMIRExport
+                    MLIRLLVMCommonConversion
+                    MLIRLLVMToLLVMIRTranslation)
+
 add_link_options(-Wl,--no-as-needed)
 # Create the CUDA-Q Library
 add_library(${LIBRARY_NAME} 
          SHARED cudaq.cpp 
+                builder/kernel_builder.cpp
+                builder/QuakeValue.cpp 
+                builder/kernels.cpp
                 distributed/mpi_plugin.cpp
                 simulators/qpp/QppCircuitSimulator.cpp
                 spin/spin_op.cpp
@@ -30,9 +54,12 @@ add_library(${LIBRARY_NAME}
                 utils/NoiseModel.cpp
                 utils/Trace.cpp
                 utils/Future.cpp
+                utils/RuntimeMLIR.cpp 
                 platform/quantum_platform.cpp
                 platform/default/DefaultQuantumPlatform.cpp
                 platform/common/QuantumExecutionQueue.cpp
+                platform/default/rest/RemoteRESTQPU.cpp
+                platform/default/rest/helpers/quantinuum/QuantinuumServerHelper.cpp
                 )
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
@@ -77,6 +104,7 @@ if (CUDA_FOUND)
             ${CUSTATEVEC_LIB}
             ${CUDA_LIBRARIES} 
             cublas
+            ${CUDAQ_MLIR_LIBS}
             target_config_empty)
 
   target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
@@ -92,6 +120,7 @@ else()
     PRIVATE fmt::fmt-header-only 
             spdlog::spdlog 
             libqpp 
+            ${CUDAQ_MLIR_LIBS}
             target_config_empty)
 endif()
 

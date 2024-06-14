@@ -7,9 +7,9 @@
  ******************************************************************************/
 
 #pragma once
-#include "common/ExecutionContext.h"
-#include "common/RestClient.h"
-#include "common/ServerHelper.h"
+#include "cudaq/utils/ExecutionContext.h"
+#include "cudaq/utils/RestClient.h"
+#include "cudaq/utils/ServerHelper.h"
 
 namespace cudaq {
 
