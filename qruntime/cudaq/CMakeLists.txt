@@ -55,12 +55,30 @@ add_library(${LIBRARY_NAME}
                 utils/Trace.cpp
                 utils/Future.cpp
                 utils/RuntimeMLIR.cpp 
+                utils/ServerHelper.cpp
+                utils/Executor.cpp
                 platform/quantum_platform.cpp
                 platform/default/DefaultQuantumPlatform.cpp
                 platform/common/QuantumExecutionQueue.cpp
                 platform/default/rest/RemoteRESTQPU.cpp
                 platform/default/rest/helpers/quantinuum/QuantinuumServerHelper.cpp
                 )
+
+# We can only build the RestClient support if we have OpenSSL
+if(OPENSSL_FOUND)
+  message(STATUS "OpenSSL Found, building REST Client.")
+
+  target_sources(${LIBRARY_NAME} PRIVATE utils/RestClient.cpp)
+  target_link_libraries(${LIBRARY_NAME} PRIVATE cpr::cpr -Wl,--start-group ZLIB::ZLIB)
+  target_compile_definitions(${LIBRARY_NAME} PRIVATE -DCUDAQ_RESTCLIENT_AVAILABLE)
+endif()
+
+if(EXISTS "$ENV{CURL_INSTALL_PREFIX}/cacert.pem")
+  # Copy to build directory so that developers can run from the build directory
+  file(COPY "$ENV{CURL_INSTALL_PREFIX}/cacert.pem" DESTINATION "${CMAKE_BINARY_DIR}")
+  # Also include it as an install target
+  install(FILES "$ENV{CURL_INSTALL_PREFIX}/cacert.pem" DESTINATION .)
+endif()
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
 

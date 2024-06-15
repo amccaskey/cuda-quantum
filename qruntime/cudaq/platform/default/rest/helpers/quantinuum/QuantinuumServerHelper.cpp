@@ -28,7 +28,7 @@ std::string searchAPIKey(std::string &key, std::string &refreshKey,
 /// to map Job requests and Job result retrievals actions from the calling
 /// Executor to the specific schema required by the remote Quantinuum REST
 /// server.
-class QuantinuumServerHelper : public ServerHelper {
+class QuantinuumServerHelper : public details::ServerHelper_impl<QuantinuumServerHelper> {
 protected:
   /// @brief The base URL
   std::string baseUrl = "https://qapi.quantinuum.com/v1/";
@@ -52,6 +52,9 @@ protected:
   RestHeaders generateRequestHeader() const;
 
 public:
+
+  CUDAQ_REGISTER_SERVERHELPER(quantinuum, QuantinuumServerHelper)
+
   /// @brief Return the name of this server helper, must be the
   /// same as the qpu config file.
   const std::string name() const override { return "quantinuum"; }
@@ -381,6 +384,3 @@ std::string searchAPIKey(std::string &key, std::string &refreshKey,
 }
 
 } // namespace cudaq
-
-CUDAQ_REGISTER_TYPE(cudaq::ServerHelper, cudaq::QuantinuumServerHelper,
-                    quantinuum)

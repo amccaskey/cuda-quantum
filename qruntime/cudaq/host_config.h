@@ -37,7 +37,6 @@ using complex = std::complex<real>;
 
 } // namespace cudaq
 
-
 struct target_config {
   const char * simulator; 
   const char * executionManager;

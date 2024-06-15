@@ -17,7 +17,7 @@ namespace cudaq {
 /// quantum codes targeting a remote REST server. This type provides a
 /// clean abstraction launching a vector of Jobs for sampling and observation
 /// tasks, both synchronously and asynchronously.
-class Executor : public registry::RegisteredType<Executor> {
+class Executor  {
 protected:
   /// @brief The REST Client used to interact with the remote system
   RestClient client;

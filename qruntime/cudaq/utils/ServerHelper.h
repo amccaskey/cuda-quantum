@@ -8,12 +8,11 @@
 
 #pragma once
 
-#include "nlohmann/json.hpp"
-
 #include "ExecutionContext.h"
 #include "Future.h"
 #include "MeasureCounts.h"
-#include "Registry.h"
+#include "extension_point.h"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 
 namespace cudaq {
@@ -60,7 +59,7 @@ using OutputNamesType = std::map<std::size_t, ResultInfoType>;
 /// to a remote server. It enables clients to create server-specific job
 /// payloads, extract job ids, and query / request job results. Moreover it
 /// provides a hook for extracting results from a server response.
-class ServerHelper : public registry::RegisteredType<ServerHelper> {
+class ServerHelper : public extension_point<ServerHelper> {
 protected:
   /// @brief All ServerHelpers can be configured at the `nvq++` command line.
   /// This map holds those configuration key-values
@@ -136,4 +135,11 @@ public:
   virtual void updatePassPipeline(const std::filesystem::path &platformPath,
                                   std::string &passPipeline) {}
 };
+
+CUDAQ_DEFINE_EXTENSION_IMPL(ServerHelper)
+#define CUDAQ_REGISTER_SERVERHELPER(NAME, TYPE)                                \
+  static inline const std::string class_identifier = #NAME;                    \
+  static std::unique_ptr<ServerHelper> create() {                              \
+    return std::make_unique<TYPE>();                                           \
+  }
 } // namespace cudaq

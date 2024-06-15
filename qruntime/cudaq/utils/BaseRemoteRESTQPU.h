@@ -50,8 +50,16 @@
 
 namespace cudaq {
 
+template<typename Derived>
 class BaseRemoteRESTQPU : public cudaq::QPU {
 protected:
+  static inline bool register_type() {
+    auto &registry = get_registry();
+    registry[Derived::GetRemoteRESTQPUName()] = Derived::create;
+    return true;
+  }
+  static const bool registered_;
+
   /// The number of shots
   std::optional<int> nShots;
 
@@ -312,7 +320,7 @@ public:
     qpuName = mutableBackend;
 
     // Create the ServerHelper for this QPU and give it the backend config
-    serverHelper = cudaq::registry::get<cudaq::ServerHelper>(qpuName);
+    serverHelper = cudaq::ServerHelper::get(qpuName);
     serverHelper->initialize(backendConfig);
     serverHelper->updatePassPipeline(platformPath, passPipelineConfig);
 
@@ -365,7 +373,7 @@ public:
     mlir::MLIRContext &context = *contextPtr;
 
     // Extract the kernel name
-    auto func = m_module.lookupSymbol<mlir::func::FuncOp>(
+    auto func = m_module.template lookupSymbol<mlir::func::FuncOp>(
         std::string("__nvqpp__mlirgen__") + kernelName);
 
     // Create a new Module to clone the function into

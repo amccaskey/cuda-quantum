@@ -21,7 +21,7 @@ sample_result future::get() {
 
 #ifdef CUDAQ_RESTCLIENT_AVAILABLE
   RestClient client;
-  auto serverHelper = registry::get<ServerHelper>(qpuName);
+  auto serverHelper = ServerHelper::get(qpuName);
   serverHelper->initialize(serverConfig);
   auto headers = serverHelper->getHeaders();
 

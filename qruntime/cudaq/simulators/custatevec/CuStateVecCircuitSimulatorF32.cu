@@ -8,5 +8,9 @@
 
 #define __NVQIR_CUSTATEVEC_TOGGLE_CREATE
 #include "CuStateVecCircuitSimulator.cu"
-CUDAQ_SIMULATOR_INITIALIZER(CuStateVecCircuitSimulator<float>)
+template <>
+const bool cudaq::CircuitSimulatorBase<
+    float, CuStateVecCircuitSimulator<float>>::registered_ =
+    cudaq::CircuitSimulatorBase<
+        float, CuStateVecCircuitSimulator<float>>::register_type();
 #undef __NVQIR_CUSTATEVEC_TOGGLE_CREATE

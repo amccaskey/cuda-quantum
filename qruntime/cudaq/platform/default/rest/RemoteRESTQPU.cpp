@@ -26,7 +26,7 @@ namespace {
 /// Execution Contexts, including sampling and observation via synchronous or
 /// asynchronous client invocations. This type should enable both QIR-based
 /// backends as well as those that take OpenQASM2 as input.
-class RemoteRESTQPU : public cudaq::details::QPU_impl<RemoteRESTQPU> {
+class RemoteRESTQPU : public cudaq::BaseRemoteRESTQPU<RemoteRESTQPU> {
 protected:
   std::tuple<ModuleOp, MLIRContext *, void *>
   extractQuakeCodeAndContext(const std::string &kernelName,
@@ -52,9 +52,16 @@ public:
   RemoteRESTQPU(RemoteRESTQPU &&) = delete;
   virtual ~RemoteRESTQPU() = default;
 
-    CUDAQ_REGISTER_QPU(DefaultQPU, default)
-
+  static std::string GetRemoteRESTQPUName() { return "remote_rest"; }
+  static std::unique_ptr<cudaq::QPU> create() {
+    return std::make_unique<RemoteRESTQPU>();
+  }
 };
+
+template <>
+const bool cudaq::BaseRemoteRESTQPU<RemoteRESTQPU>::registered_ =
+    cudaq::BaseRemoteRESTQPU<RemoteRESTQPU>::register_type();
+
 } // namespace
 
-CUDAQ_REGISTER_TYPE(cudaq::QPU, RemoteRESTQPU, remote_rest)
+// CUDAQ_REGISTER_TYPE(cudaq::QPU, RemoteRESTQPU, remote_rest)
