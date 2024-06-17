@@ -427,7 +427,10 @@ public:
       return;
     }
 
-    auto kernelNameInQuake = cudaq::runtime::cudaqGenPrefixName + kernelName;
+    std::string kernelNameInQuake = kernelName;
+    if (!StringRef(kernelName).contains(cudaq::runtime::cudaqGenPrefixName))
+      kernelNameInQuake = cudaq::runtime::cudaqGenPrefixName + kernelName;
+    
     // Get the function we care about (the one with kernelName)
     auto funcOp = module.lookupSymbol<func::FuncOp>(kernelNameInQuake);
     if (!funcOp) {
