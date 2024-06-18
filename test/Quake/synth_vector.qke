@@ -22,4 +22,4 @@ module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i6
   }
 }
 
-// CHECK: %0 = cc.const_array [1.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00, 2.000000e-01] : !cc.array<complex<f64> x 4>
+// CHECK: cc.global constant @__nvqpp_rodata_init_state.0 ([1.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00, 2.000000e-01]) : !cc.array<complex<f64> x 4>

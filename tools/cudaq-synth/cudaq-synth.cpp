@@ -337,11 +337,9 @@ int main(int argc, char **argv) {
     PassManager pm(&context);
     pm.addPass(cudaq::opt::createGenerateKernelExecution());
     pm.addPass(createCanonicalizerPass());
-    // cudaq::opt::addLowerToCCPipeline(pm);
     OpPassManager &optPM = pm.nest<func::FuncOp>();
     optPM.addPass(cudaq::opt::createLowerToCFGPass());
     cudaq::opt::addPipelineConvertToQIR(pm);
-    // pm.addPass(cudaq::opt::createCCToLLVM());
     if (failed(pm.run(*module)))
       return -1;
   }
@@ -359,7 +357,6 @@ int main(int argc, char **argv) {
     if (failed(pm.run(originalModule)))
       return -1;
   }
-  originalModule.dump();
 
   // Cleanup
   delete keepJitAround;
