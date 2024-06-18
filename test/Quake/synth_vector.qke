@@ -1,0 +1,25 @@
+// ========================================================================== //
+// Copyright (c) 2022 - 2024 NVIDIA Corporation & Affiliates.                 //
+// All rights reserved.                                                       //
+//                                                                            //
+// This source code and the accompanying materials are made available under   //
+// the terms of the Apache License 2.0 which accompanies this distribution.   //
+// ========================================================================== //
+
+// RUN: cudaq-synth %s --arg "1., 0., 0., 1+.2j" --kernel-name test | FileCheck %s
+
+module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", llvm.triple = "x86_64-unknown-linux-gnu", quake.mangled_name_map = {__nvqpp__mlirgen__function_test._Z4testRSt6vectorISt7complexIdESaIS1_EE = "_Z4testRSt6vectorISt7complexIdESaIS1_EE"}} {
+  func.func @__nvqpp__mlirgen__function_test._Z4testRSt6vectorISt7complexIdESaIS1_EE(%arg0: !cc.stdvec<complex<f64>>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
+    %0 = cc.stdvec_size %arg0 : (!cc.stdvec<complex<f64>>) -> i64
+    %1 = math.cttz %0 : i64
+    %2 = cc.stdvec_data %arg0 : (!cc.stdvec<complex<f64>>) -> !cc.ptr<complex<f64>>
+    %3 = quake.alloca !quake.veq<?>[%1 : i64]
+    %4 = quake.init_state %3, %2 : (!quake.veq<?>, !cc.ptr<complex<f64>>) -> !quake.veq<?>
+    return
+  }
+  func.func @_Z4testRSt6vectorISt7complexIdESaIS1_EE(%arg0: !cc.ptr<!cc.struct<{!cc.ptr<complex<f64>>, !cc.ptr<complex<f64>>, !cc.ptr<complex<f64>>}>>) attributes {no_this} {
+    return
+  }
+}
+
+// CHECK: %0 = cc.const_array [1.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00, 2.000000e-01] : !cc.array<complex<f64> x 4>

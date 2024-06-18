@@ -134,10 +134,11 @@ public:
         if (intSizeTy.getWidth() != 64)
           sizeOperand = rewriter.create<cudaq::cc::CastOp>(
               loc, i64Ty, sizeOperand, cudaq::cc::CastOpMode::Unsigned);
+      } else {
+        llvm::errs() <<" checking here\n";
       }
       if (!sizeOperand)
         return failure();
-
       Value buffer =
           rewriter.create<cudaq::cc::AllocaOp>(loc, i64Ty, sizeOperand);
       rewriter.create<func::CallOp>(loc, std::nullopt,

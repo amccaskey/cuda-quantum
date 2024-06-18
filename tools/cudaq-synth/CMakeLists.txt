@@ -35,8 +35,8 @@ target_link_libraries(cudaq-synth
   MLIRLLVMToLLVMIRTranslation
 
   CCDialect
-  OptTransforms
   OptCodeGen
+  OptTransforms
   QuakeDialect
 
   cudaq

@@ -11,9 +11,11 @@
 #include "cudaq/Optimizer/CodeGen/OpenQASMEmitter.h"
 #include "cudaq/Optimizer/CodeGen/Pipelines.h"
 #include "cudaq/Optimizer/Dialect/CC/CCDialect.h"
+#include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "cudaq/Support/Version.h"
 #include "cudaq/Todo.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
@@ -88,6 +90,58 @@ void simpleAllocateAndSet(auto &argData, auto &deleters,
   deleters.push_back([](void *ptr) { delete static_cast<T *>(ptr); });
 }
 
+std::pair<std::string, std::string>
+splitComplexNumberString(StringRef value, const std::string delimiter = "") {
+  if (delimiter.empty()) {
+    if (value.contains("j"))
+      return std::make_pair("0.0", value.str());
+
+    return std::make_pair(value.str(), "0.0");
+  }
+
+  SmallVector<StringRef> tmp;
+  SplitString(value, tmp, StringRef(delimiter));
+  auto realPart = tmp[0].trim().str();
+
+  // Drop the j
+  if (!value.contains("j"))
+    throw std::runtime_error("invalid complex format (must be a +- bj)");
+  auto imagPart = tmp[1].drop_back().trim().str();
+  if (delimiter == "-")
+    imagPart = "-" + imagPart;
+  return std::make_pair(realPart, imagPart);
+}
+
+template <typename T>
+void simpleVectorAllocateAndSet(std::vector<void *> &argData, auto &deleters,
+                                const std::string &value,
+                                const auto &casterFunc) {
+  std::vector<std::complex<T>> *runtimeArg = new std::vector<std::complex<T>>();
+  SmallVector<StringRef> out;
+  SplitString(StringRef(value), out, StringRef(","));
+  for (auto &o : out) {
+    if (o.contains("+")) {
+      auto [realPart, imagPart] = splitComplexNumberString(o, "+");
+      (*runtimeArg).emplace_back(casterFunc(realPart), casterFunc(imagPart));
+      continue;
+    }
+
+    if (o.contains("-")) {
+      auto [realPart, imagPart] = splitComplexNumberString(o, "-");
+      (*runtimeArg).emplace_back(casterFunc(realPart), casterFunc(imagPart));
+      continue;
+    }
+
+    auto [realPart, imagPart] = splitComplexNumberString(o);
+    (*runtimeArg).emplace_back(casterFunc(realPart), casterFunc(imagPart));
+  }
+
+  deleters.push_back([](void *ptr) {
+    delete static_cast<std::vector<std::complex<T>> *>(ptr);
+  });
+  argData.push_back(runtimeArg);
+}
+
 void packRuntimeArgs(std::vector<std::string> &values,
                      std::vector<void *> &args,
                      std::vector<std::function<void(void *)>> &deleters,
@@ -114,6 +168,27 @@ void packRuntimeArgs(std::vector<std::string> &values,
         .Case([&](Float64Type ty) {
           return simpleAllocateAndSet<double>(
               args, deleters, [&]() { return std::stod(values[counter++]); });
+        })
+        .Case([&](cc::StdvecType ty) {
+          auto eleTy = ty.getElementType();
+          TypeSwitch<Type, void>(eleTy)
+              .Case([&](ComplexType type) {
+                if (type.getElementType().isF64()) {
+                  return simpleVectorAllocateAndSet<double>(
+                      args, deleters, values[counter++],
+                      [&](auto &el) { return std::stod(el); });
+                }
+
+                if (type.getElementType().isF32())
+                  return simpleVectorAllocateAndSet<float>(
+                      args, deleters, values[counter++],
+                      [&](auto &el) { return std::stof(el); });
+
+                throw std::runtime_error("invalid stdvec complex data type.");
+              })
+              .Default([](Type ty) {
+                throw std::runtime_error("invalid stdvec data type.");
+              });
         })
         .Default([&](Type ty) {
           ty.dump();
@@ -262,10 +337,11 @@ int main(int argc, char **argv) {
     PassManager pm(&context);
     pm.addPass(cudaq::opt::createGenerateKernelExecution());
     pm.addPass(createCanonicalizerPass());
-    cudaq::opt::addLowerToCCPipeline(pm);
+    // cudaq::opt::addLowerToCCPipeline(pm);
     OpPassManager &optPM = pm.nest<func::FuncOp>();
     optPM.addPass(cudaq::opt::createLowerToCFGPass());
-    pm.addPass(cudaq::opt::createCCToLLVM());
+    cudaq::opt::addPipelineConvertToQIR(pm);
+    // pm.addPass(cudaq::opt::createCCToLLVM());
     if (failed(pm.run(*module)))
       return -1;
   }
@@ -290,5 +366,9 @@ int main(int argc, char **argv) {
   for (std::size_t i = 0; i < argData.size(); i++)
     deleters[i](argData[i]);
 
+  std::error_code ec;
+  llvm::ToolOutputFile out(outputFilename, ec, llvm::sys::fs::OF_None);
+  out.os() << *originalModule << "\n";
+  out.keep();
   return 0;
 }
