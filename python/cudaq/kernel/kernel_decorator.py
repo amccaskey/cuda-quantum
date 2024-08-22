@@ -213,6 +213,9 @@ class PyKernelDecorator(object):
         self.dependentCaptures = extraMetadata[
             'dependent_captures'] if 'dependent_captures' in extraMetadata else None
 
+    def attachJITCompiledFunctionPointer(self):
+        cudaq_runtime.attachJITPointer(self)
+
     def __str__(self):
         """
         Return the MLIR Module string representation for this kernel.

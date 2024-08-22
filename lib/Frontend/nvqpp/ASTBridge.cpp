@@ -301,6 +301,15 @@ public:
   }
 
   bool VisitVarDecl(clang::VarDecl *x) {
+    // Do not check if this is a 
+    // if (auto *p = dyn_cast<clang::ParmVarDecl>(x))
+    //   if (auto *ctx = p->getParentFunctionOrMethod())
+    //     if (auto *fdecl = dyn_cast<clang::FunctionDecl>(ctx);
+    //         cudaq::ASTBridgeAction::ASTBridgeConsumer::isQuantum(fdecl)) {
+    //       llvm::errs() << "FOUND A QUANTUM DECL for this parmvar\n";
+    //       return true;
+    //     }
+
     // The check to make sure that quantum data types are only used in kernels
     // is done here. This checks both variable declarations and parameters.
     if (quantumTypesNotAllowed)

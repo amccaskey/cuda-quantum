@@ -42,7 +42,7 @@ LLVM::LLVMStructType cudaq::opt::lambdaAsPairOfPointers(MLIRContext *context) {
 
 void cudaq::opt::populateCCTypeConversions(LLVMTypeConverter *converter) {
   converter->addConversion([](cc::CallableType type) {
-    return lambdaAsPairOfPointers(type.getContext());
+    return cudaq::opt::factory::getPointerType(type.getContext()); //lambdaAsPairOfPointers(type.getContext());
   });
   converter->addConversion([converter](cc::SpanLikeType type) {
     auto eleTy = converter->convertType(type.getElementType());

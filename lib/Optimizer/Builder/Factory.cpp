@@ -32,8 +32,8 @@ bool factory::isAArch64(ModuleOp module) {
 template <bool isOutput>
 static Type genBufferType(Type ty) {
   auto *ctx = ty.getContext();
-  if (isa<cudaq::cc::CallableType>(ty))
-    return cudaq::cc::PointerType::get(ctx);
+  // if (isa<cudaq::cc::CallableType>(ty))
+  //   return cudaq::cc::PointerType::get(ctx);
   if (auto vecTy = dyn_cast<cudaq::cc::SpanLikeType>(ty)) {
     auto i64Ty = IntegerType::get(ctx, 64);
     if (isOutput) {

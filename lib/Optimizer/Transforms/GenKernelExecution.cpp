@@ -742,8 +742,11 @@ public:
                                             Value trailingData, Value val,
                                             Type inTy, std::int64_t off,
                                             cudaq::cc::StructType structTy) {
-    if (isa<cudaq::cc::CallableType>(inTy))
-      return {builder.create<cudaq::cc::UndefOp>(loc, inTy), trailingData};
+    if (isa<cudaq::cc::CallableType>(inTy)){
+      return {builder.create<cudaq::cc::ExtractValueOp>(loc, inTy, val, off),
+                trailingData};
+      // return {builder.create<cudaq::cc::UndefOp>(loc, inTy), trailingData};
+    }
     if (auto stdVecTy = dyn_cast<cudaq::cc::SpanLikeType>(inTy)) {
       Value vecSize = builder.create<cudaq::cc::ExtractValueOp>(
           loc, builder.getI64Type(), val, off);
@@ -1147,8 +1150,11 @@ public:
       Type inTy = arg.getType();
       Type quakeTy = funcTy.getInput(idx);
       // If the argument is a callable, skip it.
-      if (isa<cudaq::cc::CallableType>(quakeTy))
+      if (isa<cudaq::cc::CallableType>(quakeTy)) {
+        stVal = builder.create<cudaq::cc::InsertValueOp>(loc, stVal.getType(),
+                                                           stVal, arg, idx);
         continue;
+      }
       // If the argument is an empty struct, skip it.
       if (auto strTy = dyn_cast<cudaq::cc::StructType>(quakeTy))
         if (strTy.isEmpty())

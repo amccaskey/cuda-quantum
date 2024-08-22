@@ -135,9 +135,39 @@ public:
             .getSignature();
     auto operands = adaptor.getOperands();
     auto *ctx = rewriter.getContext();
+    if (auto ptrTy = dyn_cast<LLVM::LLVMPointerType>(operands[0].getType())) {
+      auto rawFuncPtr = operands[0];
+      Type funcPtrTy = getTypeConverter()->convertType(calleeFuncTy);
+      auto funcPtr =
+          rewriter.create<LLVM::BitcastOp>(loc, funcPtrTy, rawFuncPtr);
+      SmallVector<Type> resultTy;
+
+      SmallVector<Value> arguments1 = {funcPtr};
+      arguments1.append(operands.begin() + 1, operands.end());
+      // auto call1 = rewriter.create<LLVM::CallOp>(loc, resultTy, arguments1);
+      rewriter.replaceOpWithNewOp<LLVM::CallOp>(call, resultTy, arguments1);
+      // rewriter.create<LLVM::BrOp>(loc, call1.getResults(), endBlock);
+      // rewriter.setInsertionPointToEnd(elseBlock);
+      // auto llvmFuncTy = cast<LLVM::LLVMFunctionType>(
+      //     cast<LLVM::LLVMPointerType>(funcPtrTy).getElementType());
+      // SmallVector<Type> argTys(operands.getTypes().begin(),
+      //                          operands.getTypes().end());
+      // auto adjustedFuncTy =
+      //     LLVM::LLVMFunctionType::get(llvmFuncTy.getReturnType(), argTys);
+      // auto adjustedFuncPtr = rewriter.create<LLVM::BitcastOp>(
+      //     loc, cudaq::opt::factory::getPointerType(adjustedFuncTy), funcPtr);
+      // SmallVector<Value> arguments2 = {adjustedFuncPtr};
+      // arguments2.append(operands.begin(), operands.end());
+      // auto call2 = rewriter.create<LLVM::CallOp>(loc, resultTy, arguments2);
+      // // rewriter.create<LLVM::BrOp>(loc, call2.getResults(), endBlock);
+      // rewriter.replaceOp(call, call2.getResults());
+      return success();
+    }
+
     auto structTy = dyn_cast<LLVM::LLVMStructType>(operands[0].getType());
     if (!structTy)
       return failure();
+
     auto ptr0Ty = structTy.getBody()[0];
     auto zero = DenseI64ArrayAttr::get(ctx, ArrayRef<std::int64_t>{0});
     auto rawFuncPtr =

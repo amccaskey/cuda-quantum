@@ -290,6 +290,7 @@ std::string get_quake_by_name(const std::string &kernelName,
   std::shared_lock<std::shared_mutex> lock(globalRegistryMutex);
 
   for (const auto &pair : quakeRegistry) {
+    printf("WE HAVE THIS: %s\n", pair.first.c_str());
     if (pair.first == kernelName) {
       // Exact match. Return the code.
       return pair.second;

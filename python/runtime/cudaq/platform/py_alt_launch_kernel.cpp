@@ -138,6 +138,7 @@ jitAndCreateArgs(const std::string &name, MlirModule module,
         return nullptr;
       }
       ExecutionEngine::setupTargetTriple(llvmModule.get());
+      llvmModule->dump();
       return llvmModule;
     };
 
@@ -733,5 +734,29 @@ void bindAltLaunchKernel(py::module &mod) {
         }
       },
       "Remove our pointers to the cudaq states.");
+
+  mod.def("attachJITPointer", [](py::object kernel) {
+    auto module = kernel.attr("module").cast<MlirModule>();
+    auto name = kernel.attr("name").cast<std::string>();
+    py::print(kernel.attr("__str__")());
+    auto noneType = mlir::NoneType::get(unwrap(module).getContext());
+    OpaqueArguments runtimeArgs;
+    auto [jit, rawArgs, size, returnOffset] =
+        jitAndCreateArgs(name, module, runtimeArgs, {}, noneType);
+    auto functor = jit->lookup("__nvqpp__mlirgen__" + name);
+    if (!functor)
+      throw std::runtime_error("HEY BAD");
+
+    py::capsule capsule(*functor, "__c_api_jitted_kernel");
+    kernel.attr("__c_api_jitted_kernel") = capsule;
+    return;
+  });
+
+  mod.def("CALLME", [](py::object kernel) {
+    py::capsule c = kernel.attr("__c_api_jitted_kernel");
+    void *raw = c;
+    auto *f = reinterpret_cast<void (*)()>(raw);
+    f();
+  });
 }
 } // namespace cudaq

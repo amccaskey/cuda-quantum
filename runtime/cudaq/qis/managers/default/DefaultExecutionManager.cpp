@@ -36,6 +36,7 @@ private:
 
   /// @brief Allocate all requested `qudits`.
   void flushRequestedAllocations() {
+    printf("Flushing %lu\n", requestedAllocations.size());
     if (requestedAllocations.empty())
       return;
 
@@ -45,6 +46,7 @@ private:
 
 protected:
   void allocateQudit(const cudaq::QuditInfo &q) override {
+    printf("REQUESTING QUBIT ALLOC %lu\n", q.id);
     requestedAllocations.emplace_back(2, q.id);
   }
 
