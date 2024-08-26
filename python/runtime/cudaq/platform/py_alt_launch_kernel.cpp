@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/InitAllPasses.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include <fmt/core.h>
@@ -742,5 +743,59 @@ void bindAltLaunchKernel(py::module &mod) {
         }
       },
       "Remove our pointers to the cudaq states.");
+
+  mod.def("mergeExternalMLIR", [](MlirModule modA, const std::string &modBStr) {
+    auto ctx = unwrap(modA).getContext();
+    auto moduleB = parseSourceString<ModuleOp>(modBStr, ctx);
+    auto moduleA = unwrap(modA).clone();
+    moduleB->walk([&moduleA](func::FuncOp op) {
+      moduleA.push_back(op.clone());
+      return WalkResult::advance();
+    });
+    return wrap(moduleA);
+  });
+
+  mod.def("synthPyCallable", [](MlirModule modA, const std::string &funcName) {
+    auto m = unwrap(modA);
+    auto context = m.getContext();
+    PassManager pm(context);
+    pm.addNestedPass<func::FuncOp>(
+        cudaq::opt::createPySynthCallableBlockArgs({funcName}, true));
+    if (failed(pm.run(m)))
+      throw std::runtime_error(
+          "cudaq::jit failed to remove callable block arguments.");
+
+    // fix up the mangled name map
+    DictionaryAttr attr;
+    m.walk([&](func::FuncOp op) {
+      if (op->hasAttrOfType<UnitAttr>("cudaq-entrypoint")) {
+        auto strAttr = StringAttr::get(
+            context, op.getName().str() + "_PyKernelEntryPointRewrite");
+        attr = DictionaryAttr::get(
+            context,
+            {NamedAttribute(StringAttr::get(context, op.getName()), strAttr)});
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
+    if (attr)
+      m->setAttr("quake.mangled_name_map", attr);
+  });
+
+  mod.def("jitAndGetFunctionPointer",
+          [](MlirModule mod, const std::string &funcName) {
+            OpaqueArguments runtimeArgs;
+            auto noneType = mlir::NoneType::get(unwrap(mod).getContext());
+            auto [jit, rawArgs, size, returnOffset] =
+                jitAndCreateArgs(funcName, mod, runtimeArgs, {}, noneType);
+
+            auto funcPtr = jit->lookup(funcName);
+            if (!funcPtr) {
+              throw std::runtime_error(
+                  "cudaq::builder failed to get kernelReg function.");
+            }
+
+            return py::capsule(*funcPtr);
+          });
 }
 } // namespace cudaq

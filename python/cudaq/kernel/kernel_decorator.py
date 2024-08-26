@@ -62,7 +62,7 @@ class PyKernelDecorator(object):
             self.location = location
             self.signature = signature
         else:
-            self.kernelFunction = function
+            self.kernelFunction = function 
             self.name = kernelName if kernelName != None else self.kernelFunction.__name__
             self.location = (inspect.getfile(self.kernelFunction),
                              inspect.getsourcelines(self.kernelFunction)[1]
@@ -111,7 +111,7 @@ class PyKernelDecorator(object):
                     entryBlock = function.entry_block
                     self.argTypes = [v.type for v in entryBlock.arguments]
                     self.signature = {
-                        'arg{}'.format(i): mlirTypeToPyType(v.type)
+                        'arg{}'.format(i): mlirTypeToPyType(v)
                         for i, v in enumerate(self.argTypes)
                     }
                     self.returnType = self.signature[

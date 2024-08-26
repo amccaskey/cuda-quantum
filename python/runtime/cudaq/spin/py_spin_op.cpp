@@ -34,7 +34,7 @@ spin_op fromOpenFermionQubitOperator(py::object &op) {
       auto casted = element.cast<std::pair<std::size_t, std::string>>();
       localTerm *= creatorMap[casted.second](casted.first);
     }
-    H += terms[term].cast<double>() * localTerm;
+    H += terms[term].cast<std::complex<double>>() * localTerm;
   }
   H -= spin::i(H.num_qubits() - 1);
   return H;

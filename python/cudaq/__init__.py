@@ -173,6 +173,7 @@ def __clearKernelRegistries():
 from .domains import chemistry
 from .kernels import uccsd
 from .dbg import ast
+from .jit import utils
 
 initKwargs = {}
 
