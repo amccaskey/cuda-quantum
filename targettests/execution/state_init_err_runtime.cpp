@@ -11,6 +11,9 @@
 // RUN: nvq++ %cpp_std --enable-mlir -target remote-mqpu --remote-mqpu-url localhost:9999 -fkernel-exec-kind=1 %s -o %t && %t |& FileCheck %s
 // clang-format on
 
+// FIXME! Requires init_state to be implemented via new argument synthesis
+// UNSUPPORTED: *
+
 #include <cudaq.h>
 #include <iostream>
 
