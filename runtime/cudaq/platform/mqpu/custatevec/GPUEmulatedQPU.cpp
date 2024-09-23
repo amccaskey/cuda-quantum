@@ -28,7 +28,7 @@ protected:
   std::map<std::size_t, cudaq::ExecutionContext *> contexts;
 
 public:
-  GPUEmulatedQPU() : QPU(){};
+  GPUEmulatedQPU() : QPU() {};
   GPUEmulatedQPU(std::size_t id) : QPU(id) {}
 
   void enqueue(cudaq::QuantumTask &task) override {

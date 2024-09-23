@@ -14,5 +14,5 @@ add_subdirectory(quantum_lib)
 pybind11_add_module(cudaq_test_cpp_algo test_cpp_quantum_algorithm_module.cpp)
 target_link_libraries(cudaq_test_cpp_algo PRIVATE cudaq quantum_lib cudaq-python-interop)
 target_include_directories(cudaq_test_cpp_algo PRIVATE ${CMAKE_SOURCE_DIR}/python)
-add_dependencies(cudaq_test_cpp_algo nvq++)
+add_dependencies(cudaq_test_cpp_algo nvq++ cudaq-opt cudaq-quake)
 
