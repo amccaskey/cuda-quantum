@@ -19,6 +19,8 @@ def do_something():
     yield
     cudaq.reset_target()
     cudaq.__clearKernelRegistries()
+    # Make the tests stable by enforcing resource release
+    gc.collect()
 
 
 def test_qudit():

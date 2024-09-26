@@ -12,7 +12,7 @@
 // clang-format on
 
 // FIXME! Requires init_state to be implemented via new argument synthesis
-// UNSUPPORTED: *
+// UNSUPPORTED: {{.*}}
 
 #include <cudaq.h>
 #include <iostream>

@@ -214,7 +214,7 @@ class PhotonicsHandler(object):
 
     def __init__(self, function):
 
-        if 'photonics' != cudaq_runtime.get_target().name:
+        if _TARGET_NAME != cudaq_runtime.get_target().name:
             raise RuntimeError(
                 "A photonics kernel can only be used with 'photonics' target.")
 

@@ -15,7 +15,7 @@
 // clang-format on
 
 // FIXME: state handling with new argument synthesis?
-// UNSUPPORTED: *
+// UNSUPPORTED: c++20
 
 #include <cudaq.h>
 #include <iostream>
