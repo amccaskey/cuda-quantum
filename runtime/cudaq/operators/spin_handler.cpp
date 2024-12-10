@@ -87,15 +87,6 @@ spin_handler::num_qubits(const details::operator_data &thisPtr) const {
   return data[0].size() / 2;
 }
 
-// Operations on operator...
-void spin_handler::assign(details::operator_data &thisPtr,
-                          const details::operator_data &other) {
-  auto [data, coeffs] = other;
-  thisPtr.productTerms = other.productTerms;
-  thisPtr.coefficients = other.coefficients;
-  return;
-}
-
 /// @brief Add the given spin_op to this one and return *this
 void spin_handler::addAssign(details::operator_data &thisPtr,
                              const details::operator_data &v) {
@@ -183,18 +174,6 @@ void spin_handler::multAssign(details::operator_data &thisPtr,
       thisPtr.coefficients.push_back(coeff);
     }
   }
-  return;
-}
-
-void spin_handler::multScalarAssign(details::operator_data &thisPtr,
-                                    const details::scalar_parameter &v) {
-  auto &[data, coeffs] = thisPtr;
-
-  for (std::size_t i = 0; auto &term : data) {
-    coeffs[i] = coeffs[i] * v;
-    i++;
-  }
-
   return;
 }
 

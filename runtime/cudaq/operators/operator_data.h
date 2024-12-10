@@ -169,7 +169,11 @@ public:
   virtual std::size_t num_qubits(const operator_data &thisPtr) const = 0;
 
   // Operations on operator...
-  virtual void assign(operator_data &thisPtr, const operator_data &) = 0;
+  virtual void assign(operator_data &thisPtr, const operator_data &other) {
+    auto [data, coeffs] = other;
+    thisPtr.productTerms = other.productTerms;
+    thisPtr.coefficients = other.coefficients;
+  }
 
   /// @brief Add the given spin_op to this one and return *this
   virtual void addAssign(operator_data &thisPtr, const operator_data &v) = 0;
@@ -178,7 +182,15 @@ public:
   virtual void multAssign(operator_data &thisPtr, const operator_data &v) = 0;
 
   virtual void multScalarAssign(operator_data &thisPtr,
-                                const scalar_parameter &v) = 0;
+                                const scalar_parameter &v) {
+    auto &[data, coeffs] = thisPtr;
+    for (std::size_t i = 0; auto &term : data) {
+      coeffs[i] = coeffs[i] * v;
+      i++;
+    }
+
+    return;
+  }
 
   /// @brief Return true if this spin_op is equal to the given one. Equality
   /// here does not consider the coefficients.

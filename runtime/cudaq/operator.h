@@ -8,13 +8,6 @@
 
 #pragma once
 
-#include <complex>
-#include <functional>
-#include <iostream>
-#include <memory>
-#include <optional>
-#include <vector>
-
 #include "operators/operator_data.h"
 
 namespace cudaq::experimental {
@@ -55,7 +48,7 @@ public:
   /// @brief Return the number of terms in this operator
   std::size_t num_terms() const { return m_data.productTerms.size(); }
 
-  void dump() const { std::cout << handler.to_string(m_data, true); }
+  void dump() const { printf("%s", handler.to_string(m_data, true).c_str()); }
   std::string to_string(bool print = true) const {
     return handler.to_string(m_data, print);
   }
@@ -70,7 +63,7 @@ public:
   std::complex<double> get_coefficient() {
     if (num_terms() != 1 || !m_data.coefficients[0].has_value())
       throw std::runtime_error(
-          "get_coefficient on supported for operators with 1 term.");
+          "get_coefficient only supported for operators with 1 term.");
 
     return m_data.coefficients[0].constant_value();
   }
@@ -154,8 +147,8 @@ public:
     using pointer = value_type *;
     using reference = value_type &;
 
-    iterator(HandlerTy *h, details::operator_data *data, std::size_t pos = 0)
-        : handler(h), op_data(data), current_pos(pos) {
+    iterator(details::operator_data *data, std::size_t pos = 0)
+        : op_data(data), current_pos(pos) {
       if (op_data && current_pos < op_data->productTerms.size()) {
         current_value.m_data.productTerms.clear();
         current_value.m_data.coefficients.clear();
@@ -195,17 +188,14 @@ public:
     pointer operator->() { return &current_value; }
 
   private:
-    HandlerTy *handler;
     details::operator_data *op_data;
     std::size_t current_pos;
     value_type current_value;
   };
 
   // Add iterator methods to quantum_operator
-  iterator begin() { return iterator(&handler, &m_data, 0); }
-  iterator end() {
-    return iterator(&handler, &m_data, m_data.productTerms.size());
-  }
+  iterator begin() { return iterator(&m_data, 0); }
+  iterator end() { return iterator(&m_data, m_data.productTerms.size()); }
 };
 
 template <typename T>
