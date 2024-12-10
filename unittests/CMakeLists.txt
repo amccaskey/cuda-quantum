@@ -212,6 +212,13 @@ target_link_libraries(test_spin
   gtest_main)
 gtest_discover_tests(test_spin)
 
+add_executable(test_experimental_spin main.cpp operator/ExperimentalSpinOpTester.cpp)
+target_link_libraries(test_experimental_spin
+  PRIVATE 
+  cudaq
+  gtest_main)
+gtest_discover_tests(test_experimental_spin)
+
 add_subdirectory(plugin)
 
 # build the test qudit execution manager
