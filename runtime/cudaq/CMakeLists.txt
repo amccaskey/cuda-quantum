@@ -24,7 +24,11 @@ add_library(${LIBRARY_NAME}
                 qis/state.cpp
                 utils/cudaq_utils.cpp
                 utils/tensor.cpp
-                distributed/mpi_plugin.cpp)
+                distributed/mpi_plugin.cpp
+                operators/operator_data.cpp
+                operators/spin_handler.cpp
+                operators/particle_handler.cpp
+                operators/matrix_handler.cpp)
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
 
