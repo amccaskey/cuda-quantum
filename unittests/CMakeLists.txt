@@ -212,6 +212,35 @@ target_link_libraries(test_spin
   gtest_main)
 gtest_discover_tests(test_spin)
 
+add_executable(test_experimental_spin main.cpp operator/ExperimentalSpinOpTester.cpp)
+target_link_libraries(test_experimental_spin
+  PRIVATE 
+  cudaq
+  gtest_main)
+gtest_discover_tests(test_experimental_spin)
+
+add_executable(test_experimental_fermion main.cpp operator/ExperimentalFermionOpTester.cpp)
+target_link_libraries(test_experimental_fermion
+  PRIVATE 
+  cudaq
+  gtest_main)
+gtest_discover_tests(test_experimental_fermion)
+
+add_executable(test_experimental_boson main.cpp operator/ExperimentalBosonOpTester.cpp)
+target_link_libraries(test_experimental_boson
+  PRIVATE 
+  cudaq
+  gtest_main)
+gtest_discover_tests(test_experimental_boson)
+
+add_executable(test_experimental_matrix main.cpp operator/ExperimentalMatrixOpTester.cpp)
+target_link_libraries(test_experimental_matrix
+  PRIVATE 
+  cudaq
+  gtest_main)
+gtest_discover_tests(test_experimental_matrix)
+
+
 add_subdirectory(plugin)
 
 # build the test qudit execution manager
