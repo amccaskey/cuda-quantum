@@ -67,6 +67,11 @@ public:
     return *this;
   }
 
+  const std::complex<double> *get_data() const { return data; }
+  std::size_t rows() const { return dimensions.first; }
+
+  std::size_t cols() const { return dimensions.second; }
+
   ~matrix_2() {
     if (data)
       delete[] data;
