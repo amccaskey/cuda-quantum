@@ -24,9 +24,33 @@ add_library(${LIBRARY_NAME}
                 qis/state.cpp
                 utils/cudaq_utils.cpp
                 utils/tensor.cpp
+                utils/tensor_impls/xtensor_impl.cpp
                 distributed/mpi_plugin.cpp)
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
+
+include(FetchContent)
+FetchContent_Declare(
+  xtl
+  GIT_REPOSITORY https://github.com/xtensor-stack/xtl
+  GIT_TAG 0.7.7
+  EXCLUDE_FROM_ALL
+)
+
+FetchContent_Declare(
+  xtensor
+  GIT_REPOSITORY https://github.com/xtensor-stack/xtensor
+  GIT_TAG 0.25.0
+  EXCLUDE_FROM_ALL
+)
+
+FetchContent_Declare(
+  xtensor-blas
+  GIT_REPOSITORY https://github.com/xtensor-stack/xtensor-blas
+  GIT_TAG 0.21.0
+  EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(xtl xtensor xtensor-blas)
 
 if (CUDA_FOUND)
   enable_language(CUDA)
@@ -36,12 +60,14 @@ if (CUDA_FOUND)
     PUBLIC $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtl/include>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtensor/include>
             $<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>
     PRIVATE .)
 
   target_link_libraries(${LIBRARY_NAME}
     PUBLIC dl cudaq-spin cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only CUDA::cudart_static)
+    PRIVATE nvqir fmt::fmt-header-only CUDA::cudart_static xtensor xtensor-blas)
 
   target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
 else()
@@ -53,7 +79,7 @@ else()
 
   target_link_libraries(${LIBRARY_NAME}
     PUBLIC dl cudaq-spin cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only)
+    PRIVATE nvqir fmt::fmt-header-only xtensor xtensor-blas)
 endif()
 
 add_subdirectory(qis/managers)
