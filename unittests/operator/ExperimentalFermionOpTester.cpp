@@ -190,7 +190,7 @@ TEST(FermionOperatorTester, checkJordanWignerString) {
 TEST(ParticleMatrixTester, EmptyOperatorReturnsEmptyMatrix) {
   fermion_op empty;
   auto matrix = empty.to_matrix();
-  EXPECT_TRUE(matrix.get_size() == 0);
+  EXPECT_TRUE(matrix.get_num_elements() == 0);
 }
 
 TEST(ParticleMatrixTester, SingleFermionCreation) {
@@ -198,13 +198,14 @@ TEST(ParticleMatrixTester, SingleFermionCreation) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}};
   auto matrix = c.to_matrix(dims);
 
-  std::cout << "Single\n" << matrix.dump() << "\n";
+  std::cout << "Single\n";
+  matrix.dump();
 
   // For fermions, creation operator should be:
   // [0 0]
   // [1 0]
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
   EXPECT_EQ((matrix[{0, 0}]), std::complex<double>(0, 0));
   EXPECT_EQ((matrix[{0, 1}]), std::complex<double>(0, 0));
   EXPECT_EQ((matrix[{1, 0}]), std::complex<double>(1, 0));
@@ -215,12 +216,14 @@ TEST(ParticleMatrixTester, NumberOperatorFermion) {
   auto n = create(0) * annihilate(0);
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}};
   auto matrix = n.to_matrix(dims);
-  std::cout << "NOp\n" << matrix.dump() << "\n";
+  std::cout << "NOp\n";
+  matrix.dump();
+
   // Number operator for fermions should be:
   // [0 0]
   // [0 1]
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
   EXPECT_EQ((matrix[{0, 0}]), std::complex<double>(0, 0));
   EXPECT_EQ((matrix[{1, 1}]), std::complex<double>(1, 0));
 }
@@ -230,10 +233,11 @@ TEST(ParticleMatrixTester, MultiSiteFermionHopping) {
   hop.dump();
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = hop.to_matrix(dims);
-  std::cout << "TEST:\n" << matrix.dump() << "\n";
+  std::cout << "TEST:\n";
+  matrix.dump();
   // Hopping term should have proper dimensions
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(ParticleMatrixTester, ParameterizedOperator) {
@@ -247,8 +251,8 @@ TEST(ParticleMatrixTester, ParameterizedOperator) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
 
   auto matrix = hop.to_matrix(dims, params);
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(FermionMatrixTester, CheckGapOperatorMatrix) {
@@ -259,8 +263,8 @@ TEST(FermionMatrixTester, CheckGapOperatorMatrix) {
   auto matrix = op.to_matrix(dims);
 
   // Should be 16x16 matrix (2^4 dimensions)
-  EXPECT_EQ(matrix.rows(), 16);
-  EXPECT_EQ(matrix.cols(), 16);
+  EXPECT_EQ(matrix.shape()[0], 16);
+  EXPECT_EQ(matrix.shape()[1], 16);
 }
 
 TEST(FermionMatrixTester, CheckMultiSiteProduct) {
@@ -270,8 +274,8 @@ TEST(FermionMatrixTester, CheckMultiSiteProduct) {
   auto matrix = op.to_matrix(dims);
 
   // Should be 8x8 matrix (2^3 dimensions)
-  EXPECT_EQ(matrix.rows(), 8);
-  EXPECT_EQ(matrix.cols(), 8);
+  EXPECT_EQ(matrix.shape()[0], 8);
+  EXPECT_EQ(matrix.shape()[1], 8);
 }
 
 TEST(FermionMatrixTester, CheckMissingDimensions) {
@@ -288,8 +292,8 @@ TEST(FermionMatrixTester, CheckHigherDimensionalModes) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 3}};
   auto matrix = op.to_matrix(dims);
 
-  EXPECT_EQ(matrix.rows(), 3);
-  EXPECT_EQ(matrix.cols(), 3);
+  EXPECT_EQ(matrix.shape()[0], 3);
+  EXPECT_EQ(matrix.shape()[1], 3);
   EXPECT_EQ((matrix[{1, 0}]), std::complex<double>(1, 0));
   EXPECT_EQ((matrix[{2, 1}]), std::complex<double>(std::sqrt(2), 0));
 }
@@ -299,9 +303,9 @@ TEST(FermionMatrixTester, CheckSumOperatorMatrix) {
   auto op = create(0) + create(1);
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = op.to_matrix(dims);
-  std::cout << matrix.dump() << "\n";
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  matrix.dump();
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(FermionMatrixTester, CheckParameterizedSum) {
@@ -315,8 +319,8 @@ TEST(FermionMatrixTester, CheckParameterizedSum) {
       {"g", std::complex<double>(0.5, 0)}};
 
   auto matrix = op.to_matrix(dims, params);
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(ParticleMatrixTester, MultiSiteFermionHoppingElements) {
@@ -324,8 +328,8 @@ TEST(ParticleMatrixTester, MultiSiteFermionHoppingElements) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = hop.to_matrix(dims);
 
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
   // |00> -> 0, |01> -> 1, |10> -> 2, |11> -> 3
   EXPECT_EQ((matrix[{2, 1}]), std::complex<double>(1, 0)); // <10|hop|01>
   EXPECT_EQ((matrix[{0, 0}]), std::complex<double>(0, 0)); // <00|hop|00>
@@ -336,9 +340,9 @@ TEST(ParticleMatrixTester, GapOperatorElements) {
   auto op = create(0) * create(2);
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}, {2, 2}};
   auto matrix = op.to_matrix(dims);
-  std::cout << matrix.dump() << "\n";
-  EXPECT_EQ(matrix.rows(), 8);
-  EXPECT_EQ(matrix.cols(), 8);
+   matrix.dump();
+  EXPECT_EQ(matrix.shape()[0], 8);
+  EXPECT_EQ(matrix.shape()[1], 8);
   EXPECT_EQ((matrix[{5, 0}]), std::complex<double>(1, 0));
   EXPECT_EQ((matrix[{7, 2}]), std::complex<double>(-1, 0));
 }
@@ -348,8 +352,8 @@ TEST(ParticleMatrixTester, NumberOperatorElements) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = n.to_matrix(dims);
 
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
   // Check diagonal elements
   EXPECT_EQ((matrix[{0, 0}]), std::complex<double>(0, 0)); // <00|n|00>
   EXPECT_EQ((matrix[{1, 1}]), std::complex<double>(1, 0)); // <01|n|01>
@@ -362,8 +366,8 @@ TEST(ParticleMatrixTester, HigherDimensionalModeElements) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 3}};
   auto matrix = c.to_matrix(dims);
 
-  EXPECT_EQ(matrix.rows(), 3);
-  EXPECT_EQ(matrix.cols(), 3);
+  EXPECT_EQ(matrix.shape()[0], 3);
+  EXPECT_EQ(matrix.shape()[1], 3);
   EXPECT_EQ((matrix[{1, 0}]), std::complex<double>(1, 0));
   EXPECT_EQ((matrix[{2, 1}]), std::complex<double>(std::sqrt(2), 0));
   EXPECT_EQ((matrix[{0, 0}]), std::complex<double>(0, 0));
@@ -378,8 +382,8 @@ TEST(FermionOperatorTester, ElementaryOperatorsSingleSite) {
   EXPECT_EQ(matrices.size(), 1);
 
   // Verify creation operator matrix structure
-  EXPECT_EQ(matrices[0].rows(), 2);
-  EXPECT_EQ(matrices[0].cols(), 2);
+  EXPECT_EQ(matrices[0].shape()[0], 2);
+  EXPECT_EQ(matrices[0].shape()[1], 2);
   EXPECT_EQ((matrices[0][{1, 0}]), std::complex<double>(1, 0));
 }
 
@@ -391,13 +395,13 @@ TEST(FermionOperatorTester, ElementaryOperatorsProductTerm) {
   EXPECT_EQ(matrices.size(), 2);
 
   // First matrix should be creation on site 0
-  EXPECT_EQ(matrices[0].rows(), 2);
-  EXPECT_EQ(matrices[0].cols(), 2);
+  EXPECT_EQ(matrices[0].shape()[0], 2);
+  EXPECT_EQ(matrices[0].shape()[1], 2);
   EXPECT_EQ((matrices[0][{1, 0}]), std::complex<double>(1, 0));
 
   // Second matrix should be annihilation on site 1
-  EXPECT_EQ(matrices[1].rows(), 2);
-  EXPECT_EQ(matrices[1].cols(), 2);
+  EXPECT_EQ(matrices[1].shape()[0], 2);
+  EXPECT_EQ(matrices[1].shape()[1], 2);
   EXPECT_EQ((matrices[1][{0, 1}]), std::complex<double>(1, 0));
 }
 
@@ -416,8 +420,8 @@ TEST(FermionOperatorTester, ElementaryOperatorsWithDimensions) {
   EXPECT_EQ(matrices.size(), 1);
 
   // Verify 3-level creation operator
-  EXPECT_EQ(matrices[0].rows(), 3);
-  EXPECT_EQ(matrices[0].cols(), 3);
+  EXPECT_EQ(matrices[0].shape()[0], 3);
+  EXPECT_EQ(matrices[0].shape()[1], 3);
   EXPECT_EQ((matrices[0][{1, 0}]), std::complex<double>(1, 0));
   EXPECT_EQ((matrices[0][{2, 1}]), std::complex<double>(std::sqrt(2), 0));
 }

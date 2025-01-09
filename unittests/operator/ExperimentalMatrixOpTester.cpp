@@ -6,24 +6,24 @@ using namespace cudaq::experimental;
 
 TEST(MatrixOperatorTest, BasicConstruction) {
   {
-    operator_matrix m({1.0, 0.0, 0.0, 1.0});
+    operator_matrix m({1.0, 0.0, 0.0, 1.0}, 2, 2);
     auto op = from_matrix(m, 0);
     EXPECT_EQ(op.num_qubits(), 1);
     EXPECT_EQ(op.num_terms(), 1);
     auto matrix = op.to_matrix();
-    std::cout << matrix.dump() << "\n";
+    matrix.dump();
   }
   {
     auto op = from_matrix(
         [](const dimensions_map &, const parameter_map &p) {
           auto theta = p.at("theta");
-          return operator_matrix({theta, 0, 0, theta});
+          return operator_matrix({theta, 0, 0, theta}, 2, 2);
         },
         0);
 
     op.dump();
     auto matrix = op.to_matrix({{"theta", 1.0}});
-    std::cout << matrix.dump() << "\n";
+    matrix.dump();
   }
 }
 
@@ -53,7 +53,7 @@ TEST(MatrixOperatorTest, Multiplication) {
     EXPECT_EQ(prod.num_terms(), 1);
 
     auto m = prod.to_matrix();
-    std::cout << m.dump() << "\n";
+    m.dump();
     // FIXME check elements
     std::vector<std::complex<double>> expected{0, -1, 1, 0};
     EXPECT_NEAR(std::abs(m[{0, 0}]), 0.0, 1e-6);
@@ -65,7 +65,7 @@ TEST(MatrixOperatorTest, Multiplication) {
     auto prod = (op1 + op2) * (op3 + op1);
     prod.dump();
     auto m = prod.to_matrix();
-    std::cout << m.dump() << "\n";
+    m.dump();
     std::vector<std::complex<double>> expected{
         {1, 1}, {1, -1}, {-1, -1}, {1, -1}};
     // FIXME check
@@ -73,7 +73,7 @@ TEST(MatrixOperatorTest, Multiplication) {
 }
 
 TEST(MatrixOperatorTest, IdentityOperator) {
-  operator_matrix I({1.0, 0.0, 0.0, 1.0});
+  operator_matrix I({1.0, 0.0, 0.0, 1.0}, 2, 2);
   auto op = from_matrix(I, 0);
   auto matrix = op.to_matrix();
 
@@ -92,7 +92,8 @@ TEST(MatrixOperatorTest, ParameterizedOperator) {
         return operator_matrix({std::cos(theta),
                                 {0, -std::sin(theta)},
                                 {0, std::sin(theta)},
-                                std::cos(theta)});
+                                std::cos(theta)},
+                               2, 2);
       },
       0);
 
@@ -102,21 +103,21 @@ TEST(MatrixOperatorTest, ParameterizedOperator) {
 }
 
 TEST(MatrixOperatorTest, TensorProduct) {
-  operator_matrix X({0.0, 1.0, 1.0, 0.0});
-  operator_matrix Z({1.0, 0.0, 0.0, -1.0});
+  operator_matrix X({0.0, 1.0, 1.0, 0.0}, 2, 2);
+  operator_matrix Z({1.0, 0.0, 0.0, -1.0}, 2, 2);
 
   auto opX = from_matrix(X, 0);
   auto opZ = from_matrix(Z, 1);
   auto product = opX * opZ;
   product.dump();
   auto matrix = product.to_matrix();
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
   EXPECT_EQ(product.num_qubits(), 2);
 }
 
 TEST(MatrixOperatorTest, ScalarMultiplication) {
-  operator_matrix X({0.0, 1.0, 1.0, 0.0});
+  operator_matrix X({0.0, 1.0, 1.0, 0.0}, 2, 2);
   auto op = from_matrix(X, 0);
   auto scaled = op * 2.0;
 
@@ -128,7 +129,7 @@ TEST(MatrixOperatorTest, ScalarMultiplication) {
 TEST(MatrixOperatorTest, GetElementaryOperators) {
   // Single site operator
   {
-    operator_matrix X({0.0, 1.0, 1.0, 0.0});
+    operator_matrix X({0.0, 1.0, 1.0, 0.0}, 2, 2);
     auto op = from_matrix(X, 0);
     auto matrices = op.get_elementary_operators();
 
@@ -139,8 +140,8 @@ TEST(MatrixOperatorTest, GetElementaryOperators) {
 
   // Two-site operator with gap
   {
-    operator_matrix X({0.0, 1.0, 1.0, 0.0});
-    operator_matrix Z({1.0, 0.0, 0.0, -1.0});
+    operator_matrix X({0.0, 1.0, 1.0, 0.0}, 2, 2);
+    operator_matrix Z({1.0, 0.0, 0.0, -1.0}, 2, 2);
     auto op = from_matrix(X, 0) * from_matrix(Z, 2);
     op.dump();
     auto matrices = op.get_elementary_operators();
@@ -159,8 +160,8 @@ TEST(MatrixOperatorTest, GetElementaryOperators) {
 
   // Should throw for sum of operators
   {
-    operator_matrix X({0.0, 1.0, 1.0, 0.0});
-    operator_matrix Z({1.0, 0.0, 0.0, -1.0});
+    operator_matrix X({0.0, 1.0, 1.0, 0.0}, 2, 2);
+    operator_matrix Z({1.0, 0.0, 0.0, -1.0}, 2, 2);
     auto sum = from_matrix(X, 0) + from_matrix(Z, 1);
     EXPECT_THROW(sum.get_elementary_operators(), std::runtime_error);
   }
@@ -171,10 +172,10 @@ TEST(MatrixOperatorTest, GetElementaryOperators) {
                            {3, 3}); // bug here if you dont specify dimensions
     auto op = from_matrix(qutrit, 0);
     auto matrices = op.get_elementary_operators({{0, 3}});
-    std::cout << "TEST:\n" << matrices[0].dump() << "\n";
+    matrices[0].dump();
     EXPECT_EQ(matrices.size(), 1);
-    EXPECT_EQ(matrices[0].rows(), 3);
-    EXPECT_EQ(matrices[0].cols(), 3);
+    EXPECT_EQ(matrices[0].shape()[0], 3);
+    EXPECT_EQ(matrices[0].shape()[1], 3);
     EXPECT_NEAR(std::abs(matrices[0][{2, 2}].real() + 1.0), 0.0, 1e-6);
   }
 
@@ -184,7 +185,8 @@ TEST(MatrixOperatorTest, GetElementaryOperators) {
         [](const dimensions_map &, const parameter_map &p) {
           auto theta = p.at("theta");
           return operator_matrix({std::cos(theta), -std::sin(theta),
-                                  std::sin(theta), std::cos(theta)});
+                                  std::sin(theta), std::cos(theta)},
+                                 2, 2);
         },
         0);
 
@@ -205,8 +207,8 @@ TEST(MixedOperatorTest, SpinFermionMultiplication) {
   // Check matrix representation
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = mixed.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(MixedOperatorTest, ElementaryOperators) {
@@ -239,8 +241,8 @@ TEST(MixedOperatorTest, MultiTermOperators) {
 
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = mixed.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(MixedOperatorTest, ParameterizedOperators) {
@@ -253,7 +255,7 @@ TEST(MixedOperatorTest, ParameterizedOperators) {
   parameter_map params;
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = mixed.to_matrix(dims, params);
-  std::cout << matrix.dump() << "\n";
+  matrix.dump();
 
   // Check coefficient is multiplied correctly
   EXPECT_NEAR(std::abs(matrix[{3, 0}].real()), 0.0, 1e-6);
@@ -271,8 +273,8 @@ TEST(MixedOperatorTest, DifferentDimensions) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 3}};
   auto matrix = mixed.to_matrix(dims);
 
-  EXPECT_EQ(matrix.rows(), 6);
-  EXPECT_EQ(matrix.cols(), 6);
+  EXPECT_EQ(matrix.shape()[0], 6);
+  EXPECT_EQ(matrix.shape()[1], 6);
 }
 
 TEST(OperatorAdditionTest, DifferentTypeAddition) {
@@ -289,8 +291,8 @@ TEST(OperatorAdditionTest, DifferentTypeAddition) {
 
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = result.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 }
 
 TEST(OperatorAdditionTest, SpinFermionAddition) {
@@ -305,8 +307,8 @@ TEST(OperatorAdditionTest, SpinFermionAddition) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}};
 
   auto matrix = sum.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 }
 
 TEST(OperatorAdditionTest, MultiQubitAddition) {
@@ -318,8 +320,8 @@ TEST(OperatorAdditionTest, MultiQubitAddition) {
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
 
   auto matrix = result.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(OperatorAdditionTest, ParameterizedAddition) {
@@ -333,8 +335,8 @@ TEST(OperatorAdditionTest, ParameterizedAddition) {
 
   // Test matrix with parameters
   auto matrix = sum.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 }
 
 TEST(OperatorAdditionTest, EmptyOperatorAddition) {
@@ -354,8 +356,8 @@ TEST(OperatorAdditionTest, AdditionWithScalar) {
 
   EXPECT_EQ(result.num_terms(), 2);
   auto matrix = result.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 }
 
 TEST(OperatorSubtractionTest, DifferentTypeAddition) {
@@ -372,8 +374,8 @@ TEST(OperatorSubtractionTest, DifferentTypeAddition) {
 
   std::unordered_map<std::size_t, std::size_t> dims{{0, 2}, {1, 2}};
   auto matrix = result.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 }
 
 TEST(OperatorExpTest, SingleQubitExponential) {
@@ -383,8 +385,8 @@ TEST(OperatorExpTest, SingleQubitExponential) {
 
   // Check matrix dimensions
   auto matrix = exp_ix.to_matrix();
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 
   // Should be cos(1) I + i*sin(1) X
   EXPECT_NEAR(std::abs(matrix[{0, 0}].real() - std::cos(1)), 0.0, 1e-6);
@@ -400,8 +402,8 @@ TEST(OperatorExpTest, NumberOperatorExponential) {
 
   dimensions_map dims{{0, 2}};
   auto matrix = exp_n.to_matrix(dims);
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 
   // Should be diagonal with [1, e]
   EXPECT_NEAR(std::abs(matrix[{0, 0}].real() - 1.0), 0.0, 1e-6);
@@ -414,10 +416,10 @@ TEST(OperatorExpTest, MultiQubitExponential) {
   auto exp_xx = exp(xx);
 
   auto matrix = exp_xx.to_matrix();
-  std::cout << matrix.dump() << "\n";
+  matrix.dump();
 
-  EXPECT_EQ(matrix.rows(), 4);
-  EXPECT_EQ(matrix.cols(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(OperatorExpTest, ParameterizedExponential) {
@@ -432,8 +434,8 @@ TEST(OperatorExpTest, ParameterizedExponential) {
   parameter_map params{{"theta", std::complex<double>(M_PI / 2, 0)}};
   auto matrix = exp_theta_x.to_matrix({}, params);
 
-  EXPECT_EQ(matrix.rows(), 2);
-  EXPECT_EQ(matrix.cols(), 2);
+  EXPECT_EQ(matrix.shape()[0], 2);
+  EXPECT_EQ(matrix.shape()[1], 2);
 }
 
 TEST(OperatorExpTest, HermitianOperatorExponential) {
@@ -444,16 +446,25 @@ TEST(OperatorExpTest, HermitianOperatorExponential) {
   auto matrix = exp_ih.to_matrix();
 
   // Check unitarity by computing U†U
-  auto conj_matrix = matrix;
-  for (std::size_t i = 0; i < matrix.rows(); i++) {
-    for (std::size_t j = 0; j < matrix.cols(); j++) {
-      conj_matrix[{i, j}] = std::conj(matrix[{i, j}]);
-    }
-  }
+  operator_matrix conj_matrix = matrix;
+  for (std::size_t i = 0; i < matrix.shape()[0]; i++)
+    for (std::size_t j = 0; j < matrix.shape()[1]; j++)
+      conj_matrix[{i, j}] =
+          std::conj(matrix[{i, j}]); // should be transpose in general
 
   auto prod = matrix * conj_matrix;
-  for (std::size_t i = 0; i < matrix.rows(); i++) {
+  for (std::size_t i = 0; i < matrix.shape()[0]; i++) {
     EXPECT_NEAR(std::abs(prod[{i, i}].real() - 1.0), 0.0, 1e-6);
     EXPECT_NEAR(std::abs(prod[{i, i}].imag()), 0.0, 1e-6);
   }
+
+  // Can access with variadic indices
+  std::cout << "TEST: " << matrix(1, 1) << "\n";
+
+  operator_matrix empty;
+
+  empty = matrix;
+  empty(0, 0) = 2.2;
+  empty.dump();
+  matrix.dump();
 }

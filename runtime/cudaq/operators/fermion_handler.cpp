@@ -233,13 +233,11 @@ fermion_handler::get_support_matrices(const fermion_data &data,
           std::to_string(term[i]) + ")");
     }
 
-    operator_matrix m;
     if (term[i + 1])
-      m = create_matrix(dim);
+      support_matrices.push_back(create_matrix(dim));
     else
-      m = annihilate_matrix(dim);
+      support_matrices.push_back( annihilate_matrix(dim));
 
-    support_matrices.push_back(m);
   }
 
   // absorb the coefficient into the first matrix
@@ -250,10 +248,10 @@ fermion_handler::get_support_matrices(const fermion_data &data,
 
 operator_matrix kronecker_product(const operator_matrix &A,
                                   const operator_matrix &B) {
-  const auto A_rows = A.rows();
-  const auto A_cols = A.cols();
-  const auto B_rows = B.rows();
-  const auto B_cols = B.cols();
+  const auto A_rows = A.shape()[0];
+  const auto A_cols = A.shape()[1];
+  const auto B_rows = B.shape()[0];
+  const auto B_cols = B.shape()[1];
 
   // Result matrix dimensions
   const auto C_rows = A_rows * B_rows;
@@ -355,12 +353,12 @@ fermion_handler::to_matrix(const fermion_data &data,
       result = term_matrix;
       first_term = false;
     } else {
-      std::vector<std::complex<double>> sum_data(result.get_size());
+      std::vector<std::complex<double>> sum_data(result.get_num_elements());
       for (std::size_t i = 0; i < sum_data.size(); i++) {
-        sum_data[i] = result.get_data()[i] + term_matrix.get_data()[i];
+        sum_data[i] = result.data()[i] + term_matrix.data()[i];
       }
       result =
-          operator_matrix(sum_data, {result.get_rows(), result.get_columns()});
+          operator_matrix(sum_data, {result.shape()[0], result.shape()[1]});
     }
   }
 

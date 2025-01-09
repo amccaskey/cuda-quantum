@@ -98,7 +98,7 @@ TEST(BosonOperatorTester, canGetMatrixRepresentation) {
   // Test matrix representation with different truncation dimensions
   std::unordered_map<std::size_t, std::size_t> dims{{0, 3}};
   auto matrix = a.to_matrix(dims);
-  std::cout << matrix.dump() << "\n";
+  matrix.dump() ;
 
   // Verify annihilation operator matrix elements for 3-level truncation
   EXPECT_NEAR(std::abs(matrix[{0, 1}]), std::sqrt(1.0), 1e-12);
@@ -148,8 +148,8 @@ TEST(BosonOperatorTester, canHandleMultiModeMatrices) {
   auto matrix = bs.to_matrix(dims);
 
   // Verify matrix dimension is correct (2x2 for each mode -> 4x4 total)
-  EXPECT_EQ(matrix.get_rows(), 4);
-  EXPECT_EQ(matrix.get_columns(), 4);
+  EXPECT_EQ(matrix.shape()[0], 4);
+  EXPECT_EQ(matrix.shape()[1], 4);
 }
 
 TEST(BosonOperatorTester, canHandleParameterizedOperators) {

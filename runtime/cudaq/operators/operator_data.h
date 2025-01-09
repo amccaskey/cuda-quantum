@@ -15,7 +15,7 @@
 #include <variant>
 #include <vector>
 
-#include "cudaq/utils/tensor.h"
+#include "cudaq/tensor.h"
 
 namespace cudaq::experimental {
 
@@ -23,7 +23,7 @@ namespace cudaq::experimental {
 using parameter_map = std::unordered_map<std::string, std::complex<double>>;
 
 /// @brief A 2x2 matrix representing a quantum operator
-using operator_matrix = cudaq::matrix_2;
+using operator_matrix = cudaq::matrix<>;
 
 using dimensions_map = std::unordered_map<std::size_t, std::size_t>;
 

@@ -27,11 +27,11 @@ matrix_op_data matrix_handler::initialize() const {
 
 operator_matrix tensor_product(const std::vector<operator_matrix> &matrices) {
   if (matrices.empty())
-    return operator_matrix({1.0, 0.0, 0.0, 1.0}); // 2x2 Identity
+    return operator_matrix({1.0, 0.0, 0.0, 1.0}, 2, 2); // 2x2 Identity
 
   operator_matrix result = matrices[0];
   for (std::size_t i = 1; i < matrices.size(); i++)
-    result = kronecker(result, matrices[i]);
+    result = kron(result, matrices[i]);
   return result;
 }
 
@@ -55,7 +55,7 @@ matrix_handler::to_matrix(const matrix_op_data &data, const parameter_map &p,
   auto eye = [](std::size_t dim) {
     std::vector<std::complex<double>> d(dim * dim, 0.0);
     operator_matrix ret(d, {dim, dim});
-    for (std::size_t jj = 0; jj < ret.get_rows(); jj++)
+    for (std::size_t jj = 0; jj < ret.shape()[0]; jj++)
       ret[{jj, jj}] = 1.;
     return ret;
   };
@@ -91,10 +91,11 @@ matrix_handler::to_matrix(const matrix_op_data &data, const parameter_map &p,
       } else {
 
         // FIXME This is not good, better to check isIdentity
-        if (term_matrices[op.supports[0]].get_size() < m.get_size())
+        if (term_matrices[op.supports[0]].get_num_elements() <
+            m.get_num_elements())
           term_matrices[op.supports[0]] = m;
         else
-          term_matrices[op.supports[0]] *= m;
+          term_matrices[op.supports[0]] = term_matrices[op.supports[0]] * m;
       }
     }
 
@@ -105,7 +106,7 @@ matrix_handler::to_matrix(const matrix_op_data &data, const parameter_map &p,
     if (term_idx == 0)
       result = term_matrix;
     else
-      result += term_matrix;
+      result = result + term_matrix;
   }
 
   return result;
@@ -206,7 +207,7 @@ matrix_handler::get_support_matrices(const matrix_op_data &m_data,
   auto eye = [](std::size_t dim) {
     std::vector<std::complex<double>> d(dim * dim, 0.0);
     operator_matrix ret(d, {dim, dim});
-    for (std::size_t jj = 0; jj < ret.get_rows(); jj++)
+    for (std::size_t jj = 0; jj < ret.shape()[0]; jj++)
       ret[{jj, jj}] = 1.;
     return ret;
   };
@@ -276,9 +277,9 @@ std::string matrix_handler::to_string(const matrix_op_data &data,
 
 operator_matrix exponentiateMatrix(const operator_matrix &mat) {
   // Convert to Eigen matrix for exponentiation
-  Eigen::MatrixXcd eigenMat(mat.rows(), mat.cols());
-  for (std::size_t i = 0; i < mat.rows(); i++)
-    for (std::size_t j = 0; j < mat.cols(); j++)
+  Eigen::MatrixXcd eigenMat(mat.shape()[0], mat.shape()[1]);
+  for (std::size_t i = 0; i < eigenMat.rows(); i++)
+    for (std::size_t j = 0; j < eigenMat.cols(); j++)
       eigenMat(i, j) = mat[{i, j}];
 
   // Compute matrix exponential
@@ -291,7 +292,8 @@ operator_matrix exponentiateMatrix(const operator_matrix &mat) {
     for (std::size_t j = 0; j < expMat.cols(); j++)
       data.push_back(expMat(i, j));
 
-  return operator_matrix(data, {expMat.rows(), expMat.cols()});
+  return operator_matrix(
+      data, {(std::size_t)expMat.rows(), (std::size_t)expMat.cols()});
 }
 
 matrix_op from_matrix(const operator_matrix &m, const std::size_t quditIdx) {

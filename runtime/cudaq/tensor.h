@@ -49,6 +49,12 @@ public:
   using scalar_type = typename details::tensor_impl<Scalar>::scalar_type;
   static constexpr auto ScalarAsString = type_to_string<Scalar>();
 
+  basic_tensor()
+      : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
+            details::tensor_impl<Scalar>::get(
+                std::string("xtensor") + std::string(ScalarAsString), {})
+                .release())) {}
+
   /// @brief Construct a basic_tensor with the given shape
   /// @param shape The shape of the basic_tensor
   basic_tensor(const std::vector<std::size_t> &shape)
@@ -66,7 +72,8 @@ public:
                              std::conjunction_v<std::is_integral<Args>...>> * =
                 nullptr>
   explicit basic_tensor(Args... args)
-      : basic_tensor({static_cast<std::size_t>(args)...}) {}
+      : basic_tensor(
+            std::vector<std::size_t>{static_cast<std::size_t>(args)...}) {}
 
   basic_tensor(const std::vector<Scalar> &data,
                const std::vector<std::size_t> &shape)
@@ -85,7 +92,9 @@ public:
                              std::conjunction_v<std::is_integral<Args>...>> * =
                 nullptr>
   explicit basic_tensor(const std::vector<Scalar> &data, Args... args)
-      : basic_tensor(data, {static_cast<std::size_t>(args)...}) {}
+      : basic_tensor(
+            data, std::vector<std::size_t>{static_cast<std::size_t>(args)...}) {
+  }
 
   basic_tensor(std::unique_ptr<Scalar[]> &&data,
                const std::vector<std::size_t> &shape)
@@ -99,9 +108,21 @@ public:
                                std::to_string(Rank));
   }
 
+  basic_tensor(const basic_tensor<Rank, Scalar> &other)
+      : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
+            details::tensor_impl<Scalar>::get(std::string("xtensor") +
+                                                  std::string(ScalarAsString),
+                                              other.shape())
+                .release())) {
+    std::copy(other.data(), other.data() + other.get_num_elements(),
+              pimpl->data());
+  }
+
   /// @brief Get the rank of the basic_tensor
   /// @return The rank of the basic_tensor
-  std::size_t get_rank() const { return Rank == dynamic_rank ? pimpl->rank() : Rank; }
+  std::size_t get_rank() const {
+    return Rank == dynamic_rank ? pimpl->rank() : Rank;
+  }
 
   /// @brief Get the total number of elements in the basic_tensor
   /// @return The total number of elements in the basic_tensor
@@ -129,6 +150,42 @@ public:
   /// @return A const reference to the element at the specified indices
   const scalar_type &at(const std::vector<size_t> &indices) const {
     return pimpl->at(indices);
+  }
+
+  scalar_type &operator[](const std::vector<size_t> &indices) {
+    if (indices.size() != get_rank())
+      throw std::runtime_error(
+          "Invalid indices provided to basic_tensor::at(), size "
+          "must be equal to rank.");
+    return pimpl->at(indices);
+  }
+
+  /// @brief Access a const element of the basic_tensor
+  /// @param indices The indices of the element to access
+  /// @return A const reference to the element at the specified indices
+  const scalar_type &operator[](const std::vector<size_t> &indices) const {
+    return pimpl->at(indices);
+  }
+
+  template <typename... Args>
+  typename std::enable_if_t<(std::is_integral_v<Args> && ...), scalar_type &> &
+  operator()(const Args... indices) {
+    if (sizeof...(Args) != shape().size())
+      throw std::runtime_error("invalid element access, number of provided "
+                               "extraction indices not equal to tensor rank.");
+
+    return at({static_cast<std::size_t>(indices)...});
+  }
+
+  template <typename... Args>
+  typename std::enable_if_t<(std::is_integral_v<Args> && ...),
+                            const scalar_type &> &
+  operator()(const Args... indices) const {
+    if (sizeof...(Args) != shape().size())
+      throw std::runtime_error("invalid element access, number of provided "
+                               "extraction indices not equal to tensor rank.");
+
+    return at({static_cast<std::size_t>(indices)...});
   }
 
   scalar_type &operator()(const std::vector<size_t> &indices) {
@@ -163,11 +220,22 @@ public:
     return result;
   }
 
-  virtual basic_tensor<Rank, Scalar>
+  basic_tensor<Rank, Scalar> operator*(Scalar other) const {
+    auto tmp = *this;
+    auto *d = tmp.pimpl->data();
+    for (std::size_t i = 0; i < get_num_elements(); i++) {
+      auto &el = d[i];
+      el *= other;
+    }
+    return tmp;
+  }
+
+  basic_tensor<Rank, Scalar>
   operator*(const basic_tensor<Rank, Scalar> &other) const {
 
     // If matrices,
-    if (get_rank() == 2 && other.get_rank() == 2 && shape()[1] == other.shape()[0])
+    if (get_rank() == 2 && other.get_rank() == 2 &&
+        shape()[1] == other.shape()[0])
       return dot(other);
 
     if (shape() != other.shape()) {
@@ -195,6 +263,22 @@ public:
     basic_tensor<Rank, Scalar> result(shape());
     pimpl->scalar_modulo(value, result.pimpl.get());
     return result;
+  }
+
+  basic_tensor<Rank, Scalar> &
+  operator=(const basic_tensor<Rank, Scalar> &other) {
+    // Prevent self-assignment
+    if (this != &other) {
+      // Create a new implementation with copied data
+      pimpl = std::shared_ptr<details::tensor_impl<Scalar>>(
+          details::tensor_impl<Scalar>::get(std::string("xtensor") +
+                                                std::string(ScalarAsString),
+                                            other.shape())
+              .release());
+      std::copy(other.data(), other.data() + other.get_num_elements(),
+                pimpl->data());
+    }
+    return *this;
   }
 
   // Return the dot product of two tensors.
@@ -295,6 +379,12 @@ public:
   void dump() const { pimpl->dump(); }
 };
 
+template <std::size_t Rank, typename Scalar>
+basic_tensor<Rank, Scalar> operator*(Scalar value,
+                                     const basic_tensor<Rank, Scalar> &rhs) {
+  return rhs * value;
+}
+
 template <typename Scalar = std::complex<double>>
 using tensor = basic_tensor<dynamic_rank, Scalar>;
 
@@ -312,6 +402,18 @@ using vector = fixed_tensor<1, Scalar>;
 // Compute the Kronecker product of the two input matrices and return the
 // result.
 template <typename T>
-matrix<T> kron(const matrix<T> &A, const matrix<T> &B);
+matrix<T> kron(const matrix<T> &A, const matrix<T> &B) {
+  auto aRows = A.shape()[0];
+  auto aCols = A.shape()[1];
+  auto bRows = B.shape()[0];
+  auto bCols = B.shape()[1];
+  matrix<T> tmp(aRows * bRows, aCols * bCols);
+  for (std::size_t i = 0; i < aRows; i++)
+    for (std::size_t k = 0; k < bRows; k++)
+      for (std::size_t j = 0; j < aCols; j++)
+        for (std::size_t m = 0; m < bCols; m++)
+          tmp[{bRows * i + k, bCols * j + m}] = A[{i, j}] * B[{k, m}];
+  return tmp;
+}
 
 } // namespace cudaq

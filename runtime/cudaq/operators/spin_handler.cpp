@@ -336,26 +336,28 @@ spin_handler::get_support_matrices(const spin_data &data,
   for (std::size_t i = 0; i < nQ; i++) {
     if (term[i] && term[i + nQ]) {
       // y
-      ret.emplace_back(std::vector<std::complex<double>>{
-          0., std::complex<double>{0, -1.}, std::complex<double>{0, 1}, 0.});
+      ret.emplace_back(
+          std::vector<std::complex<double>>{0., std::complex<double>{0, -1.},
+                                            std::complex<double>{0, 1}, 0.},
+          2, 2);
       continue;
     }
 
     if (term[i]) {
       // x
-      ret.emplace_back(std::vector<std::complex<double>>{0, 1, 1, 0});
+      ret.emplace_back(std::vector<std::complex<double>>{0, 1, 1, 0}, 2, 2);
 
       continue;
     }
 
     if (term[i + nQ]) {
       // z
-      ret.emplace_back(std::vector<std::complex<double>>{1., 0, 0, -1.});
+      ret.emplace_back(std::vector<std::complex<double>>{1., 0, 0, -1.}, 2, 2);
       continue;
     }
 
     // i
-    ret.emplace_back(std::vector<std::complex<double>>{1., 0, 0, 1.});
+    ret.emplace_back(std::vector<std::complex<double>>{1., 0, 0, 1.}, 2, 2);
   }
 
   // absorb the coefficient into the first matrix
