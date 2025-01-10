@@ -13,6 +13,7 @@
 #include <iostream>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <vector>
 
 namespace cudaq {
@@ -120,6 +121,18 @@ constexpr std::string_view type_to_string<std::complex<float>>() {
   return "complex<float>";
 }
 
+// Add slice type definition
+struct slice {
+  std::optional<std::size_t> start;
+  std::optional<std::size_t> stop;
+  std::optional<std::size_t> step;
+
+  slice() = default;
+  slice(std::size_t s) : start(s), stop(s + 1) {}
+  slice(std::size_t start_, std::size_t stop_, std::size_t step_ = 1)
+      : start(start_), stop(stop_), step(step_) {}
+};
+
 } // namespace cudaq
 namespace cudaq::details {
 
@@ -133,6 +146,9 @@ public:
   using BaseExtensionPoint =
       extension_point<tensor_impl<Scalar>, const Scalar *,
                       const std::vector<std::size_t>>;
+
+  virtual void
+  slice(const std::vector<slice> &slices, std::vector<Scalar>& result_data) const = 0;
 
   /// @brief Create a tensor implementation with the given name and shape
   /// @param name The name of the tensor implementation
@@ -219,9 +235,9 @@ public:
 
   virtual void matrix_transpose(tensor_impl<Scalar> *result) const = 0;
 
-  virtual Scalar minimal_eigenvalue() const = 0; 
+  virtual Scalar minimal_eigenvalue() const = 0;
   virtual std::vector<Scalar> eigenvalues() const = 0;
-  virtual void eigenvectors(tensor_impl<Scalar> * result) const = 0; 
+  virtual void eigenvectors(tensor_impl<Scalar> *result) const = 0;
 
   /// @brief Get a pointer to the raw data of the tensor.
   /// This method provides direct access to the underlying data storage of the

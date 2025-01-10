@@ -52,6 +52,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(xtl xtensor xtensor-blas)
 
+find_package(LAPACK REQUIRED)
+
 if (CUDA_FOUND)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
@@ -62,12 +64,13 @@ if (CUDA_FOUND)
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtl/include>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtensor/include>
+            $<BUILD_INTERFACE:${xtensor-blas_SOURCE_DIR}/include>
             $<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>
     PRIVATE .)
 
   target_link_libraries(${LIBRARY_NAME}
     PUBLIC dl cudaq-spin cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only CUDA::cudart_static xtensor xtensor-blas)
+    PRIVATE nvqir fmt::fmt-header-only CUDA::cudart_static)
 
   target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
 else()
@@ -75,12 +78,18 @@ else()
     PUBLIC $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtl/include>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtensor/include>
+            $<BUILD_INTERFACE:${xtensor-blas_SOURCE_DIR}/include>
     PRIVATE .)
 
   target_link_libraries(${LIBRARY_NAME}
     PUBLIC dl cudaq-spin cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only xtensor xtensor-blas)
+    PRIVATE nvqir fmt::fmt-header-only)
 endif()
+
+# FIXME couldn't get gfortran to link...
+target_link_libraries(${LIBRARY_NAME} PUBLIC /usr/lib/x86_64-linux-gnu/libgfortran.so.5 PRIVATE ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} xtensor xtensor-blas)
 
 add_subdirectory(qis/managers)
 add_subdirectory(algorithms)

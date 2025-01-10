@@ -45,7 +45,7 @@ endif()
 
 # Project setup
 # ==============================================================================
-project(cudaq LANGUAGES CXX C)
+project(cudaq LANGUAGES CXX C Fortran)
 
 # Prevent In-source builds
 # ==============================================================================
