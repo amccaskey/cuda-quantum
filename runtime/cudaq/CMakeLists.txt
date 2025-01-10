@@ -25,6 +25,7 @@ add_library(${LIBRARY_NAME}
                 utils/cudaq_utils.cpp
                 utils/tensor.cpp
                 utils/tensor_impls/xtensor_impl.cpp
+                utils/tensor_impls/cuda_impl.cpp
                 distributed/mpi_plugin.cpp)
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
@@ -57,7 +58,9 @@ find_package(LAPACK REQUIRED)
 if (CUDA_FOUND)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
-
+  message(STATUS "CUDAToolkit_ROOT: ${CUDAToolkit_ROOT}")
+  message(STATUS "CUDAToolkit_LIBRARY_DIR: ${CUDAToolkit_LIBRARY_DIR}")
+  
   target_include_directories(${LIBRARY_NAME}
     PUBLIC $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
@@ -88,8 +91,9 @@ else()
     PRIVATE nvqir fmt::fmt-header-only)
 endif()
 
+add_library(cuda_tensor OBJECT utils/tensor_impls/cuda_kernels.cu)
 # FIXME couldn't get gfortran to link...
-target_link_libraries(${LIBRARY_NAME} PUBLIC /usr/lib/x86_64-linux-gnu/libgfortran.so.5 PRIVATE ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} xtensor xtensor-blas)
+target_link_libraries(${LIBRARY_NAME} PUBLIC CUDA::cublas ${CUDAToolkit_LIBRARY_DIR}/libcusolver.so.11 /usr/lib/x86_64-linux-gnu/libgfortran.so.5 PRIVATE cuda_tensor ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} xtensor xtensor-blas)
 
 add_subdirectory(qis/managers)
 add_subdirectory(algorithms)
