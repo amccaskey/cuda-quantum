@@ -49,6 +49,43 @@ public:
   using scalar_type = typename details::tensor_impl<Scalar>::scalar_type;
   static constexpr auto ScalarAsString = type_to_string<Scalar>();
 
+  basic_tensor<dynamic_rank, Scalar>
+  operator()(const std::vector<slice> &slices) {
+    if (slices.size() != get_rank()) {
+      throw std::runtime_error("Number of slices must match tensor rank");
+    }
+
+    for (std::size_t i = 0; i < slices.size(); i++) {
+      // for (auto &el : slices[i])
+      if (slices[i].stop > shape()[i])
+        throw std::runtime_error(
+            "invalid slice, slice index greater than number of dimensions.");
+    }
+    std::vector<std::size_t> result_shape;
+    result_shape.reserve(slices.size());
+
+    for (size_t i = 0; i < slices.size(); i++) {
+      const auto &s = slices[i];
+      std::size_t start = s.start ? *s.start : 0;
+      std::size_t stop = s.stop ? *s.stop : shape()[i];
+      std::size_t step = s.step ? *s.step : 1;
+      std::size_t dim_size = (stop - start + step - 1) / step;
+      result_shape.push_back(dim_size);
+    }
+
+    // Create result tensor with correct shape
+    basic_tensor<dynamic_rank, Scalar> result(result_shape);
+
+    // Get data from slice operation
+    std::vector<Scalar> sliced_data;
+    pimpl->slice(slices, sliced_data);
+
+    // Copy data to result tensor
+    std::copy(sliced_data.begin(), sliced_data.end(), result.data());
+
+    return result;
+  }
+
   basic_tensor()
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
             details::tensor_impl<Scalar>::get(
@@ -330,23 +367,24 @@ public:
   }
 
   Scalar minimal_eigenvalue() const {
-    if (Rank != 2)
+    if (get_rank() != 2)
       throw std::runtime_error(
-          "basic_tensor::minimal_eigenvalue only supported for matrices.");
-
+          "minimal_eigenvalue only supported for matrices.");
     return pimpl->minimal_eigenvalue();
   }
 
   std::vector<Scalar> eigenvalues() const {
-    if (Rank != 2)
-      throw std::runtime_error(
-          "basic_tensor::eigenvalues only supported for matrices.");
-
+    if (get_rank() != 2)
+      throw std::runtime_error("eigenvalues only supported for matrices.");
     return pimpl->eigenvalues();
   }
 
   basic_tensor<2, Scalar> eigenvectors() const {
-    throw std::runtime_error("implement");
+    if (get_rank() != 2)
+      throw std::runtime_error("eigenvectors only supported for matrices.");
+    basic_tensor<2, Scalar> result(shape());
+    pimpl->eigenvectors(result.pimpl.get());
+    return result;
   }
 
   /// @brief Get a pointer to the raw data of the basic_tensor.

@@ -11,6 +11,7 @@
 #include <xtensor-blas/xlinalg.hpp>
 #include <xtensor/xadapt.hpp>
 #include <xtensor/xio.hpp>
+#include <xtensor/xstrided_view.hpp>
 
 #include <fmt/ranges.h>
 
@@ -59,6 +60,28 @@ public:
   /// @brief Get the shape of the tensor
   /// @return A vector containing the dimensions of the tensor
   std::vector<std::size_t> shape() const override { return m_shape; }
+
+  void slice(const std::vector<slice> &slices,
+             std::vector<Scalar> &result_data) const override {
+    auto x = xt::adapt(m_data, size(), xt::no_ownership(), m_shape);
+
+    xt::xstrided_slice_vector xt_slices;
+    xt_slices.reserve(slices.size());
+
+    for (const auto &s : slices) {
+      std::ptrdiff_t start = s.start ? *s.start : 0;
+      std::ptrdiff_t stop = s.stop ? *s.stop : m_shape[xt_slices.size()];
+      std::ptrdiff_t step = s.step ? *s.step : 1;
+      xt_slices.push_back(xt::range(start, stop, step));
+    }
+
+    // Perform the slice
+    auto sliced = xt::strided_view(x, xt_slices);
+
+    // Resize result vector and copy data
+    result_data.resize(sliced.size());
+    std::copy(sliced.begin(), sliced.end(), result_data.begin());
+  }
 
   /// @brief Access a mutable element of the tensor
   /// @param indices The indices of the element to access
@@ -221,16 +244,67 @@ public:
   }
 
   Scalar minimal_eigenvalue() const override {
-    throw std::runtime_error("min eig value not supported yet.");
-    return 0.0;
+    auto eigenvals = eigenvalues();
+    return *std::min_element(eigenvals.begin(), eigenvals.end(),
+                             [](const auto &a, const auto &b) {
+                               return std::fabs(a) < std::fabs(b);
+                             });
   }
 
   std::vector<Scalar> eigenvalues() const override {
-    throw std::runtime_error("min eig value not supported yet.");
-    return {};
+    auto x = xt::adapt(m_data, size(), xt::no_ownership(), m_shape);
+
+    if constexpr (std::is_same_v<Scalar, float> ||
+                  std::is_same_v<Scalar, double>) {
+      // For real types, use eigh which guarantees real eigenvalues
+      auto eig_pair = xt::linalg::eigh(x);
+      return std::vector<Scalar>(std::get<0>(eig_pair).begin(),
+                                 std::get<0>(eig_pair).end());
+    } else if constexpr (std::is_integral_v<Scalar>) {
+      auto x_double = xt::cast<double>(x);
+      auto eigenvals = xt::linalg::eigvals(x_double);
+
+      // Convert back to integral type
+      std::vector<Scalar> result;
+      result.reserve(eigenvals.size());
+      std::transform(eigenvals.begin(), eigenvals.end(),
+                     std::back_inserter(result), [](const auto &val) {
+                       return static_cast<Scalar>(std::round(std::real(val)));
+                     });
+      return result;
+    } else {
+      auto eigenvals = xt::linalg::eigvals(x);
+      return std::vector<Scalar>(eigenvals.begin(), eigenvals.end());
+    }
   }
 
-  void eigenvectors(details::tensor_impl<Scalar> *result) const override {}
+  void eigenvectors(details::tensor_impl<Scalar> *result) const override {
+    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    if (!result_xt) {
+      throw std::runtime_error("Invalid tensor implementation type");
+    }
+
+    auto x = xt::adapt(m_data, size(), xt::no_ownership(), m_shape);
+
+    if constexpr (std::is_same_v<Scalar, float> ||
+                  std::is_same_v<Scalar, double>) {
+      // For real types, use eigh which guarantees real eigenvalues/vectors
+      auto eig_pair = xt::linalg::eigh(x);
+      auto eigenvecs = std::get<1>(eig_pair);
+      std::copy(eigenvecs.begin(), eigenvecs.end(), result_xt->data());
+    } else if constexpr (std::is_integral_v<Scalar>) {
+      // For integral types, compute as double then convert back
+      auto x_double = xt::cast<double>(x);
+      auto eig_pair = xt::linalg::eigh(x_double);
+      auto eigenvecs = xt::cast<Scalar>(std::get<1>(eig_pair));
+      std::copy(eigenvecs.begin(), eigenvecs.end(), result_xt->data());
+    } else {
+      // For complex types, use regular eig
+      auto eig_pair = xt::linalg::eig(x);
+      auto eigenvecs = std::get<1>(eig_pair);
+      std::copy(eigenvecs.begin(), eigenvecs.end(), result_xt->data());
+    }
+  }
 
   Scalar *data() override { return m_data; }
   const Scalar *data() const override { return m_data; }
