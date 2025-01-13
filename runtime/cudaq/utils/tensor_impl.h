@@ -147,8 +147,8 @@ public:
       extension_point<tensor_impl<Scalar>, const Scalar *,
                       const std::vector<std::size_t>>;
 
-  virtual void
-  slice(const std::vector<slice> &slices, std::vector<Scalar>& result_data) const = 0;
+  virtual void slice(const std::vector<slice> &slices,
+                     std::vector<Scalar> &result_data) const = 0;
 
   /// @brief Create a tensor implementation with the given name and shape
   /// @param name The name of the tensor implementation
@@ -234,6 +234,9 @@ public:
                                      tensor_impl<Scalar> *result) const = 0;
 
   virtual void matrix_transpose(tensor_impl<Scalar> *result) const = 0;
+
+  virtual void kron(const tensor_impl<Scalar> *other,
+                    tensor_impl<Scalar> *result) const = 0;
 
   virtual Scalar minimal_eigenvalue() const = 0;
   virtual std::vector<Scalar> eigenvalues() const = 0;

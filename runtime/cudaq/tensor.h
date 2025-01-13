@@ -69,43 +69,6 @@ public:
   using scalar_type = typename details::tensor_impl<Scalar>::scalar_type;
   static constexpr auto ScalarAsString = type_to_string<Scalar>();
 
-  basic_tensor<dynamic_rank, Scalar>
-  operator()(const std::vector<slice> &slices) {
-    if (slices.size() != get_rank()) {
-      throw std::runtime_error("Number of slices must match tensor rank");
-    }
-
-    for (std::size_t i = 0; i < slices.size(); i++) {
-      // for (auto &el : slices[i])
-      if (slices[i].stop > shape()[i])
-        throw std::runtime_error(
-            "invalid slice, slice index greater than number of dimensions.");
-    }
-    std::vector<std::size_t> result_shape;
-    result_shape.reserve(slices.size());
-
-    for (size_t i = 0; i < slices.size(); i++) {
-      const auto &s = slices[i];
-      std::size_t start = s.start ? *s.start : 0;
-      std::size_t stop = s.stop ? *s.stop : shape()[i];
-      std::size_t step = s.step ? *s.step : 1;
-      std::size_t dim_size = (stop - start + step - 1) / step;
-      result_shape.push_back(dim_size);
-    }
-
-    // Create result tensor with correct shape
-    basic_tensor<dynamic_rank, Scalar> result(result_shape);
-
-    // Get data from slice operation
-    std::vector<Scalar> sliced_data;
-    pimpl->slice(slices, sliced_data);
-
-    // Copy data to result tensor
-    std::copy(sliced_data.begin(), sliced_data.end(), result.data());
-
-    return result;
-  }
-
   basic_tensor(tensor_memory tm = tensor_memory::host)
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
             details::tensor_impl<Scalar>::get(
@@ -155,6 +118,16 @@ public:
     requires(Rank == 1)
       : basic_tensor(std::vector<std::size_t>{dim0}, tm) {}
 
+  basic_tensor(const std::vector<Scalar> &data, std::size_t dim0,
+               std::size_t dim1, tensor_memory tm = tensor_memory::host)
+    requires(Rank == 2)
+      : basic_tensor(data, std::vector<std::size_t>{dim0, dim1}, tm) {}
+
+  basic_tensor(const std::vector<Scalar> &data, std::size_t dim0,
+               tensor_memory tm = tensor_memory::host)
+    requires(Rank == 1)
+      : basic_tensor(data, std::vector<std::size_t>{dim0}, tm) {}
+
   basic_tensor(std::unique_ptr<Scalar[]> &&data,
                const std::vector<std::size_t> &shape)
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
@@ -163,12 +136,15 @@ public:
                     details::tensor_memory_or_pointer_to_string(data.get())) +
                     std::string(ScalarAsString),
                 data.release(), shape)
-                .release())),
-        memory(tm) {
+                .release())) {
     if (Rank != dynamic_rank && Rank != shape.size())
       throw std::runtime_error("Invalid shape for basic_tensor of Rank = " +
                                std::to_string(Rank));
     // FIXME get the tensor_memory set.
+    memory = "cudaq_tensor" ==
+                     details::tensor_memory_or_pointer_to_string(data.get())
+                 ? tensor_memory::cuda
+                 : tensor_memory::host;
   }
 
   basic_tensor(const basic_tensor<Rank, Scalar> &other)
@@ -177,7 +153,8 @@ public:
                 std::string(details::tensor_memory_to_string(other.memory)) +
                     std::string(ScalarAsString),
                 other.shape())
-                .release())), memory(other.memory) {
+                .release())),
+        memory(other.memory) {
     std::copy(other.data(), other.data() + other.get_num_elements(),
               pimpl->data());
   }
@@ -216,19 +193,41 @@ public:
     return pimpl->at(indices);
   }
 
-  scalar_type &operator[](const std::vector<size_t> &indices) {
-    if (indices.size() != get_rank())
-      throw std::runtime_error(
-          "Invalid indices provided to basic_tensor::at(), size "
-          "must be equal to rank.");
-    return pimpl->at(indices);
-  }
+  basic_tensor<dynamic_rank, Scalar>
+  operator[](const std::vector<slice> &slices) {
+    if (slices.size() != get_rank()) {
+      throw std::runtime_error("Number of slices must match tensor rank");
+    }
 
-  /// @brief Access a const element of the basic_tensor
-  /// @param indices The indices of the element to access
-  /// @return A const reference to the element at the specified indices
-  const scalar_type &operator[](const std::vector<size_t> &indices) const {
-    return pimpl->at(indices);
+    for (std::size_t i = 0; i < slices.size(); i++) {
+      // for (auto &el : slices[i])
+      if (slices[i].stop > shape()[i])
+        throw std::runtime_error(
+            "invalid slice, slice index greater than number of dimensions.");
+    }
+    std::vector<std::size_t> result_shape;
+    result_shape.reserve(slices.size());
+
+    for (size_t i = 0; i < slices.size(); i++) {
+      const auto &s = slices[i];
+      std::size_t start = s.start ? *s.start : 0;
+      std::size_t stop = s.stop ? *s.stop : shape()[i];
+      std::size_t step = s.step ? *s.step : 1;
+      std::size_t dim_size = (stop - start + step - 1) / step;
+      result_shape.push_back(dim_size);
+    }
+
+    // Create result tensor with correct shape
+    basic_tensor<dynamic_rank, Scalar> result(result_shape);
+
+    // Get data from slice operation
+    std::vector<Scalar> sliced_data;
+    pimpl->slice(slices, sliced_data);
+
+    // Copy data to result tensor
+    std::copy(sliced_data.begin(), sliced_data.end(), result.data());
+
+    return result;
   }
 
   template <typename... Args>
@@ -414,6 +413,26 @@ public:
     return result;
   }
 
+  // Kronecker product between two general tensor arrays. This function
+  // assumes both ranks are equal.
+  basic_tensor<Rank, Scalar> kron(const basic_tensor<Rank, Scalar> &other) {
+    if (get_rank() != other.get_rank()) {
+      throw std::runtime_error(
+          "Kronecker product requires tensors of equal rank");
+    }
+
+    // Calculate result shape
+    std::vector<std::size_t> result_shape;
+    result_shape.reserve(get_rank());
+    for (std::size_t i = 0; i < get_rank(); i++) {
+      result_shape.push_back(shape()[i] * other.shape()[i]);
+    }
+
+    basic_tensor<Rank, Scalar> result(result_shape);
+    pimpl->kron(other.pimpl.get(), result.pimpl.get());
+    return result;
+  }
+
   /// @brief Get a pointer to the raw data of the basic_tensor.
   ///
   /// This method provides direct access to the underlying data storage of the
@@ -468,17 +487,7 @@ using vector = fixed_tensor<1, Scalar>;
 // result.
 template <typename T>
 matrix<T> kron(const matrix<T> &A, const matrix<T> &B) {
-  auto aRows = A.shape()[0];
-  auto aCols = A.shape()[1];
-  auto bRows = B.shape()[0];
-  auto bCols = B.shape()[1];
-  matrix<T> tmp(aRows * bRows, aCols * bCols);
-  for (std::size_t i = 0; i < aRows; i++)
-    for (std::size_t k = 0; k < bRows; k++)
-      for (std::size_t j = 0; j < aCols; j++)
-        for (std::size_t m = 0; m < bCols; m++)
-          tmp[{bRows * i + k, bCols * j + m}] = A[{i, j}] * B[{k, m}];
-  return tmp;
+  return A.kron(B);
 }
 
 } // namespace cudaq

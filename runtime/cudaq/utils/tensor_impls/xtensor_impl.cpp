@@ -306,6 +306,29 @@ public:
     }
   }
 
+  void kron(const details::tensor_impl<Scalar> *other,
+            details::tensor_impl<Scalar> *result) const override {
+    auto *other_xt = dynamic_cast<const xtensor<Scalar> *>(other);
+    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+
+    if (!other_xt || !result_xt) {
+      throw std::runtime_error("Invalid tensor implementation type");
+    }
+
+    if (other->rank() != 2)
+      throw std::runtime_error("kron on host only supported for matrices.");
+    if (rank() != 2)
+      throw std::runtime_error("kron on host only supported for matrices.");
+      
+    auto x = xt::adapt(m_data, size(), xt::no_ownership(), m_shape);
+    auto y = xt::adapt(other_xt->data(), other_xt->size(), xt::no_ownership(),
+                       other_xt->shape());
+
+    // Use xtensor's kron function
+    auto z = xt::linalg::kron(x, y);
+    std::copy(z.begin(), z.end(), result_xt->data());
+  }
+
   Scalar *data() override { return m_data; }
   const Scalar *data() const override { return m_data; }
   void dump() const override {

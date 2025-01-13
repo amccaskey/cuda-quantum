@@ -482,10 +482,10 @@ TEST(TensorTest, InvalidAccess) {
 
 TEST(TensorEigenvalueTest, RealMatrixEigenvalues) {
   cudaq::matrix<double> m(2, 2);
-  m[{0, 0}] = 1.0;
-  m[{0, 1}] = 2.0;
-  m[{1, 0}] = 2.0;
-  m[{1, 1}] = 4.0;
+  m({0, 0}) = 1.0;
+  m({0, 1}) = 2.0;
+  m({1, 0}) = 2.0;
+  m({1, 1}) = 4.0;
 
   auto eigenvals = m.eigenvalues();
   for (auto e : eigenvals)
@@ -497,10 +497,10 @@ TEST(TensorEigenvalueTest, RealMatrixEigenvalues) {
 
 TEST(TensorEigenvalueTest, IntegerMatrixEigenvalues) {
   cudaq::matrix<int> m(2, 2);
-  m[{0, 0}] = 4;
-  m[{0, 1}] = -2;
-  m[{1, 0}] = -2;
-  m[{1, 1}] = 4;
+  m({0, 0}) = 4;
+  m({0, 1}) = -2;
+  m({1, 0}) = -2;
+  m({1, 1}) = 4;
 
   auto eigenvals = m.eigenvalues();
   EXPECT_EQ(eigenvals.size(), 2);
@@ -510,10 +510,10 @@ TEST(TensorEigenvalueTest, IntegerMatrixEigenvalues) {
 
 TEST(TensorEigenvalueTest, ComplexMatrixEigenvalues) {
   cudaq::matrix<std::complex<double>> m(2, 2);
-  m[{0, 0}] = std::complex<double>(1.0, 0.0);
-  m[{0, 1}] = std::complex<double>(0.0, 1.0);
-  m[{1, 0}] = std::complex<double>(0.0, -1.0);
-  m[{1, 1}] = std::complex<double>(1.0, 0.0);
+  m({0, 0}) = std::complex<double>(1.0, 0.0);
+  m({0, 1}) = std::complex<double>(0.0, 1.0);
+  m({1, 0}) = std::complex<double>(0.0, -1.0);
+  m({1, 1}) = std::complex<double>(1.0, 0.0);
 
   auto eigenvals = m.eigenvalues();
   for (auto e : eigenvals)
@@ -527,20 +527,20 @@ TEST(TensorEigenvalueTest, ComplexMatrixEigenvalues) {
 
 TEST(TensorEigenvalueTest, MinimalEigenvalue) {
   cudaq::matrix<double> m(2, 2);
-  m[{0, 0}] = 4.0;
-  m[{0, 1}] = 0.0;
-  m[{1, 0}] = 0.0;
-  m[{1, 1}] = 1.0;
+  m({0, 0}) = 4.0;
+  m({0, 1}) = 0.0;
+  m({1, 0}) = 0.0;
+  m({1, 1}) = 1.0;
 
   EXPECT_NEAR(m.minimal_eigenvalue(), 1.0, 1e-5);
 }
 
 TEST(TensorEigenvalueTest, Eigenvectors) {
   cudaq::matrix<double> m(2, 2);
-  m[{0, 0}] = 1.0;
-  m[{0, 1}] = 0.0;
-  m[{1, 0}] = 0.0;
-  m[{1, 1}] = 2.0;
+  m({0, 0}) = 1.0;
+  m({0, 1}) = 0.0;
+  m({1, 0}) = 0.0;
+  m({1, 1}) = 2.0;
 
   auto evecs = m.eigenvectors();
   EXPECT_EQ(evecs.shape()[0], 2);
@@ -549,7 +549,7 @@ TEST(TensorEigenvalueTest, Eigenvectors) {
   // Test orthogonality
   double dot_product = 0.0;
   for (size_t i = 0; i < 2; i++) {
-    dot_product += evecs[{i, 0}] * evecs[{i, 1}];
+    dot_product += evecs({i, 0}) * evecs({i, 1});
   }
   EXPECT_NEAR(dot_product, 0.0, 1e-5);
 }
@@ -564,7 +564,7 @@ TEST(TensorEigenvalueTest, InvalidDimensions) {
 TEST(TensorSlicingTest, checkSimple) {
   cudaq::tensor<> t({2, 2});
 
-  auto sliced = t({cudaq::slice(0, 1), cudaq::slice(0, 2)});
+  auto sliced = t[{cudaq::slice(0, 1), cudaq::slice(0, 2)}];
   sliced.dump();
 }
 
@@ -574,12 +574,12 @@ TEST(TensorSliceTest, BasicMatrixSlice) {
   // Fill matrix with sequential values
   for (size_t i = 0; i < 4; i++) {
     for (size_t j = 0; j < 4; j++) {
-      m[{i, j}] = i * 4 + j;
+      m({i, j}) = i * 4 + j;
     }
   }
 
   // Get rows 1:3
-  auto rows = m({cudaq::slice(1, 3), cudaq::slice(0, 4)});
+  auto rows = m[{cudaq::slice(1, 3), cudaq::slice(0, 4)}];
   EXPECT_EQ(rows.shape()[0], 2);
   EXPECT_EQ(rows.shape()[1], 4);
   EXPECT_EQ(rows(0, 0), 4);
@@ -590,11 +590,11 @@ TEST(TensorSliceTest, SingleColumnSlice) {
   cudaq::matrix<double> m(3, 3);
   for (size_t i = 0; i < 3; i++) {
     for (size_t j = 0; j < 3; j++) {
-      m[{i, j}] = i * 3 + j;
+      m({i, j}) = i * 3 + j;
     }
   }
 
-  auto col = m({cudaq::slice(0, 3), cudaq::slice(1, 2)});
+  auto col = m[{cudaq::slice(0, 3), cudaq::slice(1, 2)}];
   EXPECT_EQ(col.shape()[0], 3);
   EXPECT_EQ(col.shape()[1], 1);
   EXPECT_EQ(col(0, 0), 1);
@@ -606,11 +606,11 @@ TEST(TensorSliceTest, StridedSlice) {
   cudaq::matrix<double> m(4, 4);
   for (size_t i = 0; i < 4; i++) {
     for (size_t j = 0; j < 4; j++) {
-      m[{i, j}] = i * 4 + j;
+      m({i, j}) = i * 4 + j;
     }
   }
 
-  auto strided = m({cudaq::slice(0, 4, 2), cudaq::slice(0, 4, 2)});
+  auto strided = m[{cudaq::slice(0, 4, 2), cudaq::slice(0, 4, 2)}];
   EXPECT_EQ(strided.shape()[0], 2);
   EXPECT_EQ(strided.shape()[1], 2);
   EXPECT_EQ(strided(0, 0), 0);
@@ -623,11 +623,11 @@ TEST(TensorSliceTest, ComplexSlice) {
   cudaq::matrix<std::complex<double>> m(3, 3);
   for (size_t i = 0; i < 3; i++) {
     for (size_t j = 0; j < 3; j++) {
-      m[{i, j}] = std::complex<double>(i, j);
+      m({i, j}) = std::complex<double>(i, j);
     }
   }
 
-  auto slice = m({cudaq::slice(1, 3), cudaq::slice(0, 2)});
+  auto slice = m[{cudaq::slice(1, 3), cudaq::slice(0, 2)}];
   EXPECT_EQ(slice.shape()[0], 2);
   EXPECT_EQ(slice.shape()[1], 2);
   EXPECT_EQ(slice(0, 0), std::complex<double>(1, 0));
@@ -636,23 +636,49 @@ TEST(TensorSliceTest, ComplexSlice) {
 
 TEST(TensorSliceTest, InvalidSlice) {
   cudaq::matrix<double> m(3, 3);
-
-  EXPECT_THROW(m({cudaq::slice(0, 4), cudaq::slice(0, 3)}), std::runtime_error);
-
-  EXPECT_THROW(m({cudaq::slice(0, 2)}), std::runtime_error);
+  std::vector<cudaq::slice> s{cudaq::slice(0, 4), cudaq::slice(0, 3)};
+  EXPECT_THROW(m[s], std::runtime_error);
+  EXPECT_THROW(m[{cudaq::slice(0, 2)}], std::runtime_error);
 }
 
 TEST(TensorSliceTest, VectorSlice) {
   cudaq::vector<double> v(6);
   for (size_t i = 0; i < 6; i++) {
-    v[{i}] = i;
+    v({i}) = i;
   }
 
-  auto slice = v({cudaq::slice(1, 4)});
+  auto slice = v[{cudaq::slice(1, 4)}];
   EXPECT_EQ(slice.shape()[0], 3);
-  EXPECT_EQ(slice[{0}], 1);
-  EXPECT_EQ(slice[{1}], 2);
-  EXPECT_EQ(slice[{2}], 3);
+  EXPECT_EQ(slice(0), 1);
+  EXPECT_EQ(slice(1), 2);
+  EXPECT_EQ(slice(2), 3);
 
   cudaq::tensor<> t({2, 3, 4}, cudaq::tensor_memory::host);
+}
+
+TEST(TensorKronTest, MatrixKronecker) {
+  // Create two 2x2 test matrices
+  cudaq::matrix<> A({1.0, 2.0, 3.0, 4.0}, {2, 2});
+
+  cudaq::matrix<> B({0.5, 1.5, 2.5, 3.5}, 2, 2);
+
+  // Expected 4x4 result matrix after Kronecker product
+  cudaq::matrix<std::complex<double>> expected({0.5, 1.5, 1.0, 3.0, 2.5, 3.5,
+                                                5.0, 7.0, 1.5, 4.5, 2.0, 6.0,
+                                                7.5, 10.5, 10.0, 14.0},
+                                               4, 4);
+
+  // Compute Kronecker product
+  auto result = A.kron(B);
+
+  // Verify dimensions
+  EXPECT_EQ(result.shape()[0], 4);
+  EXPECT_EQ(result.shape()[1], 4);
+
+  // Verify all elements match expected values
+  for (std::size_t i = 0; i < 4; i++) {
+    for (std::size_t j = 0; j < 4; j++) {
+      EXPECT_NEAR(std::fabs(result({i, j}) - expected({i, j})), 0.0, 1e-6);
+    }
+  }
 }
