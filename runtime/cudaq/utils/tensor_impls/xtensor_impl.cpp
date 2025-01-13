@@ -319,7 +319,7 @@ public:
   /// @param s Shape of the tensor
   /// @return A unique pointer to the created xtensor object
   CUDAQ_EXTENSION_CUSTOM_CREATOR_FUNCTION_WITH_NAME(
-      xtensor<Scalar>, std::string("xtensor") + std::string(ScalarAsString),
+      xtensor<Scalar>, std::string("host_tensor") + std::string(ScalarAsString),
       static std::unique_ptr<cudaq::details::tensor_impl<Scalar>> create(
           const Scalar *d, const std::vector<std::size_t> s) {
         return std::make_unique<xtensor<Scalar>>(d, s);

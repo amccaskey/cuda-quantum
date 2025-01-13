@@ -11,8 +11,26 @@
 #include "utils/tensor_impl.h"
 
 namespace cudaq {
-inline constexpr std::size_t dynamic_rank = -1;
+inline constexpr std::size_t dynamic_rank =
+    std::numeric_limits<std::size_t>::max();
 
+enum class tensor_memory { host, cuda };
+
+namespace details {
+const char *tensor_memory_to_string(tensor_memory tm) noexcept {
+  switch (tm) {
+  case tensor_memory::host:
+    return "host_tensor";
+  case tensor_memory::cuda:
+    return "cuda_tensor";
+  }
+  return "Unknown";
+}
+
+// If data is on gpu device, return "cuda", else "host"
+const char *tensor_memory_or_pointer_to_string(void *ptr);
+
+} // namespace details
 /// @brief A basic_tensor class implementing the PIMPL idiom. The flattened data
 /// is stored where the strides grow from right to left (similar to a
 /// multi-dimensional C array).
@@ -20,6 +38,8 @@ template <std::size_t Rank = dynamic_rank,
           typename Scalar = std::complex<double>>
 class basic_tensor {
 private:
+  tensor_memory memory;
+
   std::shared_ptr<details::tensor_impl<Scalar>> pimpl;
 
   basic_tensor<Rank, Scalar>
@@ -86,71 +106,78 @@ public:
     return result;
   }
 
-  basic_tensor()
+  basic_tensor(tensor_memory tm = tensor_memory::host)
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
             details::tensor_impl<Scalar>::get(
-                std::string("xtensor") + std::string(ScalarAsString), {})
-                .release())) {}
+                std::string(details::tensor_memory_to_string(tm)) +
+                    std::string(ScalarAsString),
+                {})
+                .release())),
+        memory(tm) {}
 
   /// @brief Construct a basic_tensor with the given shape
   /// @param shape The shape of the basic_tensor
-  basic_tensor(const std::vector<std::size_t> &shape)
+  basic_tensor(const std::vector<std::size_t> &shape,
+               tensor_memory tm = tensor_memory::host)
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
             details::tensor_impl<Scalar>::get(
-                std::string("xtensor") + std::string(ScalarAsString), shape)
-                .release())) {
+                std::string(details::tensor_memory_to_string(tm)) +
+                    std::string(ScalarAsString),
+                shape)
+                .release())),
+        memory(tm) {
     if (Rank != dynamic_rank && Rank != shape.size())
       throw std::runtime_error("Invalid shape for basic_tensor of Rank = " +
                                std::to_string(Rank));
   }
-
-  template <typename... Args,
-            std::enable_if_t<(sizeof...(Args) == Rank) &&
-                             std::conjunction_v<std::is_integral<Args>...>> * =
-                nullptr>
-  explicit basic_tensor(Args... args)
-      : basic_tensor(
-            std::vector<std::size_t>{static_cast<std::size_t>(args)...}) {}
 
   basic_tensor(const std::vector<Scalar> &data,
-               const std::vector<std::size_t> &shape)
+               const std::vector<std::size_t> &shape,
+               tensor_memory tm = tensor_memory::host)
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
             details::tensor_impl<Scalar>::get(
-                std::string("xtensor") + std::string(ScalarAsString),
+                std::string(details::tensor_memory_to_string(tm)) +
+                    std::string(ScalarAsString),
                 vector_to_owned_pointer(data).release(), shape)
-                .release())) {
+                .release())),
+        memory(tm) {
     if (Rank != dynamic_rank && Rank != shape.size())
       throw std::runtime_error("Invalid shape for basic_tensor of Rank = " +
                                std::to_string(Rank));
   }
 
-  template <typename... Args,
-            std::enable_if_t<(sizeof...(Args) == Rank) &&
-                             std::conjunction_v<std::is_integral<Args>...>> * =
-                nullptr>
-  explicit basic_tensor(const std::vector<Scalar> &data, Args... args)
-      : basic_tensor(
-            data, std::vector<std::size_t>{static_cast<std::size_t>(args)...}) {
-  }
+  basic_tensor(std::size_t dim0, std::size_t dim1,
+               tensor_memory tm = tensor_memory::host)
+    requires(Rank == 2)
+      : basic_tensor(std::vector<std::size_t>{dim0, dim1}, tm) {}
+
+  basic_tensor(std::size_t dim0, tensor_memory tm = tensor_memory::host)
+    requires(Rank == 1)
+      : basic_tensor(std::vector<std::size_t>{dim0}, tm) {}
 
   basic_tensor(std::unique_ptr<Scalar[]> &&data,
                const std::vector<std::size_t> &shape)
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
-            details::tensor_impl<Scalar>::get(std::string("xtensor") +
-                                                  std::string(ScalarAsString),
-                                              data.release(), shape)
-                .release())) {
+            details::tensor_impl<Scalar>::get(
+                std::string(
+                    details::tensor_memory_or_pointer_to_string(data.get())) +
+                    std::string(ScalarAsString),
+                data.release(), shape)
+                .release())),
+        memory(tm) {
     if (Rank != dynamic_rank && Rank != shape.size())
       throw std::runtime_error("Invalid shape for basic_tensor of Rank = " +
                                std::to_string(Rank));
+    // FIXME get the tensor_memory set.
   }
 
   basic_tensor(const basic_tensor<Rank, Scalar> &other)
       : pimpl(std::shared_ptr<details::tensor_impl<Scalar>>(
-            details::tensor_impl<Scalar>::get(std::string("xtensor") +
-                                                  std::string(ScalarAsString),
-                                              other.shape())
-                .release())) {
+            details::tensor_impl<Scalar>::get(
+                std::string(details::tensor_memory_to_string(other.memory)) +
+                    std::string(ScalarAsString),
+                other.shape())
+                .release())), memory(other.memory) {
     std::copy(other.data(), other.data() + other.get_num_elements(),
               pimpl->data());
   }
@@ -308,7 +335,7 @@ public:
     if (this != &other) {
       // Create a new implementation with copied data
       pimpl = std::shared_ptr<details::tensor_impl<Scalar>>(
-          details::tensor_impl<Scalar>::get(std::string("xtensor") +
+          details::tensor_impl<Scalar>::get(std::string("host_tensor") +
                                                 std::string(ScalarAsString),
                                             other.shape())
               .release());

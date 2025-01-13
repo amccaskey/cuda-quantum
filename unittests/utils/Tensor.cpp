@@ -569,95 +569,90 @@ TEST(TensorSlicingTest, checkSimple) {
 }
 
 TEST(TensorSliceTest, BasicMatrixSlice) {
-    cudaq::matrix<double> m(4, 4);
-    
-    // Fill matrix with sequential values
-    for (size_t i = 0; i < 4; i++) {
-        for (size_t j = 0; j < 4; j++) {
-            m[{i,j}] = i * 4 + j;
-        }
+  cudaq::matrix<double> m(4, 4);
+
+  // Fill matrix with sequential values
+  for (size_t i = 0; i < 4; i++) {
+    for (size_t j = 0; j < 4; j++) {
+      m[{i, j}] = i * 4 + j;
     }
-    
-    // Get rows 1:3
-    auto rows = m({cudaq::slice(1,3), 
-                   cudaq::slice(0,4)});
-    EXPECT_EQ(rows.shape()[0], 2);
-    EXPECT_EQ(rows.shape()[1], 4);
-    EXPECT_EQ(rows(0,0), 4);
-    EXPECT_EQ(rows(1,0), 8);
+  }
+
+  // Get rows 1:3
+  auto rows = m({cudaq::slice(1, 3), cudaq::slice(0, 4)});
+  EXPECT_EQ(rows.shape()[0], 2);
+  EXPECT_EQ(rows.shape()[1], 4);
+  EXPECT_EQ(rows(0, 0), 4);
+  EXPECT_EQ(rows(1, 0), 8);
 }
 
 TEST(TensorSliceTest, SingleColumnSlice) {
-    cudaq::matrix<double> m(3, 3);
-    for (size_t i = 0; i < 3; i++) {
-        for (size_t j = 0; j < 3; j++) {
-            m[{i,j}] = i * 3 + j;
-        }
+  cudaq::matrix<double> m(3, 3);
+  for (size_t i = 0; i < 3; i++) {
+    for (size_t j = 0; j < 3; j++) {
+      m[{i, j}] = i * 3 + j;
     }
-    
-    auto col = m({cudaq::slice(0,3), 
-                  cudaq::slice(1,2)});
-    EXPECT_EQ(col.shape()[0], 3);
-    EXPECT_EQ(col.shape()[1], 1);
-    EXPECT_EQ(col(0,0), 1);
-    EXPECT_EQ(col(1,0), 4);
-    EXPECT_EQ(col(2,0), 7);
+  }
+
+  auto col = m({cudaq::slice(0, 3), cudaq::slice(1, 2)});
+  EXPECT_EQ(col.shape()[0], 3);
+  EXPECT_EQ(col.shape()[1], 1);
+  EXPECT_EQ(col(0, 0), 1);
+  EXPECT_EQ(col(1, 0), 4);
+  EXPECT_EQ(col(2, 0), 7);
 }
 
 TEST(TensorSliceTest, StridedSlice) {
-    cudaq::matrix<double> m(4, 4);
-    for (size_t i = 0; i < 4; i++) {
-        for (size_t j = 0; j < 4; j++) {
-            m[{i,j}] = i * 4 + j;
-        }
+  cudaq::matrix<double> m(4, 4);
+  for (size_t i = 0; i < 4; i++) {
+    for (size_t j = 0; j < 4; j++) {
+      m[{i, j}] = i * 4 + j;
     }
-    
-    auto strided = m({cudaq::slice(0,4,2), 
-                      cudaq::slice(0,4,2)});
-    EXPECT_EQ(strided.shape()[0], 2);
-    EXPECT_EQ(strided.shape()[1], 2);
-    EXPECT_EQ(strided(0,0), 0);
-    EXPECT_EQ(strided(0,1), 2);
-    EXPECT_EQ(strided(1,0), 8);
-    EXPECT_EQ(strided(1,1), 10);
+  }
+
+  auto strided = m({cudaq::slice(0, 4, 2), cudaq::slice(0, 4, 2)});
+  EXPECT_EQ(strided.shape()[0], 2);
+  EXPECT_EQ(strided.shape()[1], 2);
+  EXPECT_EQ(strided(0, 0), 0);
+  EXPECT_EQ(strided(0, 1), 2);
+  EXPECT_EQ(strided(1, 0), 8);
+  EXPECT_EQ(strided(1, 1), 10);
 }
 
 TEST(TensorSliceTest, ComplexSlice) {
-    cudaq::matrix<std::complex<double>> m(3, 3);
-    for (size_t i = 0; i < 3; i++) {
-        for (size_t j = 0; j < 3; j++) {
-            m[{i,j}] = std::complex<double>(i, j);
-        }
+  cudaq::matrix<std::complex<double>> m(3, 3);
+  for (size_t i = 0; i < 3; i++) {
+    for (size_t j = 0; j < 3; j++) {
+      m[{i, j}] = std::complex<double>(i, j);
     }
-    
-    auto slice = m({cudaq::slice(1,3), 
-                    cudaq::slice(0,2)});
-    EXPECT_EQ(slice.shape()[0], 2);
-    EXPECT_EQ(slice.shape()[1], 2);
-    EXPECT_EQ(slice(0,0), std::complex<double>(1,0));
-    EXPECT_EQ(slice(0,1), std::complex<double>(1,1));
+  }
+
+  auto slice = m({cudaq::slice(1, 3), cudaq::slice(0, 2)});
+  EXPECT_EQ(slice.shape()[0], 2);
+  EXPECT_EQ(slice.shape()[1], 2);
+  EXPECT_EQ(slice(0, 0), std::complex<double>(1, 0));
+  EXPECT_EQ(slice(0, 1), std::complex<double>(1, 1));
 }
 
 TEST(TensorSliceTest, InvalidSlice) {
-    cudaq::matrix<double> m(3, 3);
-    
-    EXPECT_THROW(m({cudaq::slice(0,4), 
-                    cudaq::slice(0,3)}),
-                 std::runtime_error);
-    
-    EXPECT_THROW(m({cudaq::slice(0,2)}),
-                 std::runtime_error);
+  cudaq::matrix<double> m(3, 3);
+
+  EXPECT_THROW(m({cudaq::slice(0, 4), cudaq::slice(0, 3)}), std::runtime_error);
+
+  EXPECT_THROW(m({cudaq::slice(0, 2)}), std::runtime_error);
 }
 
 TEST(TensorSliceTest, VectorSlice) {
-    cudaq::vector<double> v(6);
-    for (size_t i = 0; i < 6; i++) {
-        v[{i}] = i;
-    }
-    
-    auto slice = v({cudaq::slice(1,4)});
-    EXPECT_EQ(slice.shape()[0], 3);
-    EXPECT_EQ(slice[{0}], 1);
-    EXPECT_EQ(slice[{1}], 2);
-    EXPECT_EQ(slice[{2}], 3);
+  cudaq::vector<double> v(6);
+  for (size_t i = 0; i < 6; i++) {
+    v[{i}] = i;
+  }
+
+  auto slice = v({cudaq::slice(1, 4)});
+  EXPECT_EQ(slice.shape()[0], 3);
+  EXPECT_EQ(slice[{0}], 1);
+  EXPECT_EQ(slice[{1}], 2);
+  EXPECT_EQ(slice[{2}], 3);
+
+  cudaq::tensor<> t({2, 3, 4}, cudaq::tensor_memory::host);
 }

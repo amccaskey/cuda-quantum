@@ -6,8 +6,27 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
+#include "common/FmtCore.h"
 #include "cudaq/utils/tensor.h"
 #include <sstream>
+
+#include "cuda_runtime_api.h"
+
+#define HANDLE_CUDA_ERROR(x)                                                   \
+  {                                                                            \
+    const auto err = x;                                                        \
+    if (err != cudaSuccess) {                                                  \
+      throw std::runtime_error(fmt::format("[tensor] %{} in {} (line {})",     \
+                                           cudaGetErrorString(err),            \
+                                           __FUNCTION__, __LINE__));           \
+    }                                                                          \
+  };
+
+const char *tensor_memory_or_pointer_to_string(void *ptr)  {
+  cudaPointerAttributes attributes;
+  HANDLE_CUDA_ERROR(cudaPointerGetAttributes(&attributes, ptr));
+  return attributes.type > 1 ? "cuda_tensor" : "host_tensor";
+}
 
 inline std::complex<double> &access(std::complex<double> *p,
                                     cudaq::matrix_2::Dimensions sizes,
