@@ -24,7 +24,7 @@ add_library(${LIBRARY_NAME}
                 qis/state.cpp
                 utils/cudaq_utils.cpp
                 utils/tensor.cpp
-                utils/tensor_impls/xtensor_impl.cpp
+                utils/tensor_impls/tensor_impl.cpp
                 distributed/mpi_plugin.cpp)
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
@@ -88,8 +88,10 @@ else()
     PRIVATE nvqir fmt::fmt-header-only)
 endif()
 
+target_sources(${LIBRARY_NAME} PRIVATE utils/tensor_impls/cuda_kernels.cu)
+
 # FIXME couldn't get gfortran to link...
-target_link_libraries(${LIBRARY_NAME} PUBLIC /usr/lib/x86_64-linux-gnu/libgfortran.so.5 PRIVATE ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} xtensor xtensor-blas)
+target_link_libraries(${LIBRARY_NAME} PUBLIC /usr/lib/x86_64-linux-gnu/libgfortran.so.5 PRIVATE CUDA::cublas ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} xtensor xtensor-blas)
 
 add_subdirectory(qis/managers)
 add_subdirectory(algorithms)

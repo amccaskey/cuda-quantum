@@ -19,7 +19,7 @@ namespace cudaq {
 
 /// @brief An implementation of tensor_impl using xtensor library
 template <typename Scalar>
-class xtensor : public cudaq::details::tensor_impl<Scalar> {
+class host_tensor : public cudaq::details::tensor_impl<Scalar> {
 private:
   Scalar *m_data = nullptr;         ///< Pointer to the tensor data
   std::vector<std::size_t> m_shape; ///< Shape of the tensor
@@ -41,8 +41,12 @@ public:
   /// @brief Constructor for xtensor
   /// @param d Pointer to the tensor data
   /// @param s Shape of the tensor
-  xtensor(const Scalar *d, const std::vector<std::size_t> &s)
+  host_tensor(Scalar *d, const std::vector<std::size_t> &s)
       : m_data(const_cast<Scalar *>(d)), m_shape(s) {}
+
+  host_tensor(const std::vector<std::size_t> &s) : m_shape(s) {
+    m_data = new Scalar[size()];
+  }
 
   /// @brief Get the rank of the tensor
   /// @return The rank (number of dimensions) of the tensor
@@ -132,8 +136,8 @@ public:
 
   void elementwise_add(const details::tensor_impl<Scalar> *other,
                        details::tensor_impl<Scalar> *result) const override {
-    auto *other_xt = dynamic_cast<const xtensor<Scalar> *>(other);
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *other_xt = dynamic_cast<const host_tensor<Scalar> *>(other);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     if (!other_xt || !result_xt) {
       throw std::runtime_error("Invalid tensor implementation type");
@@ -149,8 +153,8 @@ public:
   void
   elementwise_multiply(const details::tensor_impl<Scalar> *other,
                        details::tensor_impl<Scalar> *result) const override {
-    auto *other_xt = dynamic_cast<const xtensor<Scalar> *>(other);
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *other_xt = dynamic_cast<const host_tensor<Scalar> *>(other);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     if (!other_xt || !result_xt) {
       throw std::runtime_error("Invalid tensor implementation type");
@@ -165,8 +169,8 @@ public:
 
   void elementwise_modulo(const details::tensor_impl<Scalar> *other,
                           details::tensor_impl<Scalar> *result) const override {
-    auto *other_xt = dynamic_cast<const xtensor<Scalar> *>(other);
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *other_xt = dynamic_cast<const host_tensor<Scalar> *>(other);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     if (!other_xt || !result_xt) {
       throw std::runtime_error("Invalid tensor implementation type");
@@ -188,7 +192,7 @@ public:
 
   void scalar_modulo(Scalar value,
                      details::tensor_impl<Scalar> *result) const override {
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     // For non-complex types, use regular modulo
     if constexpr (std::is_integral_v<Scalar>) {
@@ -204,8 +208,8 @@ public:
 
   void matrix_dot(const details::tensor_impl<Scalar> *other,
                   details::tensor_impl<Scalar> *result) const override {
-    auto *other_xt = dynamic_cast<const xtensor<Scalar> *>(other);
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *other_xt = dynamic_cast<const host_tensor<Scalar> *>(other);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     if (!other_xt || !result_xt) {
       throw std::runtime_error("Invalid tensor implementation type");
@@ -221,8 +225,8 @@ public:
   void
   matrix_vector_product(const details::tensor_impl<Scalar> *vec,
                         details::tensor_impl<Scalar> *result) const override {
-    auto *vec_xt = dynamic_cast<const xtensor<Scalar> *>(vec);
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *vec_xt = dynamic_cast<const host_tensor<Scalar> *>(vec);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     if (!vec_xt || !result_xt) {
       throw std::runtime_error("Invalid tensor implementation type");
@@ -236,7 +240,7 @@ public:
   }
 
   void matrix_transpose(details::tensor_impl<Scalar> *result) const override {
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     auto x = xt::adapt(m_data, size(), xt::no_ownership(), m_shape);
     auto z = xt::transpose(x, {1, 0});
@@ -279,7 +283,7 @@ public:
   }
 
   void eigenvectors(details::tensor_impl<Scalar> *result) const override {
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
     if (!result_xt) {
       throw std::runtime_error("Invalid tensor implementation type");
     }
@@ -308,8 +312,8 @@ public:
 
   void kron(const details::tensor_impl<Scalar> *other,
             details::tensor_impl<Scalar> *result) const override {
-    auto *other_xt = dynamic_cast<const xtensor<Scalar> *>(other);
-    auto *result_xt = dynamic_cast<xtensor<Scalar> *>(result);
+    auto *other_xt = dynamic_cast<const host_tensor<Scalar> *>(other);
+    auto *result_xt = dynamic_cast<host_tensor<Scalar> *>(result);
 
     if (!other_xt || !result_xt) {
       throw std::runtime_error("Invalid tensor implementation type");
@@ -319,7 +323,7 @@ public:
       throw std::runtime_error("kron on host only supported for matrices.");
     if (rank() != 2)
       throw std::runtime_error("kron on host only supported for matrices.");
-      
+
     auto x = xt::adapt(m_data, size(), xt::no_ownership(), m_shape);
     auto y = xt::adapt(other_xt->data(), other_xt->size(), xt::no_ownership(),
                        other_xt->shape());
@@ -335,56 +339,36 @@ public:
     std::cerr << xt::adapt(m_data, size(), xt::no_ownership(), m_shape) << '\n';
   }
 
-  static constexpr auto ScalarAsString = cudaq::type_to_string<Scalar>();
+  void fill_random() override {
+    // Create random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
 
-  /// @brief Custom creator function for xtensor
-  /// @param d Pointer to the tensor data
-  /// @param s Shape of the tensor
-  /// @return A unique pointer to the created xtensor object
-  CUDAQ_EXTENSION_CUSTOM_CREATOR_FUNCTION_WITH_NAME(
-      xtensor<Scalar>, std::string("host_tensor") + std::string(ScalarAsString),
-      static std::unique_ptr<cudaq::details::tensor_impl<Scalar>> create(
-          const Scalar *d, const std::vector<std::size_t> s) {
-        return std::make_unique<xtensor<Scalar>>(d, s);
-      })
+    // Fill tensor with random values
+    for (std::size_t i = 0; i < size(); i++) {
+      if constexpr (std::is_same_v<Scalar, std::complex<double>> ||
+                    std::is_same_v<Scalar, std::complex<float>>) {
+        m_data[i] = Scalar(dist(gen), dist(gen));
+      } else {
+        m_data[i] = static_cast<Scalar>(dist(gen));
+      }
+    }
+  }
 
   /// @brief Destructor for xtensor
-  ~xtensor() {
+  ~host_tensor() {
     if (ownsData)
       delete m_data;
   }
 };
 
-/// @brief Register the xtensor types
-
-#define INSTANTIATE_REGISTRY_TENSOR_IMPL(TYPE)                                 \
-  INSTANTIATE_REGISTRY(cudaq::details::tensor_impl<TYPE>, const TYPE *,        \
-                       const std::vector<std::size_t>)
-
-INSTANTIATE_REGISTRY_TENSOR_IMPL(std::complex<double>)
-INSTANTIATE_REGISTRY_TENSOR_IMPL(std::complex<float>)
-INSTANTIATE_REGISTRY_TENSOR_IMPL(int)
-INSTANTIATE_REGISTRY_TENSOR_IMPL(uint8_t)
-INSTANTIATE_REGISTRY_TENSOR_IMPL(double)
-INSTANTIATE_REGISTRY_TENSOR_IMPL(float)
-INSTANTIATE_REGISTRY_TENSOR_IMPL(std::size_t)
-
-template <>
-const bool xtensor<std::complex<double>>::registered_ =
-    xtensor<std::complex<double>>::register_type();
-template <>
-const bool xtensor<std::complex<float>>::registered_ =
-    xtensor<std::complex<float>>::register_type();
-template <>
-const bool xtensor<int>::registered_ = xtensor<int>::register_type();
-template <>
-const bool xtensor<uint8_t>::registered_ = xtensor<uint8_t>::register_type();
-template <>
-const bool xtensor<double>::registered_ = xtensor<double>::register_type();
-template <>
-const bool xtensor<float>::registered_ = xtensor<float>::register_type();
-template <>
-const bool xtensor<std::size_t>::registered_ =
-    xtensor<std::size_t>::register_type();
+template class host_tensor<std::complex<double>>;
+template class host_tensor<std::complex<float>>;
+template class host_tensor<int>;
+template class host_tensor<uint8_t>;
+template class host_tensor<double>;
+template class host_tensor<float>;
+template class host_tensor<std::size_t>;
 
 } // namespace cudaq
