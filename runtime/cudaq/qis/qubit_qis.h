@@ -10,6 +10,7 @@
 
 #include "common/MeasureCounts.h"
 #include "cudaq/host_config.h"
+#include "cudaq/operator.h"
 #include "cudaq/qis/modifiers.h"
 #include "cudaq/qis/pauli_word.h"
 #include "cudaq/qis/qarray.h"
@@ -17,6 +18,7 @@
 #include "cudaq/qis/qreg.h"
 #include "cudaq/qis/qvector.h"
 #include "cudaq/spin_op.h"
+
 #include <algorithm>
 #include <cstring>
 #include <functional>
@@ -1138,7 +1140,7 @@ void applyQuantumOperation(const std::string &gateName,
         "cudaq does not support broadcast for multi-qubit operations.");
 
   // Operation on correct number of targets, no controls, possible broadcast
-  if ((std::is_same_v<mod, base> || std::is_same_v<mod, adj>)&&NumT == 1) {
+  if ((std::is_same_v<mod, base> || std::is_same_v<mod, adj>) && NumT == 1) {
     for (auto &qubit : qubits)
       getExecutionManager()->apply(gateName, parameters, {}, {qubit},
                                    std::is_same_v<mod, adj>);
@@ -1187,6 +1189,144 @@ void genericApplicator(const std::string &gateName, Args &&...args) {
 }
 
 } // namespace cudaq::details
+
+namespace cudaq {
+
+struct custom_apply_unitary : public unitary_operation {
+  const experimental::operator_matrix &op;
+  custom_apply_unitary(const experimental::operator_matrix &_op) : op(_op) {}
+  std::vector<std::complex<double>>
+  unitary(const std::vector<double> &parameters) const override {
+    std::vector<std::complex<double>> ret;
+    for (std::size_t i = 0; i < op.get_size(); i++)
+      ret.push_back(op.get_data()[i]);
+    return ret;
+  }
+};
+
+template <typename mod = base, typename... Args>
+void apply(const experimental::operator_matrix &op, Args &&...args) {
+
+  auto gateName = [](const experimental::operator_matrix &op) {
+    // Get the raw matrix data
+    auto matrix_data = op.get_data();
+
+    // Create a string stream to build the hash
+    std::stringstream ss;
+
+    // Add matrix dimensions to make the hash more unique
+    ss << op.get_rows() << "x" << op.get_columns() << "_";
+
+    // Hash the matrix elements
+    size_t hash_val = 0;
+    for (std::size_t i = 0; i < op.get_size(); i++) {
+      auto element = matrix_data[i];
+      // Combine real and imaginary parts
+      double real = std::real(element);
+      double imag = std::imag(element);
+
+      // Use boost::hash_combine style mixing
+      hash_val ^= std::hash<double>{}(real) + 0x9e3779b9 + (hash_val << 6) +
+                  (hash_val >> 2);
+      hash_val ^= std::hash<double>{}(imag) + 0x9e3779b9 + (hash_val << 6) +
+                  (hash_val >> 2);
+    }
+
+    // Append the hash value
+    ss << std::hex << hash_val;
+
+    return "op_" + ss.str();
+  }(op);
+
+  getExecutionManager()->registerOperation<custom_apply_unitary>(gateName, op);
+
+  auto argTuple = std::forward_as_tuple(args...);
+
+  // FIXME validate all types in the tuple are quantum
+
+  // Convert doubles tuple to vector using std::apply
+  std::vector<QuditInfo> qubits;
+  std::vector<bool> qubitIsNegated;
+
+  cudaq::tuple_for_each(argTuple, [&qubits, &qubitIsNegated](auto &&element) {
+    if constexpr (details::IsQubitType<decltype(element)>::value) {
+      qubits.push_back(qubitToQuditInfo(element));
+      qubitIsNegated.push_back(element.is_negative());
+    } else {
+      // Has to be a qview,qvector,qarray...
+      for (auto &qq : element) {
+        qubits.push_back(qubitToQuditInfo(qq));
+        qubitIsNegated.push_back(qq.is_negative());
+      }
+    }
+  });
+
+  auto numQubits = qubits.size();
+  auto numTargets = (std::size_t)std::log2(op.get_rows());
+
+  // Catch the case where we have multi-target broadcast, we don't allow that
+  if (std::is_same_v<mod, base> && numTargets > 1 && qubits.size() > numTargets)
+    throw std::runtime_error(
+        "cudaq does not support broadcast for multi-qubit operations.");
+
+  // Operation on correct number of targets, no controls, possible broadcast
+  if ((std::is_same_v<mod, base> || std::is_same_v<mod, adj>) &&
+      numTargets == 1) {
+    for (auto &qubit : qubits)
+      getExecutionManager()->apply(gateName, {}, {}, {qubit},
+                                   std::is_same_v<mod, adj>);
+    return;
+  }
+
+  // Partition out the controls and targets
+  std::size_t numControls = qubits.size() - numTargets;
+  std::vector<QuditInfo> targets(qubits.begin() + numControls, qubits.end()),
+      controls(qubits.begin(), qubits.begin() + numControls);
+
+  // Apply X for any negations
+  for (std::size_t i = 0; i < controls.size(); i++)
+    if (qubitIsNegated[i])
+      getExecutionManager()->apply("x", {}, {}, {controls[i]});
+
+  // Apply the gate
+  getExecutionManager()->apply(gateName, {}, controls, targets,
+                               std::is_same_v<mod, adj>);
+
+  // Reverse any negations
+  for (std::size_t i = 0; i < controls.size(); i++)
+    if (qubitIsNegated[i])
+      getExecutionManager()->apply("x", {}, {}, {controls[i]});
+
+  // Reset the negations
+  cudaq::tuple_for_each(argTuple, [&](auto &&element) {
+    using T = decltype(element);
+    if constexpr (details::IsQubitType<T>::value) {
+      if (element.is_negative())
+        element.negate();
+    } else {
+      for (auto &q : element)
+        if (q.is_negative())
+          q.negate();
+    }
+  });
+}
+
+namespace experimental {
+template <typename mod = base, typename... QuantumArgs>
+void x(QuantumArgs &&...args) {
+  auto xop = experimental::spin::x(0);
+  auto opMatrix = xop.to_matrix();
+  apply<mod>(opMatrix, std::forward<QuantumArgs>(args)...);
+}
+template <typename mod = base, typename... QuantumArgs>
+void ry(double angle, QuantumArgs &&...args) {
+  operator_matrix ryMat({std::cos(angle / 2.), -std::sin(angle / 2.),
+                         std::sin(angle / 2.), std::cos(angle / 2.)});
+  printf("Mat\n%s\n", ryMat.dump().c_str());
+  apply<mod>(ryMat, std::forward<QuantumArgs>(args)...);
+}
+} // namespace experimental
+} // namespace cudaq
 
 #define __qop__ __attribute__((annotate("user_custom_quantum_operation")))
 

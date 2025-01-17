@@ -160,13 +160,19 @@ public:
   virtual void synchronize() = 0;
 
   /// Flush the gate queue (needed for accurate timing information)
-  virtual void flushGateQueue(){};
+  virtual void flushGateQueue() {};
 
   /// @brief Register a new custom unitary operation under the
   /// provided operation name.
   template <typename T>
   void registerOperation(const std::string &name) {
     customOpRegistry::getInstance().registerOperation<T>(name);
+  }
+
+  template <typename T, typename... Args>
+  void registerOperation(const std::string &name, Args &&...args) {
+    customOpRegistry::getInstance().registerOperation<T, Args...>(name,
+                                                                  args...);
   }
 
   /// Clear the registered operations

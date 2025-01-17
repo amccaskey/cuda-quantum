@@ -126,7 +126,8 @@ public:
   /// @param applicator Function to apply to each term
   void for_each_term(
       const std::function<void(operator_<HandlerTy> &)> &applicator) const {
-    for (std::size_t i = 0; auto &term : m_data.productTerms) {
+    std::size_t i = 0;
+    for (auto &term : m_data.productTerms) {
       operator_<HandlerTy> tmp({{term}, {m_data.coefficients[i++]}});
       applicator(tmp);
     }
@@ -210,7 +211,8 @@ public:
     }
 
     // If constant, see if we have other constants
-    for (std::size_t i = 0; auto &term : m_data.productTerms) {
+    std::size_t i = 0;
+    for (auto &term : m_data.productTerms) {
       if (term.empty() && m_data.coefficients[i].has_value()) {
         m_data.coefficients[i] = m_data.coefficients[i] + p;
         return *this;

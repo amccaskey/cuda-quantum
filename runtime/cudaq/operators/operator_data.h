@@ -202,7 +202,8 @@ public:
   /// @param v The scalar to multiply by
   virtual void mult_scalar_assign(operator_data<TermTy> &thisPtr,
                                   const scalar_parameter &v) {
-    for (std::size_t i = 0; auto &term : thisPtr.productTerms) {
+    std::size_t i = 0;
+    for (auto &term : thisPtr.productTerms) {
       thisPtr.coefficients[i] = thisPtr.coefficients[i] * v;
       i++;
     }
