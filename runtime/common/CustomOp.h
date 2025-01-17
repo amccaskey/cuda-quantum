@@ -57,6 +57,19 @@ public:
     registeredOperations.insert({name, std::make_unique<T>()});
   }
 
+ 
+  template<typename T, typename... Args>
+  void registerOperation(const std::string &name, Args&&... args) {
+    {
+      std::shared_lock<std::shared_mutex> lock(mtx);
+      auto iter = registeredOperations.find(name);
+      if (iter != registeredOperations.end())
+        return;
+    }
+    std::unique_lock<std::shared_mutex> lock(mtx);
+    registeredOperations.insert({name, std::make_unique<T>(args...)});
+  }
+
   /// Clear the registered operations
   void clearRegisteredOperations();
 
