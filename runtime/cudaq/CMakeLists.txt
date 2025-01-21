@@ -24,9 +24,35 @@ add_library(${LIBRARY_NAME}
                 qis/state.cpp
                 utils/cudaq_utils.cpp
                 utils/tensor.cpp
+                utils/tensor_impls/tensor_impl.cpp
                 distributed/mpi_plugin.cpp)
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
+
+include(FetchContent)
+FetchContent_Declare(
+  xtl
+  GIT_REPOSITORY https://github.com/xtensor-stack/xtl
+  GIT_TAG 0.7.7
+  EXCLUDE_FROM_ALL
+)
+
+FetchContent_Declare(
+  xtensor
+  GIT_REPOSITORY https://github.com/xtensor-stack/xtensor
+  GIT_TAG 0.25.0
+  EXCLUDE_FROM_ALL
+)
+
+FetchContent_Declare(
+  xtensor-blas
+  GIT_REPOSITORY https://github.com/xtensor-stack/xtensor-blas
+  GIT_TAG 0.21.0
+  EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(xtl xtensor xtensor-blas)
+
+find_package(LAPACK REQUIRED)
 
 if (CUDA_FOUND)
   enable_language(CUDA)
@@ -36,7 +62,11 @@ if (CUDA_FOUND)
     PUBLIC $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtl/include>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtensor/include>
+            $<BUILD_INTERFACE:${xtensor-blas_SOURCE_DIR}/include>
             $<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>
+            $<BUILD_INTERFACE:/opt/nvidia/cutensor/include>
     PRIVATE .)
 
   target_link_libraries(${LIBRARY_NAME}
@@ -49,12 +79,20 @@ else()
     PUBLIC $<INSTALL_INTERFACE:include>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
             $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtl/include>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/xtensor/include>
+            $<BUILD_INTERFACE:${xtensor-blas_SOURCE_DIR}/include>
     PRIVATE .)
 
   target_link_libraries(${LIBRARY_NAME}
     PUBLIC dl cudaq-spin cudaq-common cudaq-nlopt cudaq-ensmallen
     PRIVATE nvqir fmt::fmt-header-only)
 endif()
+
+target_sources(${LIBRARY_NAME} PRIVATE utils/tensor_impls/cuda_kernels.cu)
+
+# FIXME couldn't get gfortran to link...
+target_link_libraries(${LIBRARY_NAME} PUBLIC /usr/lib/x86_64-linux-gnu/libgfortran.so.5 PRIVATE /opt/nvidia/cutensor/lib/libcutensor.so CUDA::cublas ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} xtensor xtensor-blas)
 
 add_subdirectory(qis/managers)
 add_subdirectory(algorithms)
