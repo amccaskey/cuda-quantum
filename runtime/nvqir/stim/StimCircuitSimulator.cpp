@@ -122,15 +122,9 @@ protected:
         executionContext->result.append(v);
     }
 
-    // If we don't have a global register, we should add one.
-    if (result.counts.empty()) {
-      printf("WE ARE MISSING A GLOBAL IMPLICIT REG\n");
-      for (auto q : qubits) {
-        printf("%lu ", q);
-      }
-      printf("\n");
-
-    }
+    // FIXME If we don't have a global register, should we should add one?
+    // if (result.counts.empty()) {
+    // }
 
     return result;
   }
@@ -308,7 +302,7 @@ protected:
     return 0;
   }
 
-  /// @brief We need to be a bit more careful with mz than the base class, 
+  /// @brief We need to be a bit more careful with mz than the base class,
   /// we have more opportunities for performance optimizations if we do.
   bool mz(const std::size_t qubitIdx, const std::string &regName) override {
     if (executionContext && executionContext->name == "sample" &&
@@ -319,7 +313,7 @@ protected:
       // we can just let Stim Tableau generate a reference sample
       // and then sample from the FrameSimulator. So in this case,
       // we just want to apply the Measure and not flush any sampling tasks.
-      
+
       flushGateQueue();
 
       // Apply measurement noise (if any)

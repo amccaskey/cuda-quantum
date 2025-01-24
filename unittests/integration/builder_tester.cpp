@@ -1469,6 +1469,7 @@ CUDAQ_TEST(BuilderTester, checkQuakeValueOperators) {
 
 #endif
 
+#ifndef CUDAQ_BACKEND_STIM
 CUDAQ_TEST(BuilderTester, checkMidCircuitMeasureWithReset) {
   // The following kernel can be executed without
   // context.hasConditionalsOnMeasureResults having to be set.
@@ -1493,3 +1494,4 @@ CUDAQ_TEST(BuilderTester, checkMidCircuitMeasureWithReset) {
       match = false;
   EXPECT_EQ(match, false);
 }
+#endif
