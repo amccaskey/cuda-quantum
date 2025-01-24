@@ -47,8 +47,63 @@ protected:
   /// measured.
   std::unordered_map<std::size_t, std::size_t> qubitMeasurementCounter;
 
+  std::unordered_map<std::string, ExecutionResult> registerLevelResults;
+  std::unordered_map<std::string, std::size_t> registerToSize;
+  std::vector<std::string> orderedRegisters;
+
   /// @brief Stim circuit only used for debugging.
   stim::Circuit circuit;
+
+  bool handleStimPerformantMzSampling(std::size_t qubitIdx,
+                                      const std::string &regName) {
+    // When we know that we don't have conditional feedback,
+    // we can just let Stim Tableau generate a reference sample
+    // and then sample from the FrameSimulator. So in this case,
+    // we just want to apply the Measure and not flush any sampling tasks.
+
+    flushGateQueue();
+
+    // Apply measurement noise (if any)
+    // Note: gate noises are applied during flushGateQueue
+    if (executionContext && executionContext->noiseModel)
+      applyNoiseChannel(/*gateName=*/"mz", /*controls=*/{},
+                        /*targets=*/{qubitIdx}, /*params=*/{});
+
+    applyOpToSims(
+        "M", std::vector<std::uint32_t>{static_cast<std::uint32_t>(qubitIdx)});
+
+    std::string mutableRegName = regName;
+    auto iter = qubitMeasurementCounter.find(qubitIdx);
+    if (iter != qubitMeasurementCounter.end()) {
+      // we've seen this before
+      auto qubitRegCounter = iter->second + 1;
+      if (measurementRegMap[qubitMeasurementCounter[qubitIdx]] == regName)
+        mutableRegName += "%" + std::to_string(qubitRegCounter);
+
+      iter->second++;
+    } else
+      qubitMeasurementCounter.insert({qubitIdx, 0});
+
+    if (!registerLevelResults.count(mutableRegName))
+      registerLevelResults.insert(
+          {mutableRegName, ExecutionResult(mutableRegName)});
+
+    auto iter2 = registerToSize.find(mutableRegName);
+    if (iter2 == registerToSize.end()) {
+      registerToSize.insert({mutableRegName, 1});
+      orderedRegisters.push_back(mutableRegName);
+    } else {
+      iter2->second++;
+    }
+
+    measurementRegMap.insert({num_measurements, mutableRegName});
+    num_measurements++;
+    cudaq::info(
+        "[stim mz override] measuring {} to {} (this is measurement {})",
+        qubitIdx, mutableRegName, num_measurements - 1);
+
+    return true;
+  }
 
   ExecutionResult performantStimSample(const std::vector<std::size_t> &qubits,
                                        const int shots) {
@@ -76,40 +131,25 @@ protected:
 
     // Each shot we have information about which bits are part of
     // which register name.
-    std::unordered_map<std::string, std::string> registerLevelBits;
-    std::unordered_map<std::string, ExecutionResult> registerLevelResults;
-    for (auto &[k, v] : measurementRegMap)
-      if (registerLevelResults.find(v) == registerLevelResults.end())
-        registerLevelResults.insert({v, ExecutionResult(v)});
 
     std::vector<std::string> sequentialData;
     for (std::size_t shot = 0; shot < shots; shot++) {
       std::string aShot(num_measurements, '0');
       cudaq::info("stim framesim table row (shot) {} - ", shot);
       std::string rowStr = "";
-      for (std::size_t j = 0; j < num_measurements; j++) {
+      for (std::size_t j = 0, c = 0; j < num_measurements; j++)
         aShot[j] = sample[shot][j] ? '1' : '0';
-
-        // Extract register level information
-        auto regName = measurementRegMap[j];
-        if (regName.empty())
-          regName = cudaq::GlobalRegisterName;
-        auto iter = registerLevelBits.find(regName);
-        if (iter == registerLevelBits.end()) {
-          registerLevelBits.insert({regName, {aShot[j]}});
-        } else
-          iter->second += {aShot[j]};
-      }
 
       if (cudaq::details::should_log(cudaq::details::LogLevel::info))
         cudaq::info("{}", aShot);
 
-      sequentialData.push_back(std::move(aShot));
-      for (auto &[k, v] : registerLevelBits) {
-        cudaq::info("RegisterLevel extraction {} -> {}", k, v);
-        registerLevelResults[k].appendResult(v, 1);
+      std::size_t start = 0;
+      for (auto &regName : orderedRegisters) {
+        auto subReg = aShot.substr(start, registerToSize[regName]);
+        start += registerToSize[regName];
+        registerLevelResults[regName].appendResult(subReg, 1);
       }
-      registerLevelBits.clear();
+      sequentialData.push_back(std::move(aShot));
     }
 
     ExecutionResult result;
@@ -187,6 +227,9 @@ protected:
     measurementRegMap.clear();
     qubitMeasurementCounter.clear();
     circuit.clear();
+    orderedRegisters.clear();
+    registerToSize.clear();
+    registerLevelResults.clear();
   }
 
   /// @brief Apply operation to all Stim simulators.
@@ -308,40 +351,7 @@ protected:
     if (executionContext && executionContext->name == "sample" &&
         !executionContext->hasConditionalsOnMeasureResults &&
         !regName.empty()) {
-
-      // When we know that we don't have conditional feedback,
-      // we can just let Stim Tableau generate a reference sample
-      // and then sample from the FrameSimulator. So in this case,
-      // we just want to apply the Measure and not flush any sampling tasks.
-
-      flushGateQueue();
-
-      // Apply measurement noise (if any)
-      // Note: gate noises are applied during flushGateQueue
-      if (executionContext && executionContext->noiseModel)
-        applyNoiseChannel(/*gateName=*/"mz", /*controls=*/{},
-                          /*targets=*/{qubitIdx}, /*params=*/{});
-
-      applyOpToSims("M", std::vector<std::uint32_t>{
-                             static_cast<std::uint32_t>(qubitIdx)});
-
-      std::string mutableRegName = regName;
-      auto iter = qubitMeasurementCounter.find(qubitIdx);
-      if (iter != qubitMeasurementCounter.end()) {
-        // we've seen this before
-        auto qubitRegCounter = iter->second + 1;
-        if (measurementRegMap[qubitMeasurementCounter[qubitIdx]] == regName)
-          mutableRegName += "%" + std::to_string(qubitRegCounter);
-      } else
-        qubitMeasurementCounter.insert({qubitIdx, 0});
-
-      measurementRegMap.insert({num_measurements, mutableRegName});
-      num_measurements++;
-      cudaq::info(
-          "[stim mz override] measuring {} to {} (this is measurement {})",
-          qubitIdx, mutableRegName, num_measurements - 1);
-
-      return true;
+      return handleStimPerformantMzSampling(qubitIdx, regName);
     }
 
     // Fall back on base class mz
