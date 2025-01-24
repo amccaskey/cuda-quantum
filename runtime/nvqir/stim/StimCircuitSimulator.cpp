@@ -40,6 +40,7 @@ protected:
   /// @brief Stim Frame/Flip simulator (used to generate multiple shots)
   std::unique_ptr<stim::FrameSimulator<W>> sampleSim;
 
+  stim::Circuit circuit;
   /// @brief Grow the state vector by one qubit.
   void addQubitToState() override { addQubitsToState(1); }
 
@@ -105,6 +106,7 @@ protected:
     tempCircuit.safe_append_u(gate_name, targets);
     tableau->safe_do_circuit(tempCircuit);
     sampleSim->safe_do_circuit(tempCircuit);
+    circuit.safe_append_u(gate_name, targets);
   }
 
   /// @brief Apply the noise channel on \p qubits
@@ -144,15 +146,21 @@ protected:
 
     stim::Circuit noiseOps;
     for (auto &channel : krausChannels) {
-      if (channel.noise_type == cudaq::noise_model_type::bit_flip_channel)
+      if (channel.noise_type == cudaq::noise_model_type::bit_flip_channel) {
         noiseOps.safe_append_ua("X_ERROR", stimTargets, channel.parameters[0]);
-      else if (channel.noise_type ==
-               cudaq::noise_model_type::phase_flip_channel)
+        circuit.safe_append_ua("X_ERROR", stimTargets, channel.parameters[0]);
+      } else if (channel.noise_type ==
+                 cudaq::noise_model_type::phase_flip_channel) {
         noiseOps.safe_append_ua("Z_ERROR", stimTargets, channel.parameters[0]);
-      else if (channel.noise_type ==
-               cudaq::noise_model_type::depolarization_channel)
+        circuit.safe_append_ua("z_ERROR", stimTargets, channel.parameters[0]);
+
+      } else if (channel.noise_type ==
+                 cudaq::noise_model_type::depolarization_channel) {
         noiseOps.safe_append_ua("DEPOLARIZE1", stimTargets,
                                 channel.parameters[0]);
+        circuit.safe_append_ua("DEPOLARIZE1", stimTargets,
+                               channel.parameters[0]);
+      }
     }
     // Only apply the noise operations to the sample simulator (not the Tableau
     // simulator).
@@ -203,6 +211,25 @@ protected:
     return 0;
   }
 
+  bool mz(const std::size_t qubitIdx, const std::string &regName) override {
+    if (executionContext && executionContext->name == "sample" &&
+        !executionContext->hasConditionalsOnMeasureResults) {
+
+      // When we know that we don't have conditional feedback,
+      // we can just let Stim Tableau generate a reference sample
+      // and then sample from the FrameSimulator. So in this case,
+      // we just want to apply the Measure and not flush any sampling tasks.
+      printf("Override mz: %s %lu\n", regName.c_str(), qubitIdx);
+      flushGateQueue();
+      applyOpToSims("M", std::vector<std::uint32_t>{
+                             static_cast<std::uint32_t>(qubitIdx)});
+      num_measurements++;
+
+      return true;
+    }
+    return nvqir::CircuitSimulatorBase<double>::mz(qubitIdx, regName);
+  }
+
   /// @brief Measure the qubit and return the result.
   bool measureQubit(const std::size_t index) override {
     // Perform measurement
@@ -244,7 +271,9 @@ public:
   /// @param index 0-based index of qubit to reset
   void resetQubit(const std::size_t index) override {
     flushGateQueue();
-    flushAnySamplingTasks();
+    if (executionContext && executionContext->name == "sample" &&
+        !executionContext->hasConditionalsOnMeasureResults)
+      flushAnySamplingTasks();
     applyOpToSims(
         "R", std::vector<std::uint32_t>{static_cast<std::uint32_t>(index)});
   }
@@ -252,6 +281,48 @@ public:
   /// @brief Sample the multi-qubit state.
   cudaq::ExecutionResult sample(const std::vector<std::size_t> &qubits,
                                 const int shots) override {
+
+    if (executionContext && executionContext->name == "sample" &&
+        !executionContext->hasConditionalsOnMeasureResults) {
+
+      printf("StimCircuit:\n%s\n", circuit.str().c_str());
+
+      // We can really just generate all our shots from the
+      // Frame simulator
+      const std::vector<bool> &v = tableau->measurement_record.storage;
+      stim::simd_bits<W> ref(v.size());
+      for (size_t k = 0; k < v.size(); k++)
+        ref[k] ^= v[k];
+
+      // Now XOR results on a per-shot basis
+      stim::simd_bit_table<W> sample = sampleSim->m_record.storage;
+      auto nShots = sampleSim->batch_size;
+
+      // This is a slightly modified version of `sample_batch_measurements`,
+      // where we already have the `sample` from the frame simulator. It also
+      // places the `sample` in a layout amenable to the order of the loops
+      // below (shot major).
+      sample = sample.transposed();
+      if (ref.not_zero())
+        for (size_t s = 0; s < nShots; s++)
+          sample[s].word_range_ref(0, ref.num_simd_words) ^= ref;
+
+      std::vector<std::string> sequentialData;
+      for (std::size_t shot = 0; shot < shots; shot++) {
+        std::string aShot(num_measurements, '0');
+        printf("framesim table row %lu - ", shot);
+        for (std::size_t j = 0; j < num_measurements; j++) {
+          aShot[j] = sample[shot][j] ? '1' : '0';
+          printf("%d ", static_cast<int>(sample[shot][j]));
+        }
+        printf("\n");
+        sequentialData.push_back(std::move(aShot));
+      }
+      ExecutionResult result;
+      result.sequentialData = sequentialData;
+      return result;
+    }
+
     assert(shots <= sampleSim->batch_size);
     std::vector<std::uint32_t> stimTargetQubits(qubits.begin(), qubits.end());
     applyOpToSims("M", stimTargetQubits);
