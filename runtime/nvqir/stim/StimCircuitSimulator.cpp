@@ -40,7 +40,101 @@ protected:
   /// @brief Stim Frame/Flip simulator (used to generate multiple shots)
   std::unique_ptr<stim::FrameSimulator<W>> sampleSim;
 
+  /// @brief Map of ith measurement to its known register name.
+  std::unordered_map<std::size_t, std::string> measurementRegMap;
+
+  /// @brief Map of qubit index being measured to number of times it's been
+  /// measured.
+  std::unordered_map<std::size_t, std::size_t> qubitMeasurementCounter;
+
+  /// @brief Stim circuit only used for debugging.
   stim::Circuit circuit;
+
+  ExecutionResult performantStimSample(const std::vector<std::size_t> &qubits,
+                                       const int shots) {
+    cudaq::info("StimCircuit:\n{}", circuit.str());
+
+    // We can really just generate all our shots from the
+    // Frame simulator
+    const std::vector<bool> &v = tableau->measurement_record.storage;
+    stim::simd_bits<W> ref(v.size());
+    for (size_t k = 0; k < v.size(); k++)
+      ref[k] ^= v[k];
+
+    // Now XOR results on a per-shot basis
+    stim::simd_bit_table<W> sample = sampleSim->m_record.storage;
+    auto nShots = sampleSim->batch_size;
+
+    // This is a slightly modified version of `sample_batch_measurements`,
+    // where we already have the `sample` from the frame simulator. It also
+    // places the `sample` in a layout amenable to the order of the loops
+    // below (shot major).
+    sample = sample.transposed();
+    if (ref.not_zero())
+      for (size_t s = 0; s < nShots; s++)
+        sample[s].word_range_ref(0, ref.num_simd_words) ^= ref;
+
+    // Each shot we have information about which bits are part of
+    // which register name.
+    std::unordered_map<std::string, std::string> registerLevelBits;
+    std::unordered_map<std::string, ExecutionResult> registerLevelResults;
+    for (auto &[k, v] : measurementRegMap)
+      if (registerLevelResults.find(v) == registerLevelResults.end())
+        registerLevelResults.insert({v, ExecutionResult(v)});
+
+    std::vector<std::string> sequentialData;
+    for (std::size_t shot = 0; shot < shots; shot++) {
+      std::string aShot(num_measurements, '0');
+      cudaq::info("stim framesim table row (shot) {} - ", shot);
+      std::string rowStr = "";
+      for (std::size_t j = 0; j < num_measurements; j++) {
+        aShot[j] = sample[shot][j] ? '1' : '0';
+
+        // Extract register level information
+        auto regName = measurementRegMap[j];
+        if (regName.empty())
+          regName = cudaq::GlobalRegisterName;
+        auto iter = registerLevelBits.find(regName);
+        if (iter == registerLevelBits.end()) {
+          registerLevelBits.insert({regName, {aShot[j]}});
+        } else
+          iter->second += {aShot[j]};
+      }
+
+      if (cudaq::details::should_log(cudaq::details::LogLevel::info))
+        cudaq::info("{}", aShot);
+
+      sequentialData.push_back(std::move(aShot));
+      for (auto &[k, v] : registerLevelBits) {
+        cudaq::info("RegisterLevel extraction {} -> {}", k, v);
+        registerLevelResults[k].appendResult(v, 1);
+      }
+      registerLevelBits.clear();
+    }
+
+    ExecutionResult result;
+    result.sequentialData = sequentialData;
+    // I will manually append the register-level data.
+    for (auto &[k, v] : registerLevelResults) {
+      if (k == cudaq::GlobalRegisterName)
+        result.counts = v.counts;
+      else if (!v.counts.empty())
+        executionContext->result.append(v);
+    }
+
+    // If we don't have a global register, we should add one.
+    if (result.counts.empty()) {
+      printf("WE ARE MISSING A GLOBAL IMPLICIT REG\n");
+      for (auto q : qubits) {
+        printf("%lu ", q);
+      }
+      printf("\n");
+
+    }
+
+    return result;
+  }
+
   /// @brief Grow the state vector by one qubit.
   void addQubitToState() override { addQubitsToState(1); }
 
@@ -96,6 +190,9 @@ protected:
       randomEngine = std::move(sampleSim->rng);
     sampleSim.reset();
     num_measurements = 0;
+    measurementRegMap.clear();
+    qubitMeasurementCounter.clear();
+    circuit.clear();
   }
 
   /// @brief Apply operation to all Stim simulators.
@@ -211,22 +308,49 @@ protected:
     return 0;
   }
 
+  /// @brief We need to be a bit more careful with mz than the base class, 
+  /// we have more opportunities for performance optimizations if we do.
   bool mz(const std::size_t qubitIdx, const std::string &regName) override {
     if (executionContext && executionContext->name == "sample" &&
-        !executionContext->hasConditionalsOnMeasureResults) {
+        !executionContext->hasConditionalsOnMeasureResults &&
+        !regName.empty()) {
 
       // When we know that we don't have conditional feedback,
       // we can just let Stim Tableau generate a reference sample
       // and then sample from the FrameSimulator. So in this case,
       // we just want to apply the Measure and not flush any sampling tasks.
-      printf("Override mz: %s %lu\n", regName.c_str(), qubitIdx);
+      
       flushGateQueue();
+
+      // Apply measurement noise (if any)
+      // Note: gate noises are applied during flushGateQueue
+      if (executionContext && executionContext->noiseModel)
+        applyNoiseChannel(/*gateName=*/"mz", /*controls=*/{},
+                          /*targets=*/{qubitIdx}, /*params=*/{});
+
       applyOpToSims("M", std::vector<std::uint32_t>{
                              static_cast<std::uint32_t>(qubitIdx)});
+
+      std::string mutableRegName = regName;
+      auto iter = qubitMeasurementCounter.find(qubitIdx);
+      if (iter != qubitMeasurementCounter.end()) {
+        // we've seen this before
+        auto qubitRegCounter = iter->second + 1;
+        if (measurementRegMap[qubitMeasurementCounter[qubitIdx]] == regName)
+          mutableRegName += "%" + std::to_string(qubitRegCounter);
+      } else
+        qubitMeasurementCounter.insert({qubitIdx, 0});
+
+      measurementRegMap.insert({num_measurements, mutableRegName});
       num_measurements++;
+      cudaq::info(
+          "[stim mz override] measuring {} to {} (this is measurement {})",
+          qubitIdx, mutableRegName, num_measurements - 1);
 
       return true;
     }
+
+    // Fall back on base class mz
     return nvqir::CircuitSimulatorBase<double>::mz(qubitIdx, regName);
   }
 
@@ -282,45 +406,13 @@ public:
   cudaq::ExecutionResult sample(const std::vector<std::size_t> &qubits,
                                 const int shots) override {
 
+    // If we are sampling and do not have conditional feedback, and
+    // we've measured more times than the number of qubits provided here,
+    // then we can introduce the Stim perf improvement
     if (executionContext && executionContext->name == "sample" &&
-        !executionContext->hasConditionalsOnMeasureResults) {
-
-      printf("StimCircuit:\n%s\n", circuit.str().c_str());
-
-      // We can really just generate all our shots from the
-      // Frame simulator
-      const std::vector<bool> &v = tableau->measurement_record.storage;
-      stim::simd_bits<W> ref(v.size());
-      for (size_t k = 0; k < v.size(); k++)
-        ref[k] ^= v[k];
-
-      // Now XOR results on a per-shot basis
-      stim::simd_bit_table<W> sample = sampleSim->m_record.storage;
-      auto nShots = sampleSim->batch_size;
-
-      // This is a slightly modified version of `sample_batch_measurements`,
-      // where we already have the `sample` from the frame simulator. It also
-      // places the `sample` in a layout amenable to the order of the loops
-      // below (shot major).
-      sample = sample.transposed();
-      if (ref.not_zero())
-        for (size_t s = 0; s < nShots; s++)
-          sample[s].word_range_ref(0, ref.num_simd_words) ^= ref;
-
-      std::vector<std::string> sequentialData;
-      for (std::size_t shot = 0; shot < shots; shot++) {
-        std::string aShot(num_measurements, '0');
-        printf("framesim table row %lu - ", shot);
-        for (std::size_t j = 0; j < num_measurements; j++) {
-          aShot[j] = sample[shot][j] ? '1' : '0';
-          printf("%d ", static_cast<int>(sample[shot][j]));
-        }
-        printf("\n");
-        sequentialData.push_back(std::move(aShot));
-      }
-      ExecutionResult result;
-      result.sequentialData = sequentialData;
-      return result;
+        !executionContext->hasConditionalsOnMeasureResults &&
+        !measurementRegMap.empty()) {
+      return performantStimSample(qubits, shots);
     }
 
     assert(shots <= sampleSim->batch_size);
