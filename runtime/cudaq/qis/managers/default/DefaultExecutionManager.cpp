@@ -221,6 +221,42 @@ protected:
         })();
   }
 
+  void applyNoise(const kraus_channel &channel,
+                  const std::vector<QuditInfo> &targets) override {
+    if (isInTracerMode())
+      return;
+    flushGateQueue();
+    std::vector<std::size_t> localT;
+    std::transform(targets.begin(), targets.end(), std::back_inserter(localT),
+                   [](auto &&el) { return el.id; });
+    cudaq::info(
+        "[DefaultExecutionManager] Applying fine-grain kraus channel {}.",
+        channel.name);
+    simulator()->applyNoise(channel, localT);
+  }
+
+  void applyNoise(const std::string &name, const std::vector<double> &params,
+                  const std::vector<QuditInfo> &targets) override {
+    if (isInTracerMode())
+      return;
+
+    flushGateQueue();
+    auto channel =
+        executionContext->noiseModel->get_named_channel(name, params);
+    if (channel.empty()) {
+      if (!simulator()->isValidNoiseChannelName(name))
+        throw std::runtime_error("this is not a valid kraus channel name, no "
+                                 "kraus ops available to construct it.");
+    }
+    std::vector<std::size_t> localT;
+    std::transform(targets.begin(), targets.end(), std::back_inserter(localT),
+                   [](auto &&el) { return el.id; });
+    cudaq::info(
+        "[DefaultExecutionManager] Applying fine-grain kraus channel {}.",
+        channel.name);
+    simulator()->applyNoise(channel, localT);
+  }
+
   int measureQudit(const cudaq::QuditInfo &q,
                    const std::string &registerName) override {
     flushRequestedAllocations();

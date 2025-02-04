@@ -133,6 +133,8 @@ public:
   /// @brief Noise type enumeration
   noise_model_type noise_type = noise_model_type::unknown;
 
+  std::string name = "unknown";
+
   /// @brief Noise parameter values
   // Use `double` as the uniform type to store channel parameters (for both
   // single- and double-precision channel definitions). Some
@@ -185,7 +187,7 @@ public:
   kraus_channel &operator=(const kraus_channel &other);
 
   /// @brief Return all kraus_ops in this channel
-  std::vector<kraus_op> get_ops();
+  std::vector<kraus_op> get_ops() const;
 
   /// @brief Add a kraus_op to this channel.
   void push_back(kraus_op op);
@@ -266,6 +268,10 @@ protected:
   static constexpr const char *availableOps[] = {
       "x", "y", "z", "h", "s", "t", "rx", "ry", "rz", "r1", "u3", "mz"};
 
+  std::unordered_map<std::string,
+                     std::function<kraus_channel(const std::vector<double> &)>>
+      registeredChannels;
+
 public:
   /// @brief default constructor
   noise_model() = default;
@@ -293,6 +299,30 @@ public:
   /// @param quantumOp Quantum operation that the noise channel applies to.
   /// @param pred Callback function that generates a noise channel.
   void add_channel(const std::string &quantumOp, const PredicateFuncTy &pred);
+
+  void add_named_channel(
+      const std::string &name,
+      const std::function<kraus_channel(const std::vector<double> &)>
+          &creator) {
+    registeredChannels.insert({name, creator});
+  }
+
+  void add_named_channel(const std::string &name) {
+    registeredChannels.insert({name, [name](const std::vector<double> &params) {
+                                 kraus_channel c;
+                                 c.name = name;
+                                 c.parameters = params;
+                                 return c;
+                               }});
+  }
+
+  kraus_channel get_named_channel(const std::string &name,
+                                  const std::vector<double> &params) const {
+    auto iter = registeredChannels.find(name);
+    if (iter == registeredChannels.end())
+      throw std::runtime_error("invalid named kraus channel.");
+    return iter->second(params);
+  }
 
   /// @brief Add the Kraus channel that applies to a quantum operation on any
   /// arbitrary qubits.
