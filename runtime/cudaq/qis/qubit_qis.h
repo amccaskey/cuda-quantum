@@ -18,6 +18,7 @@
 #include "cudaq/qis/qreg.h"
 #include "cudaq/qis/qvector.h"
 #include "cudaq/spin_op.h"
+#include "cudaq/platform.h"
 
 #include <algorithm>
 #include <cstring>
@@ -1261,11 +1262,12 @@ void apply_noise(const std::vector<T> &krausOperators, QuantumArgs &&...args) {
   getExecutionManager()->applyNoise(channel, qubits);
 }
 
-template <typename... QuantumArgs>
-void apply_noise(const std::string &name,
-                 const std::vector<double> &probabilities,
-                 QuantumArgs &&...args) {
-  // Convert quantum args to QuditInfo vector
+template <typename T, typename... Q>
+void apply_noise(const std::vector<double> &params, Q &&...args) {
+  auto *ctx = get_platform().get_exec_ctx();
+  if (!ctx)
+    return;
+
   std::vector<QuditInfo> qubits;
   auto argTuple = std::forward_as_tuple(args...);
   cudaq::tuple_for_each(argTuple, [&qubits](auto &&element) {
@@ -1278,8 +1280,8 @@ void apply_noise(const std::string &name,
     }
   });
 
-  // Forward to execution manager
-  getExecutionManager()->applyNoise(name, probabilities, qubits);
+  auto channel = ctx->noiseModel->template get_channel<T>(params);
+  getExecutionManager()->applyNoise(channel, qubits);
 }
 
 template <typename mod = base, typename... Args>

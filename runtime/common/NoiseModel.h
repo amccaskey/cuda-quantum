@@ -12,8 +12,11 @@
 
 #include <array>
 #include <complex>
+#include <cxxabi.h>
 #include <functional>
 #include <math.h>
+#include <memory>
+#include <typeindex>
 #include <unordered_map>
 #include <vector>
 
@@ -191,6 +194,8 @@ public:
 
   /// @brief Add a kraus_op to this channel.
   void push_back(kraus_op op);
+
+  virtual void generate(const std::vector<double> &p) { return; }
 };
 
 /// @brief The noise_model type keeps track of a set of
@@ -268,9 +273,15 @@ protected:
   static constexpr const char *availableOps[] = {
       "x", "y", "z", "h", "s", "t", "rx", "ry", "rz", "r1", "u3", "mz"};
 
-  std::unordered_map<std::string,
+  // std::unordered_map<std::string,
+  //                    std::function<kraus_channel(const std::vector<double>
+  //                    &)>>
+  //     registeredChannels;
+  std::unordered_map<std::type_index,
                      std::function<kraus_channel(const std::vector<double> &)>>
       registeredChannels;
+
+  std::unordered_map<std::string, std::type_index> nameToType;
 
 public:
   /// @brief default constructor
@@ -300,25 +311,44 @@ public:
   /// @param pred Callback function that generates a noise channel.
   void add_channel(const std::string &quantumOp, const PredicateFuncTy &pred);
 
-  void add_named_channel(
-      const std::string &name,
-      const std::function<kraus_channel(const std::vector<double> &)>
-          &creator) {
-    registeredChannels.insert({name, creator});
+  template <typename KrausChannelT>
+  void add_channel() {
+
+    // Store the demangled type name mapped to its typeindex
+    auto typeName = [](const char *mangled) -> std::string {
+      auto ptr = std::unique_ptr<char, decltype(&std::free)>{
+          abi::__cxa_demangle(mangled, nullptr, nullptr, nullptr), std::free};
+      return {ptr.get()};
+    }(typeid(KrausChannelT).name());
+
+    nameToType.insert({typeName, std::type_index(typeid(KrausChannelT))});
+
+    registeredChannels.insert(
+        {std::type_index(typeid(KrausChannelT)),
+         [typeName](const std::vector<double> &params) -> kraus_channel {
+           KrausChannelT userChannel;
+           userChannel.generate(params);
+           kraus_channel c;
+           c.parameters = params;
+           c.name = typeName;
+           for (auto &o : userChannel.get_ops())
+             c.push_back(o);
+           return c;
+         }});
   }
 
-  void add_named_channel(const std::string &name) {
-    registeredChannels.insert({name, [name](const std::vector<double> &params) {
-                                 kraus_channel c;
-                                 c.name = name;
-                                 c.parameters = params;
-                                 return c;
-                               }});
+  template <typename T>
+  kraus_channel get_channel(const std::vector<double> &params) const {
+    auto iter = registeredChannels.find(std::type_index(typeid(T)));
+    if (iter == registeredChannels.end())
+      throw std::runtime_error("invalid named kraus channel.");
+    return iter->second(params);
   }
 
-  kraus_channel get_named_channel(const std::string &name,
-                                  const std::vector<double> &params) const {
-    auto iter = registeredChannels.find(name);
+  // de-mangled name (with namespaces) for NVQIR C API
+  kraus_channel get_channel(const std::string &name,
+                            const std::vector<double> &params) const {
+    auto iter = registeredChannels.find(nameToType.at(name));
     if (iter == registeredChannels.end())
       throw std::runtime_error("invalid named kraus channel.");
     return iter->second(params);

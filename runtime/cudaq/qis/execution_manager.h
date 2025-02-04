@@ -136,10 +136,6 @@ public:
   virtual void applyNoise(const kraus_channel &channelName,
                           const std::vector<QuditInfo> &targets) = 0;
 
-  virtual void applyNoise(const std::string &channelName,
-                          const std::vector<double> &params,
-                          const std::vector<QuditInfo> &targets) = 0;
-
   /// Reset the qubit to the |0> state
   virtual void reset(const QuditInfo &target) = 0;
 

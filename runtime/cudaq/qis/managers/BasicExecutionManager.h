@@ -238,11 +238,6 @@ public:
     return;
   }
 
-  void applyNoise(const std::string &channel, const std::vector<double> &params,
-                  const std::vector<QuditInfo> &targets) override {
-    return;
-  }
-
   void synchronize() override {
     for (auto &instruction : instructionQueue) {
       if (!isInTracerMode()) {
