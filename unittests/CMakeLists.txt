@@ -68,11 +68,11 @@ macro (create_tests_with_backend NVQIR_BACKEND EXTRA_BACKEND_TESTER)
   target_link_libraries(${TEST_EXE_NAME}
     PUBLIC 
     nvqir-${NVQIR_BACKEND}
-    nvqir  
+    # nvqir  
     cudaq
     fmt::fmt-header-only
     cudaq-platform-default
-    cudaq-builder
+    # cudaq-builder
     gtest_main)
   set(TEST_LABELS "")
   if (${NVQIR_BACKEND} STREQUAL "qpp")
@@ -124,7 +124,7 @@ if (CUSTATEVEC_ROOT AND CUDA_FOUND)
   target_link_libraries(test_mqpu
     PRIVATE 
     cudaq
-    cudaq-builder
+    # cudaq-builder
     cudaq-platform-mqpu
     nvqir-custatevec-fp64
     gtest_main)
@@ -147,7 +147,7 @@ if (CUSTATEVEC_ROOT AND CUDA_FOUND)
   target_link_libraries(test_custatevec_observe_from_sampling
     PRIVATE 
     cudaq
-    cudaq-builder
+    # cudaq-builder
     cudaq-platform-default
     nvqir-custatevec-fp32
     gtest_main)
@@ -188,7 +188,7 @@ if (CUSTATEVEC_ROOT AND CUDA_FOUND)
     target_link_libraries(test_gpu_get_state
       PRIVATE 
       cudaq
-      cudaq-builder
+      # cudaq-builder
       cudaq-platform-mqpu
       nvqir-custatevec-fp64
       gtest_main)
@@ -240,7 +240,7 @@ if(TARGET nvqir-tensornet)
   target_link_libraries(test_tensornet_observe_path_reuse
     PRIVATE 
     cudaq
-    cudaq-builder
+    # cudaq-builder
     cudaq-platform-default
     nvqir-tensornet
     gtest_main)
@@ -256,7 +256,7 @@ set(CUDAQ_SPIN_TEST_SOURCES
 add_executable(test_spin main.cpp ${CUDAQ_SPIN_TEST_SOURCES})
 target_link_libraries(test_spin
   PRIVATE 
-  cudaq-spin
+  cudaq
   gtest_main)
 gtest_discover_tests(test_spin)
 
@@ -278,8 +278,8 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
 endif()
 target_link_libraries(test_operators
   PRIVATE
-  cudaq-spin
-  cudaq-operator
+  # cudaq-spin
+  # cudaq-operator
   cudaq
   gtest_main)
 gtest_discover_tests(test_operators)
@@ -323,7 +323,7 @@ target_link_libraries(test_utils
   cudaq
   cudaq-platform-default
   cudaq-em-photonics
-  nvqir
+  # nvqir
   nvqir-qpp fmt::fmt-header-only
   gtest_main)
 gtest_discover_tests(test_utils)
@@ -384,8 +384,8 @@ if (CUDAQ_ENABLE_PYTHON)
     PRIVATE 
     cudaq
     cudaq-platform-default
-    nvqir nvqir-qpp
-    cudaq-spin
+    nvqir-qpp
+    # cudaq-spin
     cudaq-chemistry
     cudaq-pyscf
     gtest_main)

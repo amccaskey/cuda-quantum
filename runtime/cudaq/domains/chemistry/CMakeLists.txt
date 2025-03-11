@@ -9,12 +9,14 @@
 add_library(cudaq-chemistry SHARED molecule.cpp)
 
 set (CHEMISTRY_DEPENDENCIES "")
-list(APPEND CHEMISTRY_DEPENDENCIES cudaq-spin)
+list(APPEND CHEMISTRY_DEPENDENCIES cudaq)
 add_openmp_configurations(cudaq-chemistry CHEMISTRY_DEPENDENCIES)
 
 target_link_libraries(cudaq-chemistry PRIVATE ${CHEMISTRY_DEPENDENCIES})
 target_include_directories(cudaq-chemistry SYSTEM
    PRIVATE 
+     ${CMAKE_SOURCE_DIR}/runtime 
+     ${CMAKE_SOURCE_DIR}/runtime/cudaq 
      ${CMAKE_SOURCE_DIR}/tpls/xtl/include 
      ${CMAKE_SOURCE_DIR}/tpls/xtensor/include)
 

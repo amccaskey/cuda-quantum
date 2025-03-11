@@ -28,10 +28,10 @@ endif()
 
 target_link_libraries(cudaq-rest-qpu 
   PUBLIC 
-    cudaq-spin 
-    cudaq-common 
+    # cudaq-spin 
+    # cudaq-common 
   PRIVATE 
-    cudaq-mlir-runtime 
+    # cudaq#-mlir-runtime 
     MLIRTranslateLib
     fmt::fmt-header-only 
     cudaq 

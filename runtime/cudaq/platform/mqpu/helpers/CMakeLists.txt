@@ -10,7 +10,7 @@ add_library(mqpu_util OBJECT MQPUUtils.cpp)
 target_link_libraries(mqpu_util
     PRIVATE
         LLVMSupport
-        cudaq-common  
+        cudaq#-common  
         spdlog::spdlog 
         fmt::fmt-header-only
 )

@@ -7,7 +7,7 @@
  ******************************************************************************/
 
 #include "PassDetails.h"
-#include "common/EigenDense.h"
+#include "cudaq/common/EigenDense.h"
 #include "cudaq/Optimizer/Builder/Factory.h"
 #include "cudaq/Optimizer/CodeGen/Passes.h"
 #include "cudaq/Optimizer/Dialect/CC/CCOps.h"

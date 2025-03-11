@@ -6,7 +6,6 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(spin)
 
 set(LIBRARY_NAME cudaq)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ctad-maybe-unsupported")
@@ -26,36 +25,34 @@ add_library(${LIBRARY_NAME}
                 utils/tensor.cpp
                 distributed/mpi_plugin.cpp)
 
+
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
+
+target_include_directories(${LIBRARY_NAME}
+    PUBLIC $<INSTALL_INTERFACE:include>
+           $<INSTALL_INTERFACE:include/cudaq>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
+            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime/cudaq>
+    PRIVATE .)
+
+target_link_libraries(${LIBRARY_NAME}
+    PUBLIC dl cudaq-nlopt cudaq-ensmallen
+    PRIVATE fmt::fmt-header-only)
 
 if (CUDA_FOUND)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
-
   target_include_directories(${LIBRARY_NAME}
-    PUBLIC $<INSTALL_INTERFACE:include>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
-            $<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>
-    PRIVATE .)
-
+    PUBLIC $<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>)
   target_link_libraries(${LIBRARY_NAME}
-    PUBLIC dl cudaq-spin cudaq-operator cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only CUDA::cudart_static)
-
+    PRIVATE CUDA::cudart_static)
   target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
-else()
-  target_include_directories(${LIBRARY_NAME}
-    PUBLIC $<INSTALL_INTERFACE:include>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
-    PRIVATE .)
-
-  target_link_libraries(${LIBRARY_NAME}
-    PUBLIC dl cudaq-spin cudaq-operator cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only)
 endif()
 
+add_subdirectory(nvqir)
+add_subdirectory(spin)
+add_subdirectory(common)
 add_subdirectory(qis/managers)
 add_subdirectory(algorithms)
 add_subdirectory(platform)
@@ -63,7 +60,7 @@ add_subdirectory(builder)
 add_subdirectory(domains)
 add_subdirectory(dynamics)
 
-install(TARGETS ${LIBRARY_NAME} EXPORT cudaq-targets DESTINATION lib)
+install(TARGETS ${LIBRARY_NAME} CCDialect QuakeDialect OptCodeGen OptTransforms OptimBuilder CUDAQuantumMLIRCAPI EXPORT cudaq-targets DESTINATION lib)
 
 install(EXPORT cudaq-targets
         FILE CUDAQTargets.cmake

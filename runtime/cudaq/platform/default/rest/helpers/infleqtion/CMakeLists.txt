@@ -11,7 +11,7 @@ add_target_config(infleqtion)
 add_library(cudaq-serverhelper-infleqtion SHARED InfleqtionServerHelper.cpp )
 target_link_libraries(cudaq-serverhelper-infleqtion
   PUBLIC
-    cudaq-common
+    cudaq #-common
     fmt::fmt-header-only
 )
 install(TARGETS cudaq-serverhelper-infleqtion DESTINATION lib)

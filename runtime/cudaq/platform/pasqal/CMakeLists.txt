@@ -17,17 +17,17 @@ add_library(${LIBRARY_NAME}
 
 target_include_directories(${LIBRARY_NAME} PRIVATE .
   PUBLIC 
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime/cudaq>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
     $<INSTALL_INTERFACE:include>
 )
 
 target_link_libraries(${LIBRARY_NAME}
   PUBLIC
-    cudaq-spin 
-    cudaq-common 
+    # cudaq-spin 
+    # cudaq-common 
   PRIVATE
     pthread
-    cudaq-mlir-runtime 
     fmt::fmt-header-only
     cudaq 
     cudaq-platform-default

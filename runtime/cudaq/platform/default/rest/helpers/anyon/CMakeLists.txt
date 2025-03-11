@@ -13,7 +13,7 @@ add_target_mapping_arch(anyon telegraph-8q.txt)
 add_library(cudaq-serverhelper-anyon SHARED AnyonServerHelper.cpp )
 target_link_libraries(cudaq-serverhelper-anyon
   PUBLIC 
-    cudaq-common 
+    cudaq #-common 
     fmt::fmt-header-only 
 )
 install(TARGETS cudaq-serverhelper-anyon DESTINATION lib)

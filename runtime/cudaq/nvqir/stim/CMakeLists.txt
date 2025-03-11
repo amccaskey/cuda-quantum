@@ -24,7 +24,7 @@ add_subdirectory(${STIM_SOURCE_DIR} ${STIM_BINARY_DIR} EXCLUDE_FROM_ALL)
 add_library(${LIBRARY_NAME} SHARED StimCircuitSimulator.cpp)
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
 
-set (STIM_DEPENDENCIES libstim fmt::fmt-header-only cudaq-common)
+set (STIM_DEPENDENCIES libstim fmt::fmt-header-only cudaq)
 
 # If -Wall is enabled (as is done in parent directories), Stim will not compile.
 # So override that here.
@@ -34,6 +34,8 @@ target_include_directories(${LIBRARY_NAME}
     PUBLIC
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
       $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime/cudaq>
+
       $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(${LIBRARY_NAME}

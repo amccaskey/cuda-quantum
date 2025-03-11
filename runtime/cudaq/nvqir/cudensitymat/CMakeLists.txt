@@ -31,14 +31,14 @@ target_include_directories(${LIBRARY_NAME}
   PRIVATE 
     . .. 
     ${CUDAToolkit_INCLUDE_DIRS} 
-    ${CMAKE_SOURCE_DIR}/runtime/common
+    ${CMAKE_SOURCE_DIR}/runtime/cudaq
     ${CUDENSITYMAT_INCLUDE_DIR}
 )
 
 target_link_libraries(${LIBRARY_NAME} 
                       PRIVATE
                         fmt::fmt-header-only
-                        cudaq-common
+                        cudaq #-common
                         CUDA::cudart_static
                      )
 install(TARGETS ${LIBRARY_NAME} DESTINATION lib)

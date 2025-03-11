@@ -7,20 +7,20 @@
 # ============================================================================ #
 
 include(HandleLLVMOptions)
-set(LIBRARY_NAME cudaq-builder)
+set(LIBRARY_NAME cudaq) #-builder)
 
-add_library(cudaq-builder SHARED kernel_builder.cpp QuakeValue.cpp kernels.cpp)
-set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
-target_include_directories(cudaq-builder PUBLIC 
-          $<INSTALL_INTERFACE:include> 
-          $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
-          $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
-target_link_libraries(cudaq-builder
-  PRIVATE
-    cudaq
-    fmt::fmt-header-only
-    nvqir
-    cudaq-mlir-runtime
-)
+target_sources(cudaq PRIVATE kernel_builder.cpp QuakeValue.cpp kernels.cpp)
+# set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
+# target_include_directories(cudaq PUBLIC 
+#           $<INSTALL_INTERFACE:include> 
+#           $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
+#           $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
+# target_link_libraries(cudaq
+#   PRIVATE
+#     cudaq
+#     fmt::fmt-header-only
+#     nvqir
+#     # cudaq-mlir-runtime
+# )
 
-install(TARGETS cudaq-builder DESTINATION lib)
+# install(TARGETS cudaq-builder DESTINATION lib)

@@ -7,7 +7,7 @@
 # ============================================================================ #
 
 include(HandleLLVMOptions)
-set(LIBRARY_NAME cudaq-common)
+set(LIBRARY_NAME cudaq) # -common)
 
 set(COMMON_EXTRA_DEPS "")
 set(COMMON_RUNTIME_SRC
@@ -24,7 +24,8 @@ set(COMMON_RUNTIME_SRC
 )
 
 # Create the cudaq-common library
-add_library(${LIBRARY_NAME} SHARED ${COMMON_RUNTIME_SRC})
+# add_library(${LIBRARY_NAME} SHARED ${COMMON_RUNTIME_SRC})
+target_sources(cudaq PRIVATE ${COMMON_RUNTIME_SRC})
 
 # Add into runtime_libs property
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
@@ -37,7 +38,7 @@ target_include_directories(${LIBRARY_NAME}
         ${CMAKE_SOURCE_DIR}/runtime)
 
 # Link privately to all dependencies
-target_link_libraries(${LIBRARY_NAME} PUBLIC cudaq-spin PRIVATE spdlog::spdlog)
+target_link_libraries(${LIBRARY_NAME} PRIVATE spdlog::spdlog)
 
 # Bug in GCC 12 leads to spurious warnings (-Wrestrict)
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105329
@@ -64,11 +65,11 @@ if (CUDAQ_UPPERCASE_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
 endif()
 
 # Install the target
-install(TARGETS ${LIBRARY_NAME} EXPORT cudaq-common-targets DESTINATION lib)
-install(EXPORT cudaq-common-targets
-        FILE CUDAQCommonTargets.cmake
-        NAMESPACE cudaq::
-        DESTINATION lib/cmake/cudaq)
+# install(TARGETS ${LIBRARY_NAME} EXPORT cudaq-common-targets DESTINATION lib)
+# install(EXPORT cudaq-common-targets
+#         FILE CUDAQCommonTargets.cmake
+#         NAMESPACE cudaq::
+#         DESTINATION lib/cmake/cudaq)
 if(EXISTS "$ENV{CURL_INSTALL_PREFIX}/cacert.pem")
   # Copy to build directory so that developers can run from the build directory
   file(COPY "$ENV{CURL_INSTALL_PREFIX}/cacert.pem" DESTINATION "${CMAKE_BINARY_DIR}")
@@ -83,15 +84,17 @@ endif()
 ## here called cudaq-mlir-runtime that cudaq-builder and cudaq-rest-qpu 
 ## can link to and get MLIR/LLVM things uniformly
 
-add_library(cudaq-mlir-runtime
-  SHARED
-    ArgumentConversion.cpp
-    Environment.cpp
-    JIT.cpp
-    Logger.cpp
-    RuntimeMLIR.cpp
-)
-set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS cudaq-mlir-runtime)
+# add_library(cudaq-mlir-runtime
+#   SHARED
+#     ArgumentConversion.cpp
+#     Environment.cpp
+#     JIT.cpp
+#     Logger.cpp
+#     RuntimeMLIR.cpp
+# )
+target_sources(cudaq PRIVATE ArgumentConversion.cpp Environment.cpp JIT.cpp Logger.cpp RuntimeMLIR.cpp)
+
+# set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS cudaq-mlir-runtime)
 
 # Note: JIT.cpp contains throw statements. Should RTTI be enabled?
 set_source_files_properties(
@@ -102,20 +105,18 @@ set_source_files_properties(
   PROPERTIES COMPILE_FLAGS -fno-rtti
 )
 
-target_include_directories(cudaq-mlir-runtime
+target_include_directories(cudaq #-mlir-runtime
   PRIVATE .
     ${CMAKE_SOURCE_DIR}/tpls/spdlog/include
     ${CMAKE_SOURCE_DIR}/tpls/fmt/include
     ${CMAKE_SOURCE_DIR}/runtime)
 
-target_link_libraries(cudaq-mlir-runtime 
-  PUBLIC
-    nvqir
+target_link_libraries(cudaq #-mlir-runtime 
+  PRIVATE
     CCDialect
     QuakeDialect
     OptCodeGen
     OptTransforms
-    MLIRTranslateLib
     MLIRIR
     MLIRParser
     MLIRPass
@@ -127,8 +128,8 @@ target_link_libraries(cudaq-mlir-runtime
     MLIRTargetLLVMIRExport
     MLIRLLVMCommonConversion
     MLIRLLVMToLLVMIRTranslation
+    MLIRBytecodeWriter
   PRIVATE
-    cudaq
     spdlog::spdlog)
 
-install(TARGETS cudaq-mlir-runtime DESTINATION lib)
+# install(TARGETS cudaq-mlir-runtime DESTINATION lib)

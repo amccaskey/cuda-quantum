@@ -6,7 +6,7 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-set(LIBRARY_NAME nvqir)
+set(LIBRARY_NAME cudaq)
 
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ctad-maybe-unsupported")
 
@@ -18,9 +18,10 @@ set(NVQIR_RUNTIME_SRC
   ../cudaq/qis/state.cpp
 )
 
-add_library(${LIBRARY_NAME} SHARED ${NVQIR_RUNTIME_SRC})
+target_sources(cudaq PRIVATE QIRTypes.cpp NVQIR.cpp)
+# add_library(${LIBRARY_NAME} SHARED ${NVQIR_RUNTIME_SRC})
 target_include_directories(${LIBRARY_NAME}
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime> 
+  PUBLIC $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime/cudaq> 
          $<INSTALL_INTERFACE:include> 
   PRIVATE .)
 
@@ -29,14 +30,17 @@ set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
 # Private link to nvqir-qpp, it will always be here, 
 # and by keeping it private, others can specify the
 # backend library later on
-target_link_libraries(${LIBRARY_NAME}
-  PUBLIC cudaq-common cudaq-spin dl fmt::fmt-header-only)
+# target_link_libraries(${LIBRARY_NAME}
+#   PUBLIC cudaq-common cudaq-spin dl fmt::fmt-header-only)
 
-install(TARGETS ${LIBRARY_NAME} 
-        EXPORT nvqir-targets 
-        LIBRARY DESTINATION lib
-        INCLUDES DESTINATION include/nvqir)
+# install(TARGETS ${LIBRARY_NAME} 
+#         EXPORT nvqir-targets 
+#         LIBRARY DESTINATION lib
+#         INCLUDES DESTINATION include/nvqir)
 
+include_directories(${CMAKE_SOURCE_DIR}/runtime/cudaq/nvqir)
+include_directories(${CMAKE_SOURCE_DIR}/runtime/cudaq/common)
+include_directories(${CMAKE_SOURCE_DIR}/runtime/cudaq)
 add_subdirectory(qpp)
 add_subdirectory(stim)
 
@@ -50,7 +54,7 @@ if (CUDA_FOUND)
   add_subdirectory(cudensitymat)
 endif()
 
-install(EXPORT nvqir-targets
-        FILE NVQIRTargets.cmake
-        NAMESPACE nvqir::
-        DESTINATION lib/cmake/nvqir)
+# install(EXPORT nvqir-targets
+#         FILE NVQIRTargets.cmake
+#         NAMESPACE nvqir::
+#         DESTINATION lib/cmake/nvqir)

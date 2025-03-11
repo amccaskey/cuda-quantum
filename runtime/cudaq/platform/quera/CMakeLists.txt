@@ -13,17 +13,18 @@ add_library(${LIBRARY_NAME} SHARED QuEraExecutor.cpp QuEraRemoteRESTQPU.cpp QuEr
 
 target_include_directories(${LIBRARY_NAME} PRIVATE .
     PUBLIC 
+       $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime/cudaq>
        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
        $<INSTALL_INTERFACE:include>)
 
 target_link_libraries(${LIBRARY_NAME}
   PUBLIC
     cudaq-serverhelper-braket 
-    cudaq-spin 
-    cudaq-common 
+    # cudaq #-spin 
+    # cudaq-common 
   PRIVATE
     pthread
-    cudaq-mlir-runtime 
+    # cudaq-mlir-runtime 
     fmt::fmt-header-only
     cudaq 
     cudaq-platform-default)
@@ -36,7 +37,7 @@ add_library(cudaq-serverhelper-quera SHARED QuEraExecutor.cpp QuEraServerHelper.
 target_link_libraries(cudaq-serverhelper-quera
   PUBLIC 
     cudaq-serverhelper-braket
-    cudaq-common 
+    cudaq #-common 
     fmt::fmt-header-only 
 )
 install(TARGETS cudaq-serverhelper-quera DESTINATION lib)

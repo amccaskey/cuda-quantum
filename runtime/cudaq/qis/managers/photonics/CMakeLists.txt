@@ -13,15 +13,16 @@ add_library(${LIBRARY_NAME} SHARED PhotonicsExecutionManager.cpp)
 target_include_directories(${LIBRARY_NAME} 
     PUBLIC 
        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
+       $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime/cudaq>
        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
        $<INSTALL_INTERFACE:include>)
 
 set (PHOTONICS_DEPENDENCIES "")
-list(APPEND PHOTONICS_DEPENDENCIES cudaq-common libqpp fmt::fmt-header-only)
+list(APPEND PHOTONICS_DEPENDENCIES cudaq libqpp fmt::fmt-header-only)
 add_openmp_configurations(${LIBRARY_NAME} PHOTONICS_DEPENDENCIES)
 
 target_link_libraries(${LIBRARY_NAME}
-  PUBLIC cudaq-spin
+  PUBLIC #cudaq-spin
   PRIVATE ${PHOTONICS_DEPENDENCIES}
 )
 

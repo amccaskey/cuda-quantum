@@ -75,7 +75,7 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
     ../runtime/utils/PyRemoteSimulatorQPU.cpp
     ../runtime/utils/PyRestRemoteClient.cpp
     ../utils/LinkedLibraryHolder.cpp
-    ../../runtime/common/ArgumentConversion.cpp
+    ../../runtime/cudaq/common/ArgumentConversion.cpp
     ../../runtime/cudaq/platform/common/QuantumExecutionQueue.cpp
     ../../runtime/cudaq/platform/default/rest_server/RemoteRuntimeClient.cpp
     ../../runtime/cudaq/platform/orca/OrcaExecutor.cpp
@@ -103,8 +103,8 @@ target_include_directories(CUDAQuantumPythonSources.Extension INTERFACE
 )
 target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE 
     cudaq 
-    cudaq-common 
-    cudaq-em-default
+    # cudaq-common 
+    # cudaq-em-default
     cudaq-em-photonics
     fmt::fmt-header-only
     unzip_util

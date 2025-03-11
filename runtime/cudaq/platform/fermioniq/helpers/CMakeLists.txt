@@ -10,7 +10,7 @@ target_sources(cudaq-fermioniq-qpu PRIVATE FermioniqServerHelper.cpp)
 add_library(cudaq-serverhelper-fermioniq SHARED FermioniqServerHelper.cpp )
 target_link_libraries(cudaq-serverhelper-fermioniq
   PUBLIC 
-    cudaq-common 
+    cudaq #-common 
     fmt::fmt-header-only 
 )
 install(TARGETS cudaq-serverhelper-fermioniq DESTINATION lib)

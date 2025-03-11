@@ -16,6 +16,7 @@ add_llvm_executable(CircuitCheck
 target_include_directories(CircuitCheck
   PRIVATE ${CMAKE_SOURCE_DIR}/tpls/eigen
   PRIVATE ${CMAKE_SOURCE_DIR}/runtime
+  PRIVATE ${CMAKE_SOURCE_DIR}/runtime/cudaq
 )
 
 target_link_libraries(CircuitCheck

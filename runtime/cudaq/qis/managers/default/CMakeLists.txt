@@ -8,20 +8,21 @@
 
 set(LIBRARY_NAME cudaq-em-default)
 
-add_library(${LIBRARY_NAME} SHARED DefaultExecutionManager.cpp ../../execution_manager.cpp)
-set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
-target_include_directories(${LIBRARY_NAME} 
-    PUBLIC 
-       $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
-       $<INSTALL_INTERFACE:include>
-    PRIVATE .)
+target_sources(cudaq PRIVATE DefaultExecutionManager.cpp ../../execution_manager.cpp)
+# add_library(${LIBRARY_NAME} SHARED DefaultExecutionManager.cpp ../../execution_manager.cpp)
+# set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
+# target_include_directories(${LIBRARY_NAME} 
+#     PUBLIC 
+#        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
+#        $<INSTALL_INTERFACE:include>
+#     PRIVATE .)
 
-target_link_libraries(${LIBRARY_NAME}
-  PUBLIC cudaq-spin PRIVATE nvqir cudaq-common fmt::fmt-header-only LLVMSupport)
+# target_link_libraries(${LIBRARY_NAME}
+#   PUBLIC cudaq-spin PRIVATE nvqir cudaq-common fmt::fmt-header-only LLVMSupport)
 
-install(TARGETS ${LIBRARY_NAME} EXPORT cudaq-em-default-targets DESTINATION lib)
+# install(TARGETS ${LIBRARY_NAME} EXPORT cudaq-em-default-targets DESTINATION lib)
 
-install(EXPORT cudaq-em-default-targets
-        FILE CUDAQEmDefaultTargets.cmake
-        NAMESPACE cudaq::
-        DESTINATION lib/cmake/cudaq)
+# install(EXPORT cudaq-em-default-targets
+#         FILE CUDAQEmDefaultTargets.cmake
+#         NAMESPACE cudaq::
+#         DESTINATION lib/cmake/cudaq)

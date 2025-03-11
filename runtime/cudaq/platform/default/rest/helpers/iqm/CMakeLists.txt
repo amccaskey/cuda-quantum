@@ -15,7 +15,7 @@ add_target_mapping_arch(iqm Aphrodite.txt)
 add_library(cudaq-serverhelper-iqm SHARED IQMServerHelper.cpp )
 target_link_libraries(cudaq-serverhelper-iqm
   PUBLIC 
-    cudaq-common 
+    cudaq #-common 
     fmt::fmt-header-only 
 )
 install(TARGETS cudaq-serverhelper-iqm DESTINATION lib)

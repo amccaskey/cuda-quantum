@@ -17,13 +17,14 @@ target_compile_options(${TEST_NAME} PUBLIC -Wno-type-limits -fexceptions)
 target_include_directories(${TEST_NAME}
   PUBLIC
     ${CMAKE_SOURCE_DIR}/runtime
+    ${CMAKE_SOURCE_DIR/runtime/cudaq}
 )
 
 link_directories(${CMAKE_BINARY_DIR}/lib)
 
 target_link_libraries(${TEST_NAME}
   PUBLIC
-    cudaq-mlir-runtime
+    cudaq #-mlir-runtime
 )
 
 set_property(TARGET ${TEST_NAME} PROPERTY FOLDER test)

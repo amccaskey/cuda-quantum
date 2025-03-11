@@ -18,15 +18,16 @@ add_library(${LIBRARY_NAME}
   SHARED MultiQPUPlatform.cpp ../common/QuantumExecutionQueue.cpp)
 target_include_directories(${LIBRARY_NAME} 
     PUBLIC 
+       $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime/cudaq>
        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
        $<INSTALL_INTERFACE:include>
     PRIVATE . ../../)
 
 target_link_libraries(${LIBRARY_NAME}
   PUBLIC 
-    cudaq-em-default 
-    cudaq-spin 
-    cudaq-common 
+    # cudaq-em-default 
+    # cudaq-spin 
+    # cudaq-common 
   PRIVATE 
     cudaq
     mqpu_util

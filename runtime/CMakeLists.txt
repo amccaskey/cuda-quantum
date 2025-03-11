@@ -8,8 +8,7 @@
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-add_subdirectory(common)
-add_subdirectory(nvqir)
+# add_subdirectory(nvqir)
 add_subdirectory(cudaq)
 add_subdirectory(test)
 

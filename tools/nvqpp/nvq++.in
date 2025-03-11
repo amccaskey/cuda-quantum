@@ -277,11 +277,13 @@ if [ ! -f "${install_dir}/include/cudaq.h" ]; then
 	# the build directory for testing.
 	if [ "@CMAKE_BINARY_DIR@" -ef "${install_dir}" ]; then
 		CUDAQ_INCLUDE_PATH="@CMAKE_SOURCE_DIR@/runtime"
-		INCLUDES="${INCLUDES} -I @CMAKE_SOURCE_DIR@/tpls/fmt/include"
+		INCLUDES="${INCLUDES} -I @CMAKE_SOURCE_DIR@/tpls/fmt/include -I @CMAKE_SOURCE_DIR@/runtime/cudaq"
 	else
 		error_exit "Invalid CUDA-Q install configuration."
 	fi
 fi
+
+INCLUDES="${INCLUDES} -I ${install_dir}/include/cudaq"
 
 ECHO=false
 TOOLBIN="${install_dir}/bin/"
@@ -303,7 +305,7 @@ LIBRARY_MODE_EXECUTION_MANAGER="default"
 PLATFORM_LIBRARY="default"
 LLVM_QUANTUM_TARGET="qir"
 LINKDIRS="-L${install_dir}/lib -L${install_dir}/lib/plugins @CUDAQ_CXX_NVQPP_LINK_STR@"
-LINKLIBS="-lcudaq -lcudaq-common -lcudaq-ensmallen -lcudaq-nlopt -lcudaq-spin -lcudaq-operator"
+LINKLIBS="-lcudaq -lcudaq-ensmallen -lcudaq-nlopt"
 
 # Add any plugin libraries to the link stage
 CUDAQ_PLUGIN_DIR=${install_dir}/lib/plugins

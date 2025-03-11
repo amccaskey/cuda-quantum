@@ -9,7 +9,7 @@ enable_language(CUDA)
 find_package(CUDAToolkit REQUIRED)
 add_library(gpu-emulated-qpu OBJECT GPUEmulatedQPU.cpp)
 target_link_libraries(gpu-emulated-qpu PUBLIC 
-                        cudaq-common 
+                        cudaq #-common 
                         CUDA::cudart_static
                         spdlog::spdlog 
 )
