@@ -8,6 +8,8 @@
 
 include(HandleLLVMOptions)
 add_subdirectory(default)
+add_subdirectory(entangler)
+
 if (OPENSSL_FOUND)
   add_subdirectory(orca)
 endif()
