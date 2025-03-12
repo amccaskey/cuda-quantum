@@ -3,6 +3,8 @@
 #include "channel.h"
 
 #include <stdarg.h>
+#include <vector> 
+#include <memory> 
 
 namespace cudaq::driver {
 
