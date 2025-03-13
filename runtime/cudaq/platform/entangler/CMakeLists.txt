@@ -12,7 +12,7 @@ set(INTERFACE_POSITION_INDEPENDENT_CODE ON)
 
 set(CUDAQ_DEFAULTPLATFORM_SRC
   entangler_platform.cpp
-#   ../common/QuantumExecutionQueue.cpp
+  ../common/QuantumExecutionQueue.cpp
 )
 
 add_library(${LIBRARY_NAME} SHARED entangler_platform.cpp)

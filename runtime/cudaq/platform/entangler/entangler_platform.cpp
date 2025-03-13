@@ -14,7 +14,7 @@ namespace cudaq {
 class EntanglerPlatform : public cudaq::quantum_platform {
 public:
   EntanglerPlatform() {
-   
+   // construct the QPUs based on the target information
   }
 
   /// @brief Set the target backend. Here we have an opportunity

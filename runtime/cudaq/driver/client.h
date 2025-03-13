@@ -7,21 +7,17 @@
  ******************************************************************************/
 #pragma once
 
-#include <vector> 
-#include <string> 
+#include "common/MeasureCounts.h"
+#include "common/ObserveResult.h"
 
 namespace cudaq::driver {
 
-class argument {};
-
-class channel {
+// subtypes should model the communication channel
+// e.g. shared_memory, pcie, rpc 
+class client {
 public:
-  virtual void connect() const = 0;
-  virtual std::size_t marshal(const std::vector<argument> &arguments) const = 0;
-  virtual void invoke_function(const std::string &symbolName,
-                               std::size_t argumentIdentifier) const = 0;
-  virtual void free_arguments(std::size_t identifier) const = 0;
-
+  virtual sample_result sample() const = 0;
+  virtual observe_result observe() const = 0; 
+  virtual void run() const = 0; 
 };
-
 } // namespace cudaq::driver
