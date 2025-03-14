@@ -6,19 +6,27 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(qpu)
+set(INTERFACE_POSITION_INDEPENDENT_CODE ON)
 
-set(LIBRARY_NAME cudaq-driver) 
+add_library(cudaq-driver-qpu SHARED driver_qpu.cpp 
+   ../../platform/common/QuantumExecutionQueue.cpp)
 
-add_library(${LIBRARY_NAME} SHARED driver.cpp channels/shared_memory.cpp)
+target_include_directories(cudaq-driver-qpu PRIVATE .
+    PUBLIC 
+       $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
+       $<INSTALL_INTERFACE:include>)
 
-target_include_directories(${LIBRARY_NAME} PUBLIC 
-    $<INSTALL_INTERFACE:include>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
-
-
-target_link_libraries(cudaq-driver 
+target_link_libraries(cudaq-driver-qpu 
   PUBLIC 
+    cudaq-spin 
+    cudaq-common 
   PRIVATE 
-    fmt::fmt-header-only LLVMSupport
+    # cudaq-mlir-runtime 
+    # MLIRTranslateLib
+    fmt::fmt-header-only 
+    cudaq 
+    cudaq-platform-default
     )
+
+install(TARGETS cudaq-rest-qpu DESTINATION lib)
+

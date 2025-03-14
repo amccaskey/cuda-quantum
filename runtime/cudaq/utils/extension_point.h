@@ -162,7 +162,7 @@ public:
 
 /// @brief Macro for registering an extension type.
 /// @param TYPE The class to be registered as an extension.
-#define CUDAQ_REGISTER_TYPE(TYPE)                                              \
+#define CUDAQ_REGISTER_EXTENSION_TYPE(TYPE)                                    \
   const bool TYPE::registered_ = TYPE::register_type();
 
 /// In order to support building CUDA-QX libraries with g++ and building
