@@ -22,14 +22,15 @@ class device_ptr {
 
 class channel : public extension_point<channel> {
 public:
-  channel() = default; 
+  channel() = default;
   virtual void connect(std::size_t assignedID) const = 0;
 
   virtual device_ptr malloc(std::size_t size) const = 0;
   virtual void free(device_ptr &d) const = 0;
   virtual void free(std::size_t argsHandle) const = 0;
 
-  virtual void memcpy(device_ptr &arg, const void *src, std::size_t size) const = 0;
+  virtual void memcpy(device_ptr &arg, const void *src,
+                      std::size_t size) const = 0;
   // memcpy a logical grouping of data, return a handle on that (remote) data
   virtual std::size_t memcpy(std::vector<device_ptr> &args,
                              std::vector<const void *> srcs,
@@ -42,8 +43,10 @@ public:
   // return a handle to that kernel.
   virtual std::size_t register_compiled(const std::string &quake) const = 0;
 
-  virtual void launch_kernel(std::size_t kernelHandle, std::size_t argsHandle) const = 0;
-  virtual void launch_kernel(std::size_t kernelHandle, const std::vector<device_ptr>& args) const = 0;
+  virtual void launch_kernel(std::size_t kernelHandle,
+                             std::size_t argsHandle) const = 0;
+  virtual void launch_kernel(std::size_t kernelHandle,
+                             const std::vector<device_ptr> &args) const = 0;
 };
 
 } // namespace cudaq::driver
