@@ -6,7 +6,7 @@
 
 // QPU Target Config Diagram
 //
-// Host --- ethernet_channel --- controller 
+// Host --- ethernet_channel --- controller -- quantum_register
 //                                 |
 //                                 | cuda channel
 //                                 |
@@ -28,6 +28,11 @@ devices:
   - name: "MyA6000GPU"
     config: 
       channel: cuda_channel
+      cuda_device: 0
+  - name: MyA6000GPU_1
+    config: 
+      channel: cuda_channel 
+      cuda_device: 1
 
 )#";
 
@@ -64,7 +69,7 @@ int main() {
     // Allocate data on the GPU device (device 0)
     // Host is not connected to this device, but the
     // controller is and will forward the request
-    auto gpuDevPtr = driver::malloc(sizeof(double));
+    auto gpuDevPtr = driver::malloc(sizeof(double), 0);
     driver::free(gpuDevPtr);
   }
 
@@ -72,7 +77,22 @@ int main() {
     // Allocate data on the GPU device (device 0)
     // Host is not connected to this device, but the
     // controller is and will forward the request
-    auto gpuDevPtr = driver::malloc(sizeof(double));
+    auto gpuDevPtr = driver::malloc(sizeof(double), 0);
+    double value = 2.2;
+    driver::memcpy(gpuDevPtr, &value);
+
+    double getValue = 0.;
+    driver::memcpy(&getValue, gpuDevPtr);
+    printf("From GPU, are they the same? %lf vs %lf \n", value, getValue);
+
+    driver::free(gpuDevPtr);
+  }
+
+  {
+    // Allocate data on the GPU device (device 0)
+    // Host is not connected to this device, but the
+    // controller is and will forward the request
+    auto gpuDevPtr = driver::malloc(sizeof(double), 1);
     double value = 2.2;
     driver::memcpy(gpuDevPtr, &value);
 

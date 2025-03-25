@@ -187,12 +187,6 @@ public:
     std::memcpy(dst, result.data(), size);
   }
 
-  // memcpy a logical grouping of data, return a handle on that (remote) data
-  handle memcpy(std::vector<device_ptr> &args,
-                std::vector<const void *> srcs) override {
-    return 0;
-  }
-
   error_code launch_callback(const std::string &funcName,
                              std::size_t argsHandle) const override {
     return 0;
@@ -203,7 +197,7 @@ public:
   }
 
   error_code launch_kernel(handle kernelHandle,
-                           handle argsHandle) const override {
+                           device_ptr& argsHandle) const override {
     return 0;
   }
 

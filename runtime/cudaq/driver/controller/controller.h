@@ -16,6 +16,7 @@ void connect(const std::string& cfg);
 
 // Allocate memory on devId. Return a unique handle
 std::size_t malloc(std::size_t size, std::size_t devId); 
+// Free allocated memory
 void free(std::size_t handle); 
 void memcpy_to(std::size_t handle, std::vector<char>& data, std::size_t size);
 std::vector<char> memcpy_from(std::size_t handle, std::size_t size);

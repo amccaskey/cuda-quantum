@@ -30,13 +30,11 @@ public:
     auto kernelHandle = driver::compile_kernel(quake);
 
     // Allocate the arguments on the QPU channel
-    std::vector<driver::device_ptr> driverArgs;
-    for (auto &arg : rawArgs)
-      driverArgs.emplace_back(arg, 0 /* need the size */);
-    auto argsHandle = driver::marshal_arguments(driverArgs);
+    auto argsDevPtr = driver::malloc(argsSize); 
+    driver::memcpy(argsDevPtr, args); 
 
     // Launch the kernel
-    auto err_code = driver::launch_kernel(kernelHandle, argsHandle);
+    auto err_code = driver::launch_kernel(kernelHandle, argsDevPtr);
     if (err_code != 0)
       throw std::runtime_error("");
 
@@ -46,6 +44,8 @@ public:
       // get the result
     }
 
+    driver::free(argsDevPtr); 
+    
     // call the right driver client api based on current context
     return {};
   }

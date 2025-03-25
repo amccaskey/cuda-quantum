@@ -35,10 +35,8 @@ void free(device_ptr &d);
 // Copy the given src data into the QPU device data element.
 void memcpy(device_ptr &dest, const void *src);
 
+// Copy the data on QPU device to the given host pointer dest
 void memcpy(void *dest, device_ptr &src);
-
-// Marshal arguments from host to QPU control
-handle marshal_arguments(const std::vector<device_ptr> &args);
 
 /// Run any target-specific Quake compilation passes.
 /// Returns a handle to the remotely JIT-ed code
@@ -46,7 +44,7 @@ handle compile_kernel(const std::string &quake);
 
 /// Launch the kernel remotely held at the given handle, with
 /// the given runtime arguments.
-error_code launch_kernel(handle kernelHandle, handle argHandle);
+error_code launch_kernel(handle kernelHandle, device_ptr args);
 
 // need to be able to get the result
 

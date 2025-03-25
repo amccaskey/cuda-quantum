@@ -102,6 +102,7 @@ struct BackendEndConfigEntry {
 
 struct DeviceConfigEntry {
   std::string Channel;
+  std::optional<int> CudaDevice; 
 };
 
 /// Feature option mapping for NVIDIA target.

@@ -15,43 +15,66 @@ namespace cudaq::driver {
 
 /// @brief The
 class cuda_channel : public channel {
+protected:
+  int cudaDevice = 0;
+
+  template <typename Applicator>
+  auto runOnCorrectDevice(const Applicator &applicator)
+      -> std::invoke_result_t<Applicator> {
+    int dev;
+    cudaGetDevice(&dev);
+    if (cudaDevice == dev)
+      return applicator();
+
+    cudaSetDevice(cudaDevice);
+    if constexpr (std::is_void_v<std::invoke_result_t<Applicator>>) {
+      applicator();
+      cudaSetDevice(dev);
+      return;
+    } else {
+      auto val = applicator();
+      cudaSetDevice(dev);
+      return val;
+    }
+  }
+
 public:
   using channel::channel;
 
   void connect(std::size_t assignedID,
                const config::TargetConfig &config) override {
-    cudaq::info("shared_memory channel connected.");
+    cudaDevice = config.Devices[assignedID].Config.CudaDevice.value_or(0);
+    cudaq::info("cuda channel connected (GPU Dev = {}).", cudaDevice);
   }
 
   device_ptr malloc(std::size_t size, std::size_t devId) override {
     cudaq::info("cuda channel (device {}) allocating data of size {}.", devId,
                 size);
-    void *ptr = nullptr;
-    cudaMalloc(&ptr, size);
-    cudaMemset(ptr, 0, size);
-    return {ptr, size, devId};
+    return runOnCorrectDevice([&]() -> device_ptr {
+      void *ptr = nullptr;
+      cudaMalloc(&ptr, size);
+      cudaMemset(ptr, 0, size);
+      return {ptr, size, devId};
+    });
   }
 
   void free(device_ptr &d) override {
     cudaq::info("cuda channel freeing data.");
-    cudaFree(d.data);
+    runOnCorrectDevice([&]() { cudaFree(d.data); });
   }
 
   void free(std::size_t argsHandle) override {}
 
   void memcpy(device_ptr &arg, const void *src) override {
     cudaq::info("cuda channel copying data to GPU.");
-    cudaMemcpy(arg.data, src, arg.size, cudaMemcpyHostToDevice);
+    runOnCorrectDevice(
+        [&]() { cudaMemcpy(arg.data, src, arg.size, cudaMemcpyHostToDevice); });
   }
 
   void memcpy(void *dst, device_ptr &src) override {
     cudaq::info("cuda channel copying data from GPU.");
-    cudaMemcpy(dst, src.data, src.size, cudaMemcpyDeviceToHost);
-  }
-  // memcpy a logical grouping of data, return a handle on that (remote) data
-  std::size_t memcpy(std::vector<device_ptr> &args,
-                     std::vector<const void *> srcs) override {
-    return 0;
+    runOnCorrectDevice(
+        [&]() { cudaMemcpy(dst, src.data, src.size, cudaMemcpyDeviceToHost); });
   }
 
   error_code launch_callback(const std::string &funcName,
@@ -64,7 +87,7 @@ public:
   }
 
   error_code launch_kernel(std::size_t kernelHandle,
-                           std::size_t argsHandle) const override {
+                           device_ptr &argsHandle) const override {
     return 0;
   }
 

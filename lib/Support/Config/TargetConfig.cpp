@@ -326,6 +326,7 @@ void MappingTraits<cudaq::config::BackendEndConfigEntry>::mapping(
 void MappingTraits<cudaq::config::DeviceConfigEntry>::mapping(
     IO &io, cudaq::config::DeviceConfigEntry &info) {
   io.mapRequired("channel", info.Channel);
+  io.mapOptional("cuda_device", info.CudaDevice);
 }
 
 void MappingTraits<cudaq::config::BackendFeatureMap>::mapping(

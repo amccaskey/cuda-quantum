@@ -30,11 +30,6 @@ public:
 
   void memcpy(device_ptr &arg, const void *src) override {}
   void memcpy(void *dst, device_ptr &src) override {}
-  // memcpy a logical grouping of data, return a handle on that (remote) data
-  std::size_t memcpy(std::vector<device_ptr> &args,
-                     std::vector<const void *> srcs) override {
-    return 0;
-  }
 
   error_code launch_callback(const std::string &funcName,
                              std::size_t argsHandle) const override {
@@ -46,7 +41,7 @@ public:
   }
 
   error_code launch_kernel(std::size_t kernelHandle,
-                           std::size_t argsHandle) const override {
+                           device_ptr& argsHandle) const override {
     return 0;
   }
 

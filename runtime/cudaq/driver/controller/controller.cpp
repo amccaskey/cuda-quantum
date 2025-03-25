@@ -24,10 +24,11 @@ void connect(const std::string &cfgStr) {
   yin >> config;
 
   // Configure the communication channels
-  for (auto &device : config.Devices) {
+  for (std::size_t id = 0; auto &device : config.Devices) {
     cudaq::info("controller adding classical connected device with name {}.",
                 device.Name);
     communication_channels.emplace_back(channel::get(device.Config.Channel));
+    communication_channels.back()->connect(id++, config);
   }
 }
 

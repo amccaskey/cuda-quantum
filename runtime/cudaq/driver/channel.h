@@ -54,10 +54,6 @@ public:
   virtual void memcpy(device_ptr &dest, const void *src) = 0;
   virtual void memcpy(void *dest, device_ptr &src) = 0;
 
-  // memcpy a logical grouping of data, return a handle on that (remote) data
-  virtual handle memcpy(std::vector<device_ptr> &args,
-                        std::vector<const void *> srcs) = 0;
-
   virtual error_code launch_callback(const std::string &funcName,
                                      handle argsHandle) const = 0;
 
@@ -66,7 +62,7 @@ public:
   virtual handle register_compiled(const std::string &quake) const = 0;
 
   virtual error_code launch_kernel(handle kernelHandle,
-                                   handle argsHandle) const = 0;
+                                   device_ptr& argsHandle) const = 0;
 };
 
 } // namespace cudaq::driver

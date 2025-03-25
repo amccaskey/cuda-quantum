@@ -50,13 +50,11 @@ void memcpy(void *dest, device_ptr &src) {
   details::host_qpu_channel->memcpy(dest, src);
 }
 
-handle marshal_arguments(const std::vector<device_ptr> &args) { return 0; }
-
 handle compile_kernel(const std::string &quake) {
   return details::host_qpu_channel->register_compiled(quake);
 }
 
-error_code launch_kernel(handle kernelHandle, handle argHandle) { return 0; }
+error_code launch_kernel(handle kernelHandle, device_ptr args) { return 0; }
 // sample, observe, run?
 
 } // namespace cudaq::driver
