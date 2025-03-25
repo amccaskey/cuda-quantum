@@ -23,6 +23,29 @@ public:
                void *args, std::uint64_t argsSize, std::uint64_t resultOffset,
                const std::vector<void *> &rawArgs) override {
 
+    // Get the code
+    auto quake = cudaq::get_quake_by_name(name);
+
+    // Target-specific compilation
+    auto kernelHandle = driver::compile_kernel(quake);
+
+    // Allocate the arguments on the QPU channel
+    std::vector<driver::device_ptr> driverArgs;
+    for (auto &arg : rawArgs)
+      driverArgs.emplace_back(arg, 0 /* need the size */);
+    auto argsHandle = driver::marshal_arguments(driverArgs);
+
+    // Launch the kernel
+    auto err_code = driver::launch_kernel(kernelHandle, argsHandle);
+    if (err_code != 0)
+      throw std::runtime_error("");
+
+    // FIXME how to handle result
+
+    if (resultOffset) {
+      // get the result
+    }
+
     // call the right driver client api based on current context
     return {};
   }
@@ -30,6 +53,8 @@ public:
   void setExecutionContext(cudaq::ExecutionContext *context) override {}
 
   void resetExecutionContext() override {}
+
+  void enqueue(QuantumTask &task) override {}
 
   void setTargetBackend(const std::string &backend) override {
 
@@ -60,7 +85,11 @@ public:
     cudaq::config::TargetConfig config;
     llvm::yaml::Input Input(configContents.c_str());
     Input >> config;
+
+    driver::initialize(config);
   }
 };
 
 } // namespace cudaq
+
+CUDAQ_REGISTER_TYPE(cudaq::QPU, cudaq::DriverQPU, driver_qpu)

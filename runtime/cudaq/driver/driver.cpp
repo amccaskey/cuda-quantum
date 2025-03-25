@@ -14,131 +14,62 @@
 #include <string.h>
 #include <vector>
 
+// Driver API is host-side, but needs to potentially
+// communicate actions in a separate process (the controller)
+
 namespace cudaq::driver {
 
 namespace details {
 
-// The communication channel from host to QPU control
+// The communication channel from host to QPU control.
+// Has to be the driver_channel subtype
 static std::unique_ptr<channel> host_qpu_channel;
 
-// Spec device IDs are implicit in the vector index here
-static std::vector<std::unique_ptr<channel>> communication_channels;
-
-bool isValidDeviceId(std::size_t deviceId) {
-  return deviceId < details::communication_channels.size();
-}
 } // namespace details
 
-void initialize(const config::TargetConfig &config) {
-
+void initialize(const config::TargetConfig &cfg) {
   // setup the host to qpu control communication channel
-  details::host_qpu_channel = channel::get("shared_memory");
-  details::host_qpu_channel->connect(details::host_qpu_channel_id);
-
-  // initialize target-specified control to classical device channels.
-}
-device_ptr malloc(std::size_t size) {
-  return details::host_qpu_channel->malloc(size);
+  details::host_qpu_channel = channel::get("ethernet_channel");
+  details::host_qpu_channel->connect(host_qpu_channel_id, cfg);
 }
 
-device_ptr malloc(std::size_t deviceId, std::size_t size) {
-  if (!details::isValidDeviceId(deviceId))
-    throw std::runtime_error("Invalid device id requested in driver::malloc");
-
-  return details::communication_channels[deviceId]->malloc(size);
+device_ptr malloc(std::size_t size, std::size_t devId) {
+  // If devId not equal to driver id, then this is a request to
+  // the driver to allocate the memory on the correct device
+  return details::host_qpu_channel->malloc(size, devId);
 }
 
 void free(device_ptr &d) { return details::host_qpu_channel->free(d); }
 
-void free(std::size_t deviceId, device_ptr &d) {
-  if (!details::isValidDeviceId(deviceId))
-    throw std::runtime_error("Invalid device id requested in driver::free");
-  return details::communication_channels[deviceId]->free(d);
-}
-
 // Copy the given src data into the data element.
-void memcpy(device_ptr &arg, const void *src, std::size_t size, memcpy_kind kind,
-            std::size_t deviceId) {
-  if (deviceId == details::host_qpu_channel_id)
-    if (kind == memcpy_kind::host_to_driver)
-      return details::host_qpu_channel->memcpy(arg, src, size);
-    else
-      throw std::runtime_error(
-          "memcpy_kind not yet supported in driver::memcpy");
-
-  if (!details::isValidDeviceId(deviceId))
-    throw std::runtime_error("Invalid device id requested in driver::memcpy");
-  return details::communication_channels[deviceId]->memcpy(arg, src, size);
+void memcpy(device_ptr &arg, const void *src) {
+  return details::host_qpu_channel->memcpy(arg, src);
 }
 
-std::size_t compile_kernel(const std::string &quake) {
+void memcpy(void *dest, device_ptr &src) {
+  details::host_qpu_channel->memcpy(dest, src);
+}
+
+handle marshal_arguments(const std::vector<device_ptr> &args) { return 0; }
+
+handle compile_kernel(const std::string &quake) {
   return details::host_qpu_channel->register_compiled(quake);
 }
 
-void launch_kernel(std::size_t kernelHandle, const std::vector<device_ptr> &args) {}
-void launch_kernel(std::size_t kernelHandle, std::size_t argHandle) {}
+error_code launch_kernel(handle kernelHandle, handle argHandle) { return 0; }
 // sample, observe, run?
 
 } // namespace cudaq::driver
 
 extern "C" {
 
-std::size_t __nvqpp__callback_marshal(std::size_t deviceId,
-                                      const char *argFmtStr, ...) {
-  using namespace cudaq::driver;
-
-  if (!details::isValidDeviceId(deviceId))
-    throw std::runtime_error(
-        "Invalid device id requested in __nvqpp__callback_marshal");
-
-  int numArgs = 0;
-  for (const char *p = argFmtStr; (p = strchr(p, '%')) != NULL; numArgs++, p++)
-    ;
-
-  va_list args;
-  va_start(args, argFmtStr);
-
-  // do something with these args
-  std::vector<device_ptr> marshaledArgs;
-  std::vector<const void *> srcs;
-  std::vector<std::size_t> sizes;
-  // FIXME Fill the args (malloc and memcpy)
-
-  return details::communication_channels.at(deviceId)->memcpy(marshaledArgs,
-                                                              srcs, sizes);
-}
-
 void __nvqpp__callback_run(std::size_t deviceId, const char *funcName,
                            std::size_t argsHandle) {
   using namespace cudaq::driver;
 
-  if (!details::isValidDeviceId(deviceId))
-    throw std::runtime_error(
-        "Invalid device id requested in __nvqpp__callback_run");
-
-  auto err = details::communication_channels.at(deviceId)->launch_callback(
-      funcName, argsHandle);
-
-  if (err != 0)
-    throw std::runtime_error("driver error in launching callback function");
+  // This guy gets called across the channel (remote proc)
+  // how do we give it access to this data marshalling API?
 
   return;
-}
-
-void __nvqpp__callback_result(std::size_t deviceId, const char *formatStr,
-                              std::size_t argsHandle, void *result) {
-  using namespace cudaq::driver;
-
-  if (!details::isValidDeviceId(deviceId))
-    throw std::runtime_error(
-        "Invalid device id requested in __nvqpp__callback_result");
-}
-
-void __nvqpp__callback_free(std::size_t deviceId, std::size_t argsHandle) {
-  using namespace cudaq::driver;
-
-  if (!details::isValidDeviceId(deviceId))
-    throw std::runtime_error(
-        "Invalid device id requested in __nvqpp__callback_run");
 }
 }

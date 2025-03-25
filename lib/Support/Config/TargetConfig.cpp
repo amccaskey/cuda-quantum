@@ -323,6 +323,11 @@ void MappingTraits<cudaq::config::BackendEndConfigEntry>::mapping(
   io.mapOptional("rules", info.ConditionalBuildConfigs);
 }
 
+void MappingTraits<cudaq::config::DeviceConfigEntry>::mapping(
+    IO &io, cudaq::config::DeviceConfigEntry &info) {
+  io.mapRequired("channel", info.Channel);
+}
+
 void MappingTraits<cudaq::config::BackendFeatureMap>::mapping(
     IO &io, cudaq::config::BackendFeatureMap &info) {
   io.mapRequired("name", info.Name);
@@ -340,6 +345,15 @@ void MappingTraits<cudaq::config::TargetConfig>::mapping(
   io.mapOptional("gpu-requirements", info.GpuRequired);
   io.mapOptional("config", info.BackendConfig);
   io.mapOptional("configuration-matrix", info.ConfigMap);
+  io.mapOptional("devices", info.Devices);
+  io.mapOptional("controller-ip", info.ControllerIP);
+  io.mapOptional("controller-port", info.ControllerPort);
+}
+
+void MappingTraits<cudaq::config::DeviceConfig>::mapping(
+    IO &io, cudaq::config::DeviceConfig &info) {
+  io.mapRequired("name", info.Name);
+  io.mapRequired("config", info.Config);
 }
 
 } // namespace yaml

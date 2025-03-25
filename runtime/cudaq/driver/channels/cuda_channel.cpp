@@ -9,12 +9,12 @@
 #include "cudaq/Support/TargetConfig.h"
 #include "cudaq/driver/channel.h"
 
-INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::channel)
+#include <cuda_runtime.h>
 
 namespace cudaq::driver {
 
 /// @brief The
-class shared_memory : public channel {
+class cuda_channel : public channel {
 public:
   using channel::channel;
 
@@ -23,13 +23,31 @@ public:
     cudaq::info("shared_memory channel connected.");
   }
 
-  device_ptr malloc(std::size_t size, std::size_t devId) override { return {}; }
+  device_ptr malloc(std::size_t size, std::size_t devId) override {
+    cudaq::info("cuda channel (device {}) allocating data of size {}.", devId,
+                size);
+    void *ptr = nullptr;
+    cudaMalloc(&ptr, size);
+    cudaMemset(ptr, 0, size);
+    return {ptr, size, devId};
+  }
 
-  void free(device_ptr &d) override {}
+  void free(device_ptr &d) override {
+    cudaq::info("cuda channel freeing data.");
+    cudaFree(d.data);
+  }
+
   void free(std::size_t argsHandle) override {}
 
-  void memcpy(device_ptr &arg, const void *src) override {}
-  void memcpy(void *dst, device_ptr &src) override {}
+  void memcpy(device_ptr &arg, const void *src) override {
+    cudaq::info("cuda channel copying data to GPU.");
+    cudaMemcpy(arg.data, src, arg.size, cudaMemcpyHostToDevice);
+  }
+
+  void memcpy(void *dst, device_ptr &src) override {
+    cudaq::info("cuda channel copying data from GPU.");
+    cudaMemcpy(dst, src.data, src.size, cudaMemcpyDeviceToHost);
+  }
   // memcpy a logical grouping of data, return a handle on that (remote) data
   std::size_t memcpy(std::vector<device_ptr> &args,
                      std::vector<const void *> srcs) override {
@@ -50,9 +68,9 @@ public:
     return 0;
   }
 
-  CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, shared_memory);
+  CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, cuda_channel);
 };
 
-CUDAQ_REGISTER_EXTENSION_TYPE(shared_memory)
+CUDAQ_REGISTER_EXTENSION_TYPE(cuda_channel)
 
 } // namespace cudaq::driver

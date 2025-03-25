@@ -6,24 +6,19 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-include(HandleLLVMOptions)
+set(LIBRARY_NAME cudaq-driver-controller) 
 
-if (NOT CUDAQ_DISABLE_TOOLS)
-  add_subdirectory(cudaq-opt)
-  add_subdirectory(cudaq-translate)
+add_library(${LIBRARY_NAME} 
+  SHARED 
+    callback_support.cpp 
+    controller.cpp)
 
-  if (NOT CUDAQ_DISABLE_CPP_FRONTEND)
-    add_subdirectory(cudaq-lsp-server)
-    add_subdirectory(cudaq-quake)
-    add_subdirectory(fixup-linkage)
-    add_subdirectory(nvqpp)
-    add_subdirectory(cudaq-target-conf)
-  endif()
-endif()
+target_include_directories(${LIBRARY_NAME} PUBLIC 
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
 
-if (CUDAQ_ENABLE_REMOTE_SIM)
-  # Add cudaq-qpud executable/tool (including Python wheels)
-  add_subdirectory(cudaq-qpud)
-endif()
-
-add_subdirectory(cudaq-control)
+target_link_libraries(cudaq-driver-controller 
+  PUBLIC 
+  PRIVATE 
+    rpc fmt::fmt-header-only cudaq-driver cudaq-common
+    )
