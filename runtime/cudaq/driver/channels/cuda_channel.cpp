@@ -77,7 +77,7 @@ public:
         [&]() { cudaMemcpy(dst, src.data, src.size, cudaMemcpyDeviceToHost); });
   }
 
-  // launching kernels 
+  // launching kernels
   // https://www.perplexity.ai/search/i-have-the-symbol-name-for-my-lV9vIec5Rn.Z1EV7BDItAQ
 
   CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, cuda_channel);

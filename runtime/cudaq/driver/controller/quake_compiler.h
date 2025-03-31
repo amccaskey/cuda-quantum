@@ -15,11 +15,10 @@ namespace cudaq::driver {
 class quake_compiler : public extension_point<quake_compiler> {
 public:
   virtual void initialize(const config::TargetConfig &) = 0;
-  virtual std::size_t compile(const std::string& quake) = 0; 
+  virtual std::size_t compile(const std::string &quake) = 0;
 
   // Launch the kernel thunk, results are posted to the thunkArgs pointer
-  virtual void launch(std::size_t kernelHandle, void * thunkArgs) = 0; 
-
+  virtual void launch(std::size_t kernelHandle, void *thunkArgs) = 0;
 };
 
 } // namespace cudaq::driver

@@ -102,7 +102,7 @@ struct BackendEndConfigEntry {
 
 struct DeviceConfigEntry {
   std::string Channel;
-  std::optional<int> CudaDevice; 
+  std::optional<int> CudaDevice;
 };
 
 /// Feature option mapping for NVIDIA target.
@@ -146,8 +146,8 @@ struct TargetConfig {
   /// Additional configuration mapping (if this is a multi-configuration target)
   std::vector<BackendFeatureMap> ConfigMap;
   std::vector<DeviceConfig> Devices;
-  std::optional<std::string> ControllerIP; 
-  std::optional<int> ControllerPort; 
+  std::optional<std::string> ControllerIP;
+  std::optional<int> ControllerPort;
 };
 
 /// Process the target configuration into a `nvq++` compatible script according
@@ -215,8 +215,8 @@ struct MappingTraits<cudaq::config::TargetConfig> {
 
 template <>
 struct MappingTraits<cudaq::config::DeviceConfig> {
-  static void mapping(IO &io, cudaq::config::DeviceConfig &info); 
-}; 
+  static void mapping(IO &io, cudaq::config::DeviceConfig &info);
+};
 
 } // namespace yaml
 } // namespace llvm

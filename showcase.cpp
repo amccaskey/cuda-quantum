@@ -4,7 +4,7 @@
 __qpu__ int test(double angle) {
   cudaq::qubit q, r;
   r1(angle, q);
-  x<cudaq::ctrl>(q,r);
+  x<cudaq::ctrl>(q, r);
   mz(q);
   return 22;
 }

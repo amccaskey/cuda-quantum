@@ -28,34 +28,27 @@ INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::quake_compiler)
 namespace cudaq::driver {
 static std::once_flag mlir_init_flag;
 
-std::unique_ptr<mlir::MLIRContext> initializeMLIR() {
-  using namespace mlir;
-  std::call_once(mlir_init_flag, []() {
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    cudaq::registerAllPasses();
-  });
-
-  DialectRegistry registry;
-  cudaq::opt::registerCodeGenDialect(registry);
-  cudaq::registerAllDialects(registry);
-  auto context = std::make_unique<MLIRContext>(registry);
-  context->loadAllAvailableDialects();
-  registerLLVMDialectTranslation(*context);
-  return context;
-}
-
 class default_compiler : public quake_compiler {
 protected:
   std::unique_ptr<MLIRContext> context;
   std::map<handle,
            std::pair<std::string, std::unique_ptr<mlir::ExecutionEngine>>>
       loadedKernels;
-  std::string qirType = "qir-adaptive"; 
+  std::string qirType = "qir-adaptive";
 
 public:
   void initialize(const config::TargetConfig &) override {
-    context = initializeMLIR();
+    std::call_once(mlir_init_flag, []() {
+      llvm::InitializeNativeTarget();
+      llvm::InitializeNativeTargetAsmPrinter();
+      cudaq::registerAllPasses();
+    });
+    DialectRegistry registry;
+    cudaq::opt::registerCodeGenDialect(registry);
+    cudaq::registerAllDialects(registry);
+    context = std::make_unique<MLIRContext>(registry);
+    context->loadAllAvailableDialects();
+    registerLLVMDialectTranslation(*context);
   }
 
   std::size_t compile(const std::string &quake) override {
@@ -121,7 +114,6 @@ public:
   }
 
   CUDAQ_EXTENSION_CREATOR_FUNCTION(quake_compiler, default_compiler);
-
 };
 
 CUDAQ_REGISTER_EXTENSION_TYPE(default_compiler)

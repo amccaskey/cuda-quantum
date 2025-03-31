@@ -40,7 +40,6 @@ public:
     if (res.result.data != nullptr)
       std::memcpy(args, res.result.data, argsSize);
     return {};
-
   }
 
   void setExecutionContext(cudaq::ExecutionContext *context) override {}

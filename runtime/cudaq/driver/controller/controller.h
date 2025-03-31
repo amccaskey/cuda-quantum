@@ -11,17 +11,17 @@
 #include "cudaq/driver/controller/quake_compiler.h"
 #include "cudaq/utils/extension_point.h"
 
-/// The Controller Interface provides an extension point 
-/// for QPU device side control. By assumption, it sits in 
-/// a separate process / memory space from host-side code. 
-/// The controller receives requests from the host-side driver 
-/// to allocate / deallocate memory, and to load and launch 
-/// quantum kernels. The Controller has knowledge of the available 
-/// classical device communication channels and can perform automatic 
-/// data marshalling across devices. 
+/// The Controller Interface provides an extension point
+/// for QPU device side control. By assumption, it sits in
+/// a separate process / memory space from host-side code.
+/// The controller receives requests from the host-side driver
+/// to allocate / deallocate memory, and to load and launch
+/// quantum kernels. The Controller has knowledge of the available
+/// classical device communication channels and can perform automatic
+/// data marshalling across devices.
 ///
-/// The design here provides an extension point class that is 
-/// meant to be subtyped for the specific host-control communcation 
+/// The design here provides an extension point class that is
+/// meant to be subtyped for the specific host-control communcation
 /// type, e.g. rpc, pcie, etc.
 
 namespace cudaq::driver {

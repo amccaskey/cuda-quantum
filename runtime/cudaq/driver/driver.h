@@ -46,5 +46,4 @@ handle load_kernel(const std::string &quake);
 /// the given runtime arguments.
 launch_result launch_kernel(handle kernelHandle, device_ptr args);
 
-
 } // namespace cudaq::driver
