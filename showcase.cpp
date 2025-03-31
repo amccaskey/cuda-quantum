@@ -1,49 +1,17 @@
+#include "cudaq.h"
 #include "cudaq/driver/driver.h"
 
-#include "cudaq/Support/TargetConfig.h"
-
-// bin/nvq++ test.cpp -I ../include/ -I /usr/local/llvm/include -L /usr/local/llvm/lib/ -l LLVMSupport -lcudaq-driver
-
-// QPU Target Config Diagram
-//
-// Host --- ethernet_channel --- controller -- quantum_register
-//                                 |
-//                                 | cuda channel
-//                                 |
-//                               MyA6000GPU (Device 0)     
-//                          
-const std::string target_config_str = R"#(
-
-description: "Custom target for DGX-Q experimentation."
-
-name: entangler 
-controller-ip: "127.0.0.1"
-
-config: 
-  gen-target-backend: true
-  platform-qpu: driver_qpu
-  link-libs: ["-lcudaq-driver-qpu", "-lcudaq-driver"]
-
-devices:
-  - name: "MyA6000GPU"
-    config: 
-      channel: cuda_channel
-      cuda_device: 0
-  - name: MyA6000GPU_1
-    config: 
-      channel: cuda_channel 
-      cuda_device: 1
-
-)#";
+__qpu__ int test(double angle) {
+  cudaq::qubit q, r;
+  r1(angle, q);
+  x<cudaq::ctrl>(q,r);
+  mz(q);
+  return 22;
+}
 
 int main() {
 
   using namespace cudaq;
-
-  llvm::yaml::Input yin(target_config_str);
-  config::TargetConfig config;
-  yin >> config;
-  driver::initialize(config);
 
   {
     // Allocate data on the driver
@@ -101,5 +69,10 @@ int main() {
     printf("From GPU, are they the same? %lf vs %lf \n", value, getValue);
 
     driver::free(gpuDevPtr);
+  }
+
+  {
+    auto i = test(2.2);
+    printf("From showcase %d\n", i);
   }
 }

@@ -96,13 +96,13 @@ bool is_server_available() {
 
 namespace cudaq::driver {
 
-class ethernet_channel : public channel {
+class rpc_controller_channel : public controller_channel {
 protected:
   bool startedLocalServer = false;
   std::unordered_map<void *, std::size_t> fakePtrsToRemoteHandles;
 
 public:
-  using channel::channel;
+  using controller_channel::controller_channel;
 
   std::unique_ptr<rpc::client> client;
 
@@ -143,7 +143,7 @@ public:
       yout << const_cast<config::TargetConfig &>(config);
     }
     client->call("connect", asStr);
-    cudaq::info("ethernet channel connected to {}:{}.", ip, port);
+    cudaq::info("controller channel connected to {}:{}.", ip, port);
   }
 
   device_ptr malloc(std::size_t size, std::size_t devId) override {
@@ -187,30 +187,39 @@ public:
     std::memcpy(dst, result.data(), size);
   }
 
-  error_code launch_callback(const std::string &funcName,
-                             std::size_t argsHandle) const override {
-    return 0;
+  handle load_kernel(const std::string &quake) const {
+    auto kernelHandle = client->call("load_kernel", quake);
+    // FIXME may want to do something with this here
+    return kernelHandle.as<std::size_t>();
   }
 
-  handle register_compiled(const std::string &quake) const override {
-    return 0;
+  launch_result launch_kernel(handle kernelHandle,
+                              device_ptr &argsHandle) const {
+    auto it = fakePtrsToRemoteHandles.find(argsHandle.data);
+    if (it == fakePtrsToRemoteHandles.end())
+      throw std::runtime_error("Invalid device pointer");
+    auto size = argsHandle.size;
+    auto resultData = client->call("launch_kernel", kernelHandle, it->second)
+                          .as<std::vector<char>>();
+
+    device_ptr ptr;
+    ptr.data = std::malloc(resultData.size());
+    ptr.size = resultData.size();
+    std::memcpy(ptr.data, resultData.data(), ptr.size);
+    return {ptr, 0, ""};
   }
 
-  error_code launch_kernel(handle kernelHandle,
-                           device_ptr& argsHandle) const override {
-    return 0;
-  }
-
-  ~ethernet_channel() {
+  ~rpc_controller_channel() {
     if (startedLocalServer) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-      cudaq::info("shutdown ethernet channel.");
+      cudaq::info("shutdown controller channel.");
       client->call("stopServer");
     }
   }
-  CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, ethernet_channel);
+
+  CUDAQ_EXTENSION_CREATOR_FUNCTION(controller_channel, rpc_controller_channel);
 };
 
-CUDAQ_REGISTER_EXTENSION_TYPE(ethernet_channel)
+CUDAQ_REGISTER_EXTENSION_TYPE(rpc_controller_channel)
 
 } // namespace cudaq::driver

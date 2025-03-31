@@ -40,14 +40,11 @@ void memcpy(void *dest, device_ptr &src);
 
 /// Run any target-specific Quake compilation passes.
 /// Returns a handle to the remotely JIT-ed code
-handle compile_kernel(const std::string &quake);
+handle load_kernel(const std::string &quake);
 
 /// Launch the kernel remotely held at the given handle, with
 /// the given runtime arguments.
-error_code launch_kernel(handle kernelHandle, device_ptr args);
+launch_result launch_kernel(handle kernelHandle, device_ptr args);
 
-// need to be able to get the result
-
-// sample, observe, run?
 
 } // namespace cudaq::driver

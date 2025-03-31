@@ -11,7 +11,6 @@ set_target_properties(${TOOL_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_
 target_compile_options(${TOOL_NAME} PRIVATE -fno-rtti)
 target_link_libraries(${TOOL_NAME} 
   PRIVATE 
-    rpc 
     cudaq-driver-controller 
     fmt::fmt-header-only 
     CUDAQTargetConfigUtil

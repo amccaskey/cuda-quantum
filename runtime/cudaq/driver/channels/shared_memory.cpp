@@ -10,10 +10,10 @@
 #include "cudaq/driver/channel.h"
 
 INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::channel)
+INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::controller_channel)
 
 namespace cudaq::driver {
 
-/// @brief The
 class shared_memory : public channel {
 public:
   using channel::channel;
@@ -30,20 +30,6 @@ public:
 
   void memcpy(device_ptr &arg, const void *src) override {}
   void memcpy(void *dst, device_ptr &src) override {}
-
-  error_code launch_callback(const std::string &funcName,
-                             std::size_t argsHandle) const override {
-    return 0;
-  }
-
-  std::size_t register_compiled(const std::string &quake) const override {
-    return 0;
-  }
-
-  error_code launch_kernel(std::size_t kernelHandle,
-                           device_ptr& argsHandle) const override {
-    return 0;
-  }
 
   CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, shared_memory);
 };

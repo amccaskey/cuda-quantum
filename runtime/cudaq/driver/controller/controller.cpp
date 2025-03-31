@@ -11,12 +11,14 @@
 
 #include "rpc/server.h"
 
+INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::controller)
+
 namespace cudaq::driver {
-std::vector<std::unique_ptr<channel>> communication_channels;
 
-std::map<intptr_t, device_ptr> memory_pool;
+// The concrete controller.
+std::unique_ptr<controller> m_controller;
 
-void connect(const std::string &cfgStr) {
+void controller::connect(const std::string &cfgStr) {
   // parse back to target yaml
   // Create the communication channels
   llvm::yaml::Input yin(cfgStr.c_str());
@@ -30,10 +32,14 @@ void connect(const std::string &cfgStr) {
     communication_channels.emplace_back(channel::get(device.Config.Channel));
     communication_channels.back()->connect(id++, config);
   }
+
+  // FIXME add this to the config
+  compiler = quake_compiler::get("default_compiler");
+  compiler->initialize(config);
 }
 
 // Allocate memory on devId. Return a unique handle
-std::size_t malloc(std::size_t size, std::size_t devId) {
+std::size_t controller::malloc(std::size_t size, std::size_t devId) {
   cudaq::info("controller malloc requested. size = {}, devId = {}", size,
               devId);
   device_ptr ptr;
@@ -60,7 +66,7 @@ std::size_t malloc(std::size_t size, std::size_t devId) {
   return uniqueInt;
 }
 
-void free(std::size_t handle) {
+void controller::free(std::size_t handle) {
   cudaq::info("controller deallocating device pointer with handle {}.", handle);
   auto iter = memory_pool.find(handle);
   if (iter == memory_pool.end())
@@ -80,19 +86,19 @@ void free(std::size_t handle) {
 }
 
 // memcpy from driver to host (hence the return)
-std::vector<char> memcpy_from(std::size_t handle, std::size_t size) {
+std::vector<char> controller::memcpy_from(std::size_t handle,
+                                          std::size_t size) {
   auto iter = memory_pool.find(handle);
   if (iter == memory_pool.end())
     throw std::runtime_error("Invalid memcpy handle");
 
   device_ptr &dest = iter->second;
   std::vector<char> result(size);
-  cudaq::info(
-      "memcpy data with handle {} and size {} from {} to host.",
-      handle, size,
-      dest.deviceId == std::numeric_limits<std::size_t>::max()
-          ? "driver"
-          : "device " + std::to_string(dest.deviceId));
+  cudaq::info("memcpy data with handle {} and size {} from {} to host.", handle,
+              size,
+              dest.deviceId == std::numeric_limits<std::size_t>::max()
+                  ? "driver"
+                  : "device " + std::to_string(dest.deviceId));
 
   if (dest.deviceId == std::numeric_limits<std::size_t>::max()) {
     std::memcpy(result.data(), dest.data, size);
@@ -103,18 +109,17 @@ std::vector<char> memcpy_from(std::size_t handle, std::size_t size) {
   return result;
 }
 
-void memcpy_to(std::size_t handle, std::vector<char> &data, std::size_t size) {
+void controller::memcpy_to(std::size_t handle, std::vector<char> &data,
+                           std::size_t size) {
   auto iter = memory_pool.find(handle);
   if (iter == memory_pool.end())
     throw std::runtime_error("Invalid memcpy handle");
 
   device_ptr &dest = iter->second;
-  cudaq::info(
-      "memcpy data with handle {} and size {} to {}.",
-      handle, size,
-      dest.deviceId == std::numeric_limits<std::size_t>::max()
-          ? "driver"
-          : "device " + std::to_string(dest.deviceId));
+  cudaq::info("memcpy data with handle {} and size {} to {}.", handle, size,
+              dest.deviceId == std::numeric_limits<std::size_t>::max()
+                  ? "driver"
+                  : "device " + std::to_string(dest.deviceId));
   if (dest.deviceId == std::numeric_limits<std::size_t>::max()) {
     // Local controller copy
     std::memcpy(dest.data, data.data(), size);
@@ -124,4 +129,49 @@ void memcpy_to(std::size_t handle, std::vector<char> &data, std::size_t size) {
   }
 }
 
+handle controller::load_kernel(const std::string &quake) {
+  cudaq::info("Loading and JIT compiling the kernel!");
+  return compiler->compile(quake);
+}
+
+// launch and return a handle to the result, -1 if void
+std::vector<char> controller::launch_kernel(std::size_t kernelHandle,
+                                            std::size_t argsHandle) {
+  // Get the arguments from the memory pool
+  auto iter = memory_pool.find(argsHandle);
+  if (iter == memory_pool.end())
+    throw std::runtime_error("Invalid args handle");
+  auto *thunkArgs = iter->second.data;
+
+  cudaq::info("Launching Kernel {}, args size {}", kernelHandle,
+              iter->second.size);
+
+  // Launch the kernel
+  compiler->launch(kernelHandle, thunkArgs);
+
+  // Return the result data
+  std::vector<char> retRes(iter->second.size);
+  std::memcpy(retRes.data(), thunkArgs, iter->second.size);
+  return retRes;
+}
+
+void initialize(const std::string &controllerType, int argc, char **argv) {
+  m_controller = controller::get(controllerType);
+  m_controller->initialize(argc, argv);
+}
+
+bool should_stop() { return m_controller->should_stop(); }
 } // namespace cudaq::driver
+
+extern "C" {
+
+void __nvqpp__callback_run(std::size_t deviceId, const char *funcName,
+                           std::size_t argsHandle) {
+  using namespace cudaq::driver;
+
+  // This guy gets called across the channel (remote proc)
+  // how do we give it access to this data marshalling API?
+
+  return;
+}
+}

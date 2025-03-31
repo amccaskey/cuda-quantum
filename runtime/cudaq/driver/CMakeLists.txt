@@ -16,7 +16,7 @@ add_library(${LIBRARY_NAME}
   SHARED 
     driver.cpp 
     channels/shared_memory.cpp 
-    channels/ethernet_channel.cpp)
+    channels/rpc_controller_channel.cpp)
 
 target_include_directories(${LIBRARY_NAME} PUBLIC 
     $<INSTALL_INTERFACE:include>

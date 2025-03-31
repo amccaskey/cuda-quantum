@@ -77,19 +77,8 @@ public:
         [&]() { cudaMemcpy(dst, src.data, src.size, cudaMemcpyDeviceToHost); });
   }
 
-  error_code launch_callback(const std::string &funcName,
-                             std::size_t argsHandle) const override {
-    return 0;
-  }
-
-  std::size_t register_compiled(const std::string &quake) const override {
-    return 0;
-  }
-
-  error_code launch_kernel(std::size_t kernelHandle,
-                           device_ptr &argsHandle) const override {
-    return 0;
-  }
+  // launching kernels 
+  // https://www.perplexity.ai/search/i-have-the-symbol-name-for-my-lV9vIec5Rn.Z1EV7BDItAQ
 
   CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, cuda_channel);
 };

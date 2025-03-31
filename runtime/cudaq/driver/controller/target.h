@@ -7,10 +7,16 @@
  ******************************************************************************/
 #pragma once
 
+#include "cudaq/utils/extension_point.h"
+
 namespace cudaq::driver {
 
-class target {
+enum class opcode { r1 };
+
+class target : public extension_point<target> {
 public:
+  virtual void apply_opcode(opcode, const std::vector<double> &,
+                            const std::vector<std::size_t> &) = 0;
 };
 
 } // namespace cudaq::driver

@@ -27,27 +27,20 @@ public:
     auto quake = cudaq::get_quake_by_name(name);
 
     // Target-specific compilation
-    auto kernelHandle = driver::compile_kernel(quake);
+    auto kernelHandle = driver::load_kernel(quake);
 
     // Allocate the arguments on the QPU channel
-    auto argsDevPtr = driver::malloc(argsSize); 
-    driver::memcpy(argsDevPtr, args); 
+    auto argsDevPtr = driver::malloc(argsSize);
+    driver::memcpy(argsDevPtr, args);
 
     // Launch the kernel
-    auto err_code = driver::launch_kernel(kernelHandle, argsDevPtr);
-    if (err_code != 0)
-      throw std::runtime_error("");
+    auto res = driver::launch_kernel(kernelHandle, argsDevPtr);
+    driver::free(argsDevPtr);
 
-    // FIXME how to handle result
-
-    if (resultOffset) {
-      // get the result
-    }
-
-    driver::free(argsDevPtr); 
-    
-    // call the right driver client api based on current context
+    if (res.result.data != nullptr)
+      std::memcpy(args, res.result.data, argsSize);
     return {};
+
   }
 
   void setExecutionContext(cudaq::ExecutionContext *context) override {}

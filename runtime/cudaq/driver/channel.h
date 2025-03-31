@@ -39,30 +39,44 @@ struct device_ptr {
 using handle = std::size_t;
 using error_code = std::size_t;
 
-class channel : public extension_point<channel> {
-public:
-  channel() = default;
-  virtual ~channel() = default;
+struct launch_result {
+  device_ptr result;
+  error_code error;
+  std::string msg;
+};
 
+class data_marshaller {
+public:
   virtual void connect(std::size_t assignedID,
                        const config::TargetConfig &config) = 0;
-
   virtual device_ptr malloc(std::size_t size, std::size_t devId) = 0;
   virtual void free(device_ptr &d) = 0;
   virtual void free(std::size_t argsHandle) = 0;
 
   virtual void memcpy(device_ptr &dest, const void *src) = 0;
   virtual void memcpy(void *dest, device_ptr &src) = 0;
+};
 
-  virtual error_code launch_callback(const std::string &funcName,
-                                     handle argsHandle) const = 0;
+class channel : public data_marshaller, public extension_point<channel> {
+public:
+  channel() = default;
+  virtual ~channel() = default;
+  virtual launch_result launch_callback(const std::string &funcName,
+                                        handle argsHandle) const {
+    throw std::runtime_error("launch callback not supported on this channel.");
+    return {};
+  }
+};
 
-  // Register the given quake code on the other side of the channel,
-  // return a handle to that kernel.
-  virtual handle register_compiled(const std::string &quake) const = 0;
+class controller_channel : public data_marshaller,
+                           public extension_point<controller_channel> {
+public:
+  controller_channel() = default;
+  virtual ~controller_channel() = default;
 
-  virtual error_code launch_kernel(handle kernelHandle,
-                                   device_ptr& argsHandle) const = 0;
+  virtual handle load_kernel(const std::string &quake) const = 0;
+  virtual launch_result launch_kernel(handle kernelHandle,
+                                      device_ptr &argsHandle) const = 0;
 };
 
 } // namespace cudaq::driver
