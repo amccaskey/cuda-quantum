@@ -11,7 +11,7 @@
 #include "cudaq/driver/controller/quake_compiler.h"
 #include "cudaq/utils/extension_point.h"
 
-#include <map> 
+#include <map>
 
 /// The Controller Interface provides an extension point
 /// for QPU device side control. By assumption, it sits in
@@ -48,6 +48,9 @@ public:
                          std::size_t size);
   virtual std::vector<char> memcpy_from(std::size_t handle, std::size_t size);
 
+  virtual launch_result launch_callback(std::size_t deviceId,
+                                        const std::string &funcName,
+                                        std::size_t argsHandle) = 0;
   // load the kernel into controller memory,
   // can perform target-specific compilation.
   virtual handle load_kernel(const std::string &quake);

@@ -7,6 +7,7 @@
  ******************************************************************************/
 #include "controller.h"
 
+#include "common/ThunkInterface.h"
 #include "cudaq/Support/TargetConfig.h"
 
 #include "rpc/server.h"
@@ -155,6 +156,13 @@ std::vector<char> controller::launch_kernel(std::size_t kernelHandle,
   return retRes;
 }
 
+launch_result controller::launch_callback(std::size_t devId,
+                                          const std::string &funcName,
+                                          std::size_t argsHandle) {
+  // FIXME check devId is valid
+  return communication_channels[devId]->launch_callback(funcName, argsHandle);
+}
+
 void initialize(const std::string &controllerType, int argc, char **argv) {
   m_controller = controller::get(controllerType);
   m_controller->initialize(argc, argv);
@@ -165,13 +173,29 @@ bool should_stop() { return m_controller->should_stop(); }
 
 extern "C" {
 
-void __nvqpp__callback_run(std::size_t deviceId, const char *funcName,
-                           std::size_t argsHandle) {
+cudaq::KernelThunkResultType __nvqpp__callback_run(std::size_t deviceId,
+                                                   const char *funcName,
+                                                   void *args,
+                                                   std::size_t argsSize) {
   using namespace cudaq::driver;
 
-  // This guy gets called across the channel (remote proc)
-  // how do we give it access to this data marshalling API?
+  // Tell the controller to allocate memory on deviceId
+  auto argsHandle = m_controller->malloc(argsSize, deviceId);
 
-  return;
+  // Send the data to that device pointer across the channel
+  std::vector<char> asVec(argsSize);
+  std::memcpy(asVec.data(), args, argsSize);
+  m_controller->memcpy_to(argsHandle, asVec, argsSize);
+
+  // Launch the callback
+  auto callbackResultHolder =
+      m_controller->launch_callback(deviceId, funcName, argsHandle);
+
+  // Get the result pointer and size
+  auto *resPtr = callbackResultHolder.result.data;
+  auto resSize = callbackResultHolder.result.size;
+
+  // Return the result
+  return {resPtr, resSize};
 }
 }
