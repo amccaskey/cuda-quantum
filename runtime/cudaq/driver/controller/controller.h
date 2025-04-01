@@ -50,7 +50,7 @@ public:
 
   virtual launch_result launch_callback(std::size_t deviceId,
                                         const std::string &funcName,
-                                        std::size_t argsHandle) = 0;
+                                        std::size_t argsHandle);
   // load the kernel into controller memory,
   // can perform target-specific compilation.
   virtual handle load_kernel(const std::string &quake);
