@@ -11,6 +11,8 @@
 #include "cudaq/driver/controller/quake_compiler.h"
 #include "cudaq/utils/extension_point.h"
 
+#include <map> 
+
 /// The Controller Interface provides an extension point
 /// for QPU device side control. By assumption, it sits in
 /// a separate process / memory space from host-side code.

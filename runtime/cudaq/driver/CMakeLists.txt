@@ -23,17 +23,16 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
 
 if (CUDA_FOUND) 
-target_sources(${LIBRARY_NAME} PRIVATE channels/cuda_channel.cpp)
-target_link_libraries(cudaq-driver 
-  PUBLIC 
-  PRIVATE 
-    fmt::fmt-header-only LLVMSupport rpc CUDA::cudart_static
-    )
+  target_sources(${LIBRARY_NAME} PRIVATE channels/cuda_channel.cpp)
+  target_link_libraries(cudaq-driver 
+    PUBLIC 
+    PRIVATE 
+      fmt::fmt-header-only LLVMSupport rpc CUDA::cudart_static
+  )
 else() 
-
-target_link_libraries(cudaq-driver 
-  PUBLIC 
-  PRIVATE 
-    fmt::fmt-header-only LLVMSupport rpc
-    )
+  target_link_libraries(cudaq-driver 
+    PUBLIC 
+    PRIVATE 
+      fmt::fmt-header-only LLVMSupport rpc
+  )
 endif()

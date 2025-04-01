@@ -19,8 +19,6 @@ class TargetConfig;
 
 namespace cudaq::driver {
 
-enum class memcpy_kind { host_to_driver, driver_to_host };
-
 // The communication channel from host to QPU control is special,
 // give it a unique ID none of the others will get
 static constexpr std::size_t host_qpu_channel_id =

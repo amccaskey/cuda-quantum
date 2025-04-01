@@ -13,7 +13,8 @@ add_library(${LIBRARY_NAME}
     controller.cpp
     controller_qir_impl.cpp
     controllers/rpc_controller.cpp
-    compilers/default_compiler.cpp)
+    compilers/default_compiler.cpp
+    targets/default_target.cpp)
 
 target_include_directories(${LIBRARY_NAME} PUBLIC 
     $<INSTALL_INTERFACE:include>

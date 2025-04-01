@@ -3,10 +3,12 @@
 
 __qpu__ int test(double angle) {
   cudaq::qubit q, r;
-  r1(angle, q);
+  // r1(angle, q);
+  h(q);
   x<cudaq::ctrl>(q, r);
-  mz(q);
-  return 22;
+  auto b = mz(q);
+  // if (b) x(r);
+  return b;
 }
 
 int main() {

@@ -7,12 +7,19 @@
  ******************************************************************************/
 #pragma once
 
-#include "cudaq/Support/TargetConfig.h"
+#include "cudaq/driver/controller/target.h"
 #include "cudaq/utils/extension_point.h"
+
+namespace cudaq::config {
+class TargetConfig;
+}
 
 namespace cudaq::driver {
 
 class quake_compiler : public extension_point<quake_compiler> {
+protected:
+  std::unique_ptr<target> m_target;
+
 public:
   virtual void initialize(const config::TargetConfig &) = 0;
   virtual std::size_t compile(const std::string &quake) = 0;
