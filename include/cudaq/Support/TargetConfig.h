@@ -9,6 +9,7 @@
 #pragma once
 
 #include "llvm/Support/YAMLTraits.h"
+
 #include <optional>
 #include <string>
 #include <vector>
@@ -99,6 +100,11 @@ struct BackendEndConfigEntry {
   std::vector<ConditionalBuildConfig> ConditionalBuildConfigs;
 };
 
+struct DeviceConfigEntry {
+  std::string Channel;
+  std::optional<int> CudaDevice;
+};
+
 /// Feature option mapping for NVIDIA target.
 // For the unified `nvidia` target, users can use feature option to specify
 // precision, mgpu/mqpu distribution. e.g., `--target-option fp32,mgpu` or
@@ -113,6 +119,12 @@ struct BackendFeatureMap {
   std::optional<bool> Default;
   /// The full configuration for this option.
   BackendEndConfigEntry Config;
+};
+
+/// Device configuration entry
+struct DeviceConfig {
+  std::string Name;
+  DeviceConfigEntry Config;
 };
 
 /// Schema of the target configuration file.
@@ -133,6 +145,9 @@ struct TargetConfig {
   std::optional<BackendEndConfigEntry> BackendConfig;
   /// Additional configuration mapping (if this is a multi-configuration target)
   std::vector<BackendFeatureMap> ConfigMap;
+  std::vector<DeviceConfig> Devices;
+  std::optional<std::string> ControllerIP;
+  std::optional<int> ControllerPort;
 };
 
 /// Process the target configuration into a `nvq++` compatible script according
@@ -147,6 +162,7 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(cudaq::config::TargetFeatureFlag)
 LLVM_YAML_IS_SEQUENCE_VECTOR(cudaq::config::TargetArgument)
 LLVM_YAML_IS_SEQUENCE_VECTOR(cudaq::config::ConditionalBuildConfig)
 LLVM_YAML_IS_SEQUENCE_VECTOR(cudaq::config::BackendFeatureMap)
+LLVM_YAML_IS_SEQUENCE_VECTOR(cudaq::config::DeviceConfig)
 
 namespace llvm {
 namespace yaml {
@@ -179,6 +195,11 @@ struct MappingTraits<cudaq::config::ConditionalBuildConfig> {
 };
 
 template <>
+struct MappingTraits<cudaq::config::DeviceConfigEntry> {
+  static void mapping(IO &io, cudaq::config::DeviceConfigEntry &info);
+};
+
+template <>
 struct MappingTraits<cudaq::config::BackendEndConfigEntry> {
   static void mapping(IO &io, cudaq::config::BackendEndConfigEntry &info);
 };
@@ -191,5 +212,11 @@ template <>
 struct MappingTraits<cudaq::config::TargetConfig> {
   static void mapping(IO &io, cudaq::config::TargetConfig &info);
 };
+
+template <>
+struct MappingTraits<cudaq::config::DeviceConfig> {
+  static void mapping(IO &io, cudaq::config::DeviceConfig &info);
+};
+
 } // namespace yaml
 } // namespace llvm
