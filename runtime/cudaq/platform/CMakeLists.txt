@@ -8,6 +8,7 @@
 
 include(HandleLLVMOptions)
 add_subdirectory(default)
+
 if (OPENSSL_FOUND)
   add_subdirectory(orca)
 endif()

@@ -63,6 +63,7 @@ add_subdirectory(platform)
 add_subdirectory(builder)
 add_subdirectory(domains)
 add_subdirectory(operators)
+add_subdirectory(driver) 
 
 install(TARGETS ${LIBRARY_NAME} EXPORT cudaq-targets DESTINATION lib)
 
