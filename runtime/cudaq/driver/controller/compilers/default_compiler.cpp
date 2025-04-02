@@ -64,6 +64,7 @@ public:
   }
 
   std::size_t compile(const std::string &quake) override {
+    printf("%s\n", quake.c_str());
     // Parse the Quake code into an MLIR module
     mlir::OwningOpRef<mlir::ModuleOp> module =
         mlir::parseSourceString<mlir::ModuleOp>(quake, context.get());

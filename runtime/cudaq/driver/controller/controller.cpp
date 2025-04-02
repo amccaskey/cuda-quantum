@@ -173,29 +173,25 @@ bool should_stop() { return m_controller->should_stop(); }
 
 extern "C" {
 
-cudaq::KernelThunkResultType __nvqpp__callback_run(std::size_t deviceId,
+cudaq::KernelThunkResultType __nvqpp__device_callback_run(std::size_t deviceId,
                                                    const char *funcName,
                                                    void *args,
                                                    std::size_t argsSize) {
   using namespace cudaq::driver;
-
+  cudaq::info("classical callback {} {}", std::string(funcName), argsSize);
   // Tell the controller to allocate memory on deviceId
   auto argsHandle = m_controller->malloc(argsSize, deviceId);
 
   // Send the data to that device pointer across the channel
-  std::vector<char> asVec(argsSize);
-  std::memcpy(asVec.data(), args, argsSize);
+  std::vector<char> asVec(static_cast<char *>(args),
+                          static_cast<char *>(args) + argsSize);
   m_controller->memcpy_to(argsHandle, asVec, argsSize);
 
   // Launch the callback
-  auto callbackResultHolder =
+  auto [resPtr, errc, errmsg] =
       m_controller->launch_callback(deviceId, funcName, argsHandle);
 
-  // Get the result pointer and size
-  auto *resPtr = callbackResultHolder.result.data;
-  auto resSize = callbackResultHolder.result.size;
-
   // Return the result
-  return {resPtr, resSize};
+  return {resPtr.data, resPtr.size};
 }
 }

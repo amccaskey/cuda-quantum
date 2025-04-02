@@ -58,6 +58,5 @@ handle load_kernel(const std::string &quake) {
 launch_result launch_kernel(handle kernelHandle, device_ptr args) {
   return details::host_qpu_channel->launch_kernel(kernelHandle, args);
 }
-// sample, observe, run?
 
 } // namespace cudaq::driver

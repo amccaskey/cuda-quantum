@@ -242,11 +242,9 @@ hybridLaunchKernel(const char *kernelName, KernelThunkType kernel, void *args,
 // kernel. The marshaling code will call this function. This function will then
 // call the desired callback function on the host side. The argsBuffer uses the
 // same pointer-free encoding as altLaunchKernel.
-[[nodiscard]] CallbackResultType
-__nvqpp__device_callback_run(std::uint64_t deviceId, const char *callbackName,
-                             UnmarshalFuncType unmarshalFunc, void *argsBuffer,
-                             std::uint64_t argsBufferSize,
-                             std::uint64_t returnOffset);
+// [[nodiscard]] CallbackResultType __nvqpp__device_callback_run(
+//     const char *callbackName, UnmarshalFuncType unmarshalFunc, void *argsBuffer,
+//     std::uint64_t argsBufferSize, std::uint64_t returnOffset);
 }
 
 } // namespace cudaq
