@@ -64,9 +64,9 @@ public:
 
     // Found the library, use it
     // Additional initialization with the found library
-    dlopen(libraryPath.string().c_str(), RTLD_GLOBAL | RTLD_NOW);
     simulator = getUniquePluginInstance<nvqir::CircuitSimulator>(
-        std::string("getCircuitSimulator_") + nameToLookFor);
+        std::string("getCircuitSimulator_") + nameToLookFor,
+        libraryPath.string().c_str());
   }
 
   void allocate(std::size_t num) override {
@@ -75,7 +75,7 @@ public:
   }
 
   void deallocate(std::size_t num) override {
-    for (std::size_t i = 0; i < num; i++) 
+    for (std::size_t i = 0; i < num; i++)
       simulator->deallocate(i);
   }
 

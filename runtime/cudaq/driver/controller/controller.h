@@ -63,23 +63,5 @@ public:
 void initialize(const std::string &controllerType, int argc, char **argv);
 bool should_stop();
 
-// --- Controller Server API ---
-void connect(const std::string &cfg);
-
-// Allocate memory on devId. Return a unique handle
-std::size_t malloc(std::size_t size, std::size_t devId);
-// Free allocated memory
-void free(std::size_t handle);
-
-void memcpy_to(std::size_t handle, std::vector<char> &data, std::size_t size);
-std::vector<char> memcpy_from(std::size_t handle, std::size_t size);
-
-// load the kernel into controller memory,
-// can perform target-specific compilation.
-handle load_kernel(const std::string &quake);
-
-// launch and return the result data
-std::vector<char> launch_kernel(std::size_t kernelHandle,
-                                std::size_t argsHandle);
 
 } // namespace cudaq::driver
