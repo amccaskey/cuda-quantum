@@ -18,7 +18,7 @@ target_include_directories(cudaq-driver-qpu PRIVATE .
 
 target_link_libraries(cudaq-driver-qpu 
   PUBLIC 
-    cudaq-spin 
+    cudaq-operator
     cudaq-common 
   PRIVATE 
     # cudaq-mlir-runtime 

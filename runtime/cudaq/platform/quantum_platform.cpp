@@ -260,22 +260,22 @@ KernelThunkResultType hybridLaunchKernel(const char *kernelName,
                                rawArgs);
 }
 
-CallbackResultType __nvqpp__device_callback_run(std::uint64_t deviceId,
-                                                const char *callbackName,
-                                                UnmarshalFuncType unmarshalFunc,
-                                                void *argsBuffer,
-                                                std::uint64_t argsBufferSize,
-                                                std::uint64_t returnOffset) {
-  ScopedTraceWithContext("__nvqpp__device_callback_run", callbackName);
-  auto &platform = *getQuantumPlatformInternal();
-  if (!platform.is_remote(platform.get_current_qpu()))
-    return unmarshalFunc(argsBuffer, /*copyResult=*/false);
-#if 0
-  return platform.deviceCallRun(deviceId, callbackName, unmarshalFunc,
-                                argsBuffer, argsBuferSize, returnOffset);
-#else
-  return {nullptr, 0};
-#endif
-}
+// CallbackResultType __nvqpp__device_callback_run(std::uint64_t deviceId,
+//                                                 const char *callbackName,
+//                                                 UnmarshalFuncType unmarshalFunc,
+//                                                 void *argsBuffer,
+//                                                 std::uint64_t argsBufferSize,
+//                                                 std::uint64_t returnOffset) {
+//   ScopedTraceWithContext("__nvqpp__device_callback_run", callbackName);
+//   auto &platform = *getQuantumPlatformInternal();
+//   if (!platform.is_remote(platform.get_current_qpu()))
+//     return unmarshalFunc(argsBuffer, /*copyResult=*/false);
+// #if 0
+//   return platform.deviceCallRun(deviceId, callbackName, unmarshalFunc,
+//                                 argsBuffer, argsBuferSize, returnOffset);
+// #else
+//   return {nullptr, 0};
+// #endif
+// }
 
 } // namespace cudaq

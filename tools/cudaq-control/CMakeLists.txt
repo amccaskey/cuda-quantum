@@ -6,12 +6,16 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 set(TOOL_NAME cudaq-controller)
-add_executable(${TOOL_NAME} cudaq-control.cpp)
+add_executable(${TOOL_NAME} cudaq-control.cpp ${CMAKE_SOURCE_DIR}/runtime/cudaq/utils/matrix.cpp )
 set_target_properties(${TOOL_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")
 target_compile_options(${TOOL_NAME} PRIVATE -fno-rtti)
 target_link_libraries(${TOOL_NAME} 
   PRIVATE 
-    cudaq-driver-controller 
+    cudaq 
+    cudaq-common
+    cudaq-operator 
     fmt::fmt-header-only 
+    cudaq-driver-controller 
     CUDAQTargetConfigUtil
-    LLVMSupport)
+    LLVMSupport
+    )
