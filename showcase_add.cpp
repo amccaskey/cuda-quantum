@@ -43,7 +43,7 @@
 // add function called across the shared_memory channel
 //
 // clang++ add.cpp -o add.o -c && clang++ -shared add.o -o libadd.so
-// bin/nvq++ eric.cpp -v --target entangler -ladd
+// bin/nvq++ showcase_add.cpp -v --target entangler -ladd
 //
 // start up the controller in a separate terminal
 //

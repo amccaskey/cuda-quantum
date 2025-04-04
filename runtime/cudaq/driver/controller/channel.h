@@ -37,16 +37,18 @@ public:
   virtual void memcpy(void *dest, device_ptr &src) = 0;
 };
 
-class device_channel : public data_marshaller, public extension_point<device_channel> {
+class device_channel : public data_marshaller,
+                       public extension_point<device_channel> {
 public:
   device_channel() = default;
   virtual ~device_channel() = default;
-  virtual void add_symbol_locations(const std::vector<std::string>&) {}
+  virtual void add_symbol_locations(const std::vector<std::string> &) {}
   virtual void load_callback(const std::string &funcName,
                              const std::string &unmarshallerCode) {}
   virtual launch_result launch_callback(const std::string &funcName,
                                         device_ptr &argsHandle) {
-    throw std::runtime_error("launch callback not supported on this device_channel.");
+    throw std::runtime_error(
+        "launch callback not supported on this device_channel.");
     return {};
   }
 };
@@ -58,8 +60,9 @@ public:
   virtual ~controller_channel() = default;
 
   virtual handle load_kernel(const std::string &quake) const = 0;
-  virtual std::vector<std::string> get_callbacks(handle kernelHandle) = 0; 
-  virtual void distribute_symbol_locations(const std::vector<std::string>& locations) = 0; 
+  virtual std::vector<std::string> get_callbacks(handle kernelHandle) = 0;
+  virtual void
+  distribute_symbol_locations(const std::vector<std::string> &locations) = 0;
   virtual launch_result launch_kernel(handle kernelHandle,
                                       device_ptr &argsHandle) const = 0;
 };

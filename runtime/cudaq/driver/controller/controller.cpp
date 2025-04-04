@@ -228,6 +228,6 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
 
   std::memcpy(argsBuffer, resPtr.data, argsBufferSize);
 
-  return {}; 
+  return {};
 }
 }
