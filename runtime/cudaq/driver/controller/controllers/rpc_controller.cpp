@@ -38,6 +38,12 @@ public:
     srv->bind("load_kernel", [&](const std::string &quake) {
       return this->load_kernel(quake);
     });
+    srv->bind("get_callbacks",
+              [&](handle h) { return this->get_callbacks(h); });
+    srv->bind("distribute_symbol_locations",
+              [&](const std::vector<std::string> &locs) {
+                return this->distribute_symbol_locations(locs);
+              });
     srv->bind("launch_kernel",
               [&](std::size_t kernelHandle, std::size_t argsHandle) {
                 return this->launch_kernel(kernelHandle, argsHandle);

@@ -21,6 +21,7 @@ namespace cudaq::driver {
 class shared_memory : public device_channel {
   std::unique_ptr<quake_compiler> unmarshalCompiler;
   std::map<std::string, std::size_t> handles;
+  std::vector<std::string> symbol_locations;
 
 public:
   using device_channel::device_channel;
@@ -30,6 +31,10 @@ public:
     cudaq::info("shared_memory channel connected.");
     unmarshalCompiler = quake_compiler::get("default_compiler");
     unmarshalCompiler->initialize(config);
+  }
+
+  void add_symbol_locations(const std::vector<std::string> &locs) {
+    symbol_locations = locs;
   }
 
   device_ptr malloc(std::size_t size, std::size_t devId) override {
@@ -49,8 +54,9 @@ public:
 
   void load_callback(const std::string &funcName,
                      const std::string &unmarshallerCode) override {
-    cudaq::info("shared memory load_callback called");
-    auto handle = unmarshalCompiler->compile_unmarshaler(unmarshallerCode);
+    cudaq::info("shared memory load_callback called - {}", funcName);
+    auto handle = unmarshalCompiler->compile_unmarshaler(unmarshallerCode,
+                                                         symbol_locations);
     handles.insert({funcName, handle});
   }
 

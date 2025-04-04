@@ -9,8 +9,11 @@
 #include "driver.h"
 #include "controller/channel.h"
 
+#include <dlfcn.h>
+#include <iostream>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <stdarg.h>
 #include <string.h>
 #include <vector>
@@ -27,6 +30,15 @@ namespace details {
 static std::unique_ptr<controller_channel> host_qpu_channel;
 
 } // namespace details
+
+std::optional<std::string> trace_symbol(const char *name) {
+  void *addr = dlsym(RTLD_DEFAULT, name);
+  Dl_info info;
+  if (dladdr(addr, &info))
+    return info.dli_fname;
+
+  return std::nullopt;
+}
 
 void initialize(const config::TargetConfig &cfg) {
   // setup the host to qpu control communication channel
@@ -59,7 +71,35 @@ void memcpy(void *dest, device_ptr &src) {
 }
 
 handle load_kernel(const std::string &quake) {
-  return details::host_qpu_channel->load_kernel(quake);
+  // Loading a kernel involves the following:
+  // 1. Analyze the quake code and find all function
+  //    symbols being called by device_call
+  // 2. Extract the library path for those symbols.
+  // 3. When compiling the code, lower device_calls to
+  //    the marshal/unmarshal intrinsics. Save these in a map
+  // 4. When a callback is invoked, we need to send the
+  //    unmarshal to the other end of the channel and JIT
+  auto kernelHandle = details::host_qpu_channel->load_kernel(quake);
+
+  // get the names of any callbacks in the kernel
+  // FIXME could add this to the driver API for users
+  auto callbackSymbols = details::host_qpu_channel->get_callbacks(kernelHandle);
+
+  // For each callback, see if we can get the library path
+  // where it resides
+  std::vector<std::string> symbolLocations;
+  for (auto &c : callbackSymbols)
+    if (auto loc = trace_symbol(c.c_str()); loc.has_value()) {
+      symbolLocations.push_back(loc.value());
+      cudaq::info("driver found required callback symbol {} at {}.", c,
+                  loc.value());
+    }
+
+  // Distribute those library locations.
+  details::host_qpu_channel->distribute_symbol_locations(symbolLocations);
+
+  // Return the kernel handle to the user.
+  return kernelHandle;
 }
 
 launch_result launch_kernel(handle kernelHandle, device_ptr args) {

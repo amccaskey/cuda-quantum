@@ -15,6 +15,8 @@ static llvm::cl::opt<std::string>
                                   "(default rpc_controller)."),
                    llvm::cl::init("rpc_controller"));
 
+// FIXME Make the controller load compilers / targets as plugins dynamically
+
 int main(int argc, char **argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "cudaq-controller process\n");
   cudaq::driver::initialize(controllerType, argc, argv);

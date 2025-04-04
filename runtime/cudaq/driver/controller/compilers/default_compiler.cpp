@@ -33,11 +33,19 @@ void setTarget(target *);
 
 static std::once_flag mlir_init_flag;
 
+struct LoadedModule {
+  std::string thunkName = "";
+  std::optional<std::size_t> numRequiredQubits = std::nullopt;
+  std::unique_ptr<ExecutionEngine> jitEngine;
+  std::vector<Callback> callbacks;
+};
+
 struct LoadedKernel {
   std::string thunkName = "";
   std::optional<std::size_t> numRequiredQubits = std::nullopt;
   std::unique_ptr<ExecutionEngine> jitEngine;
 };
+
 struct LoadedUnmarshaler {
   std::string unmarshalFuncName = "";
   std::unique_ptr<ExecutionEngine> jitEngine;
@@ -46,93 +54,14 @@ struct LoadedUnmarshaler {
 class default_compiler : public quake_compiler {
 protected:
   std::unique_ptr<MLIRContext> context;
-  std::map<handle, LoadedKernel> loadedKernels;
+  std::map<handle, LoadedModule> loadedKernels;
   std::map<handle, LoadedUnmarshaler> loadedUnmarshalers;
 
+  // Map CallbackName to its FuncOp code string
   std::map<std::string, std::string> unmarshalFuncOpStrs;
   std::string qirType = "qir-adaptive";
 
-public:
-  void initialize(const config::TargetConfig &config) override {
-    std::call_once(mlir_init_flag, []() {
-      llvm::InitializeNativeTarget();
-      llvm::InitializeNativeTargetAsmPrinter();
-      cudaq::registerAllPasses();
-    });
-    DialectRegistry registry;
-    cudaq::opt::registerCodeGenDialect(registry);
-    cudaq::registerAllDialects(registry);
-    context = std::make_unique<MLIRContext>(registry);
-    context->loadAllAvailableDialects();
-    registerLLVMDialectTranslation(*context);
-
-    // FIXME make this configurable
-    m_target = target::get("default_target");
-    m_target->initialize(config);
-    setTarget(m_target.get());
-  }
-
-  std::size_t compile_unmarshaler(const std::string &mlirCode) {
-    printf("INPUT MLIR\n%s\n", mlirCode.c_str());
-    mlir::OwningOpRef<mlir::ModuleOp> module =
-        mlir::parseSourceString<mlir::ModuleOp>(
-            fmt::format("module {{ {} }}", mlirCode), context.get());
-
-    if (!module) {
-      cudaq::info("Failed to parse Quake code into MLIR module");
-      return 0;
-    }
-
-   module->dump();
-    mlir::PassManager pm(context.get());
-    pm.addPass(cudaq::opt::createCCToLLVM());
-    if (failed(pm.run(*module)))
-      return -1;
-
-    std::string unmarshalFuncName;
-    module->walk([&unmarshalFuncName](LLVM::LLVMFuncOp op) {
-      if (op.getName().startswith("unmarshal.")) {
-        unmarshalFuncName = op.getName().str();
-        return mlir::WalkResult::interrupt();
-      }
-      return mlir::WalkResult::advance();
-    });
-
-    static handle nextHandle = 0;
-
-    module->dump();
-
-    mlir::ExecutionEngineOptions engineOptions;
-    // FIXME Just have to figure this part out...
-    engineOptions.sharedLibPaths = {"/workspaces/cuda-quantum/build/libadd.so"};
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOpt::Default;
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) {
-      cudaq::info("Failed to create execution engine");
-      return 0;
-    }
-    loadedUnmarshalers.insert(
-        {nextHandle,
-         LoadedUnmarshaler{unmarshalFuncName, std::move(maybeEngine.get())}});
-
-    auto retHandle = nextHandle;
-    cudaq::info("Unmarshal Callback loaded successfully with handle: {}",
-                nextHandle);
-    nextHandle++;
-    return retHandle;
-  }
-
-  std::size_t compile(const std::string &quake) override {
-    printf("%s\n", quake.c_str());
-    // Parse the Quake code into an MLIR module
-    mlir::OwningOpRef<mlir::ModuleOp> module =
-        mlir::parseSourceString<mlir::ModuleOp>(quake, context.get());
-
-    if (!module) {
-      cudaq::info("Failed to parse Quake code into MLIR module");
-      return 0;
-    }
-
+  std::string getKernelThunkName(OwningOpRef<ModuleOp> &module) {
     std::string thunkName;
     module->walk([&thunkName](mlir::func::FuncOp op) {
       if (op.getName().endswith(".thunk")) {
@@ -141,14 +70,10 @@ public:
       }
       return mlir::WalkResult::advance();
     });
+    return thunkName;
+  }
 
-    mlir::PassManager pm(context.get());
-    pm.addPass(cudaq::opt::createDistributedDeviceCall());
-    // Run now, and do some work on it
-    if (failed(pm.run(*module)))
-      return -1;
-
-    printf("LETS SEARCH FOR THE UNMARSHALLERS\n");
+  std::vector<Callback> storeUnmarshalCode(OwningOpRef<ModuleOp> &module) {
     std::vector<std::string> unmarshalFuncNames;
     module->walk([&unmarshalFuncNames](func::FuncOp op) {
       if (op.getName().startswith("unmarshal.")) {
@@ -158,31 +83,31 @@ public:
       return mlir::WalkResult::advance();
     });
 
+    std::vector<Callback> callbacks;
     for (auto &unmarshalFuncName : unmarshalFuncNames) {
-      printf("ITERATE %s\n", unmarshalFuncName.c_str());
       auto funcOp = module->lookupSymbol<func::FuncOp>(unmarshalFuncName);
-      if (funcOp) {
-        auto actualCalledFuncOp = module->lookupSymbol<func::FuncOp>(
-            StringRef(unmarshalFuncName).drop_front(10).str());
-        auto zeroDynRes =
-            module->lookupSymbol<func::FuncOp>("__nvqpp_zeroDynamicResult");
-        std::string funcCode;
-        {
-          llvm::raw_string_ostream strOut(funcCode);
-          OpPrintingFlags opf;
-          funcOp.print(strOut, opf);
-          strOut << '\n';
-          actualCalledFuncOp.print(strOut, opf);
-          strOut << '\n';
-          zeroDynRes.print(strOut, opf);
-        }
-
-        unmarshalFuncOpStrs.insert(
-            {StringRef(unmarshalFuncName).drop_front(10).str(), funcCode});
-        llvm::errs() << "SAVING DEVCODE "
-                     << StringRef(unmarshalFuncName).drop_front(10) << "\n"
-                     << funcCode << "\n";
+      if (!funcOp)
+        continue;
+      auto actualCalledFuncOp = module->lookupSymbol<func::FuncOp>(
+          StringRef(unmarshalFuncName).drop_front(10).str());
+      auto zeroDynRes =
+          module->lookupSymbol<func::FuncOp>("__nvqpp_zeroDynamicResult");
+      std::string funcCode;
+      {
+        llvm::raw_string_ostream strOut(funcCode);
+        OpPrintingFlags opf;
+        funcOp.print(strOut, opf);
+        strOut << '\n';
+        actualCalledFuncOp.print(strOut, opf);
+        strOut << '\n';
+        zeroDynRes.print(strOut, opf);
       }
+
+      unmarshalFuncOpStrs.insert(
+          {StringRef(unmarshalFuncName).drop_front(10).str(), funcCode});
+
+      callbacks.emplace_back(StringRef(unmarshalFuncName).drop_front(10).str(),
+                             funcCode);
 
       // Replace with just a private declaration
       auto newFunc = mlir::func::FuncOp::create(
@@ -206,68 +131,168 @@ public:
       funcOp->erase(); // Remove original implementation
     }
 
-    llvm::errs() << "AFTER ANALYSIS\n";
-    module->dump();
+    return callbacks;
+  }
 
-    cudaq::opt::addPipelineConvertToQIR(pm, qirType);
+  std::optional<std::size_t>
+  getNumRequiredQubits(OwningOpRef<ModuleOp> &module) {
+    std::string result;
+    module->walk([&result](LLVM::LLVMFuncOp op) {
+      auto passthroughAttr = op->getAttrOfType<ArrayAttr>("passthrough");
+      if (!passthroughAttr)
+        return WalkResult::advance();
+      for (std::size_t i = 0; i < passthroughAttr.size(); i++) {
+        auto keyValPair = dyn_cast<ArrayAttr>(passthroughAttr[i]);
+        if (!keyValPair)
+          continue;
+
+        auto keyAttr = dyn_cast<StringAttr>(keyValPair[0]);
+        if (!keyAttr.getValue().equals("requiredQubits"))
+          continue;
+        result = dyn_cast<StringAttr>(keyValPair[1]).getValue();
+        return WalkResult::interrupt();
+      }
+
+      return WalkResult::interrupt();
+    });
+
+    try {
+      return std::stoi(result);
+    } catch (...) {
+      // do nothing, just return nullopt
+    }
+
+    return std::nullopt;
+  }
+
+public:
+  void initialize(const config::TargetConfig &config) override {
+    std::call_once(mlir_init_flag, []() {
+      llvm::InitializeNativeTarget();
+      llvm::InitializeNativeTargetAsmPrinter();
+      cudaq::registerAllPasses();
+    });
+    DialectRegistry registry;
+    cudaq::opt::registerCodeGenDialect(registry);
+    cudaq::registerAllDialects(registry);
+    context = std::make_unique<MLIRContext>(registry);
+    context->loadAllAvailableDialects();
+    registerLLVMDialectTranslation(*context);
+
+    // FIXME make this configurable
+    m_target = target::get("default_target");
+    m_target->initialize(config);
+    setTarget(m_target.get());
+  }
+
+  std::vector<Callback> get_callbacks(handle moduleHandle) override {
+    return loadedKernels.at(moduleHandle).callbacks;
+  }
+
+  std::size_t
+  compile_unmarshaler(const std::string &mlirCode,
+                      const std::vector<std::string> &symbolLocations) {
+    mlir::OwningOpRef<mlir::ModuleOp> module =
+        mlir::parseSourceString<mlir::ModuleOp>(
+            fmt::format("module {{ {} }}", mlirCode), context.get());
+
+    if (!module) {
+      cudaq::info("Failed to parse Quake code into MLIR module");
+      return 0;
+    }
+
+    mlir::PassManager pm(context.get());
+    pm.addPass(cudaq::opt::createCCToLLVM());
     if (failed(pm.run(*module)))
       return -1;
 
-    printf("WITH DEV CODE\n");
-    module->dump();
-
-    llvm::errs() << "AFTER ERASE:\n";
-    module->dump();
-    // Potentially get the number of required qubits.
-    std::optional<std::size_t> numRequiredQubits =
-        [&]() -> std::optional<std::size_t> {
-      std::string result;
-      module->walk([&result](LLVM::LLVMFuncOp op) {
-        auto passthroughAttr = op->getAttrOfType<ArrayAttr>("passthrough");
-        if (!passthroughAttr)
-          return WalkResult::advance();
-        for (std::size_t i = 0; i < passthroughAttr.size(); i++) {
-          auto keyValPair = dyn_cast<ArrayAttr>(passthroughAttr[i]);
-          if (!keyValPair)
-            continue;
-
-          auto keyAttr = dyn_cast<StringAttr>(keyValPair[0]);
-          if (!keyAttr.getValue().equals("requiredQubits"))
-            continue;
-          result = dyn_cast<StringAttr>(keyValPair[1]).getValue();
-          return WalkResult::interrupt();
-        }
-
-        return WalkResult::interrupt();
-      });
-
-      try {
-        return std::stoi(result);
-      } catch (...) {
-        // do nothing, just return nullopt
+    std::string unmarshalFuncName;
+    module->walk([&unmarshalFuncName](LLVM::LLVMFuncOp op) {
+      if (op.getName().startswith("unmarshal.")) {
+        unmarshalFuncName = op.getName().str();
+        return mlir::WalkResult::interrupt();
       }
+      return mlir::WalkResult::advance();
+    });
 
-      return std::nullopt;
-    }();
-
-    if (numRequiredQubits)
-      cudaq::info("Need to allocate {} qubits.", *numRequiredQubits);
-
-    // Generate a unique handle for the loaded kernel
     static handle nextHandle = 0;
 
+    std::vector<llvm::StringRef> stringRefs;
+    for (const auto &str : symbolLocations) {
+      stringRefs.push_back(llvm::StringRef(str));
+    }
+
     mlir::ExecutionEngineOptions engineOptions;
-    // engineOptions.sharedLibPaths =
-    // {"/workspaces/cuda-quantum/build/libadd.so"};
+    engineOptions.sharedLibPaths = stringRefs;
     engineOptions.jitCodeGenOptLevel = llvm::CodeGenOpt::Default;
     auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
     if (!maybeEngine) {
       cudaq::info("Failed to create execution engine");
       return 0;
     }
+    loadedUnmarshalers.insert(
+        {nextHandle,
+         LoadedUnmarshaler{unmarshalFuncName, std::move(maybeEngine.get())}});
+
+    auto retHandle = nextHandle;
+    cudaq::info("Unmarshal Callback loaded successfully with handle: {}",
+                nextHandle);
+    nextHandle++;
+    return retHandle;
+  }
+
+  std::size_t compile(const std::string &quake) override {
+    // Parse the Quake code into an MLIR module
+    mlir::OwningOpRef<mlir::ModuleOp> module =
+        mlir::parseSourceString<mlir::ModuleOp>(quake, context.get());
+
+    if (!module) {
+      cudaq::info("Failed to parse Quake code into MLIR module");
+      return 0;
+    }
+
+    // Get the kernel thunk function name
+    auto thunkName = getKernelThunkName(module);
+
+    // Lower device_call operations
+    mlir::PassManager pm(context.get());
+    pm.addPass(cudaq::opt::createDistributedDeviceCall());
+    // Run now, and do some work on it
+    if (failed(pm.run(*module)))
+      return -1;
+
+    // Search the module for unmarshal.* functions,
+    // store the FuncOp code for each. Removes the
+    // body of the unmarshal op since we don't
+    // execute it here and we don't have the symbols it needs
+    auto callbacks = storeUnmarshalCode(module);
+
+    // Lower the kernel code to adaptive QIR
+    cudaq::opt::addPipelineConvertToQIR(pm, qirType);
+    if (failed(pm.run(*module)))
+      return -1;
+
+    // Potentially get the number of required qubits.
+    std::optional<std::size_t> numRequiredQubits = getNumRequiredQubits(module);
+    if (numRequiredQubits)
+      cudaq::info("Need to allocate {} qubits.", *numRequiredQubits);
+
+    // Generate a unique handle for the loaded kernel
+    static handle nextHandle = 0;
+
+    // Create the ExecutionEngine for JIT compilation
+    mlir::ExecutionEngineOptions engineOptions;
+    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOpt::Default;
+    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+    if (!maybeEngine) {
+      cudaq::info("Failed to create execution engine");
+      return 0;
+    }
+
+    // Kernel is loaded, add it to the map
     loadedKernels.insert(
-        {nextHandle, LoadedKernel{thunkName, numRequiredQubits,
-                                  std::move(maybeEngine.get())}});
+        {nextHandle, LoadedModule{thunkName, numRequiredQubits,
+                                  std::move(maybeEngine.get()), callbacks}});
 
     auto retHandle = nextHandle;
     cudaq::info("Kernel loaded successfully with handle: {}", nextHandle);
@@ -276,13 +301,16 @@ public:
   }
 
   std::string get_callback_code(const std::string &name) override {
-    // fixme error handling
+    auto iter = unmarshalFuncOpStrs.find(name);
+    if (iter == unmarshalFuncOpStrs.end())
+      return ""; // what to do here?
+
     return unmarshalFuncOpStrs[name];
   }
 
   void launch(std::size_t kernelHandle, void *thunkArgs) override {
     // Get the loaded kernel.
-    auto &[thunkName, numRequiredQubits, execEngine] =
+    auto &[thunkName, numRequiredQubits, execEngine, callbacks] =
         loadedKernels.at(kernelHandle);
 
     // Need to tell the target to allocate numRequiredQubits
@@ -311,6 +339,7 @@ public:
     // potential result is in the thunk args.
     return;
   }
+
   void launch_callback(std::size_t kernelHandle, void *thunkArgs) override {
     // Get the loaded kernel.
     auto &[thunkName, execEngine] = loadedUnmarshalers.at(kernelHandle);

@@ -5,20 +5,29 @@
 # This source code and the accompanying materials are made available under     #
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
-set(TOOL_NAME cudaq-controller)
-add_executable(${TOOL_NAME} cudaq-control.cpp ${CMAKE_SOURCE_DIR}/runtime/cudaq/utils/matrix.cpp )
-set_target_properties(${TOOL_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")
-target_compile_options(${TOOL_NAME} PRIVATE -fno-rtti)
-# FIXME only a gcc thing
-target_link_options(${TOOL_NAME} PRIVATE -Wl,--no-as-needed)
-target_link_libraries(${TOOL_NAME} 
+
+set(LIBRARY_NAME cudaq-quake-compilers) 
+
+add_library(${LIBRARY_NAME} 
+  SHARED 
+    default_compiler.cpp
+)
+
+target_include_directories(${LIBRARY_NAME} PUBLIC 
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
+
+target_compile_options(${LIBRARY_NAME} PRIVATE -fno-rtti)
+
+target_link_libraries(${LIBRARY_NAME}
   PRIVATE 
-    cudaq 
-    cudaq-common
-    cudaq-operator 
-    cudaq-quake-compilers # Make this runtime load
     fmt::fmt-header-only 
-    cudaq-driver-controller 
-    CUDAQTargetConfigUtil
-    LLVMSupport
+    cudaq-common
+    MLIRIR
+    MLIRPass 
+    MLIRExecutionEngine 
+    CCDialect
+    QuakeDialect
+    OptCodeGen
+    OptTransforms
     )

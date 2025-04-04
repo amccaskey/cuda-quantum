@@ -16,6 +16,12 @@ class TargetConfig;
 
 namespace cudaq::driver {
 
+struct Callback {
+  std::string callbackName;
+  std::string unmarshalFuncOpCode;
+  std::string getUnmarshalName() { return "unmarshal." + callbackName; }
+};
+
 class quake_compiler : public extension_point<quake_compiler> {
 protected:
   std::unique_ptr<target> m_target;
@@ -23,12 +29,15 @@ protected:
 public:
   virtual void initialize(const config::TargetConfig &) = 0;
   virtual std::size_t compile(const std::string &quake) = 0;
-  virtual std::size_t compile_unmarshaler(const std::string &mlirCode) = 0;
+  virtual std::size_t
+  compile_unmarshaler(const std::string &mlirCode,
+                      const std::vector<std::string> &symbolLocations) = 0;
 
+  virtual std::vector<Callback> get_callbacks(handle moduleHandle) = 0;
   virtual std::string get_callback_code(const std::string &name) = 0;
   // Launch the kernel thunk, results are posted to the thunkArgs pointer
   virtual void launch(std::size_t kernelHandle, void *thunkArgs) = 0;
-  virtual void launch_callback(handle unmarshaller, void * thunkArgs) = 0;
+  virtual void launch_callback(handle unmarshaller, void *thunkArgs) = 0;
 };
 
 } // namespace cudaq::driver

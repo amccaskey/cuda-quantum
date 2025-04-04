@@ -13,7 +13,7 @@
 
 #define CUDAQ_RTTI_DISABLED
 #include "cudaq/utils/cudaq_utils.h"
-#undef CUDAQ_RTTI_DISABLED 
+#undef CUDAQ_RTTI_DISABLED
 
 #include "rpc/client.h"
 
@@ -193,6 +193,16 @@ public:
     auto kernelHandle = client->call("load_kernel", quake);
     // FIXME may want to do something with this here
     return kernelHandle.as<std::size_t>();
+  }
+  
+  std::vector<std::string> get_callbacks(handle kernelHandle) override {
+    return client->call("get_callbacks", kernelHandle)
+        .as<std::vector<std::string>>();
+  }
+
+  void
+  distribute_symbol_locations(const std::vector<std::string> &locs) override {
+    client->call("distribute_symbol_locations", locs);
   }
 
   launch_result launch_kernel(handle kernelHandle,
