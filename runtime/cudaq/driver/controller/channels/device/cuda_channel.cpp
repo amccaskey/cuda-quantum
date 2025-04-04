@@ -81,7 +81,7 @@ public:
   // https://www.perplexity.ai/search/i-have-the-symbol-name-for-my-lV9vIec5Rn.Z1EV7BDItAQ
 
   launch_result launch_callback(const std::string &funcName,
-                                device_ptr& argsHandle)  override {
+                                device_ptr &argsHandle) override {
     // auto * h = dlopen("/workspaces/cuda-quantum/build/add.o", RTLD_GLOBAL);
     // auto * ptr = dlsym(h, funcName );
     return {};

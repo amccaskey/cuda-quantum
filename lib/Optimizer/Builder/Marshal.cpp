@@ -1097,8 +1097,8 @@ processInputValueImpl(Location loc, OpBuilder &builder, Value trailingData,
       ptrPackedStruct, ArrayRef<cudaq::cc::ComputePtrArg>{off});
   if (cudaq::cc::isDynamicType(inTy)) {
     if constexpr (FromQPU) {
-      auto dynamo = constructDynamicInputValue<FromQPU>(loc, builder, inTy,
-                                                      packedPtr, trailingData);
+      auto dynamo = constructDynamicInputValue<FromQPU>(
+          loc, builder, inTy, packedPtr, trailingData);
       if (isa<cudaq::cc::SpanLikeType>(inTy)) {
         Value retVal = dynamo.first;
         Value tmp = builder.create<cudaq::cc::AllocaOp>(loc, retVal.getType());

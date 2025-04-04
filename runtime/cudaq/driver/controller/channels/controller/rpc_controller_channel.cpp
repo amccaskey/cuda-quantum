@@ -194,7 +194,7 @@ public:
     // FIXME may want to do something with this here
     return kernelHandle.as<std::size_t>();
   }
-  
+
   std::vector<std::string> get_callbacks(handle kernelHandle) override {
     return client->call("get_callbacks", kernelHandle)
         .as<std::vector<std::string>>();

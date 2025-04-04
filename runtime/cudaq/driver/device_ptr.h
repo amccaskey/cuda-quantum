@@ -8,7 +8,7 @@
 #pragma once
 
 #include <cstddef>
-#include <string> 
+#include <string>
 
 namespace cudaq::driver {
 

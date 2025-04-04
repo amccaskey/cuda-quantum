@@ -56,9 +56,10 @@ public:
   // load the kernel into controller memory,
   // can perform target-specific compilation.
   virtual handle load_kernel(const std::string &quake);
-  
-  virtual std::vector<std::string> get_callbacks(handle hdl) ;
-  virtual void distribute_symbol_locations(const std::vector<std::string>& locs) ;
+
+  virtual std::vector<std::string> get_callbacks(handle hdl);
+  virtual void
+  distribute_symbol_locations(const std::vector<std::string> &locs);
 
   // launch and return the result data
   virtual std::vector<char> launch_kernel(handle kernelHandle,

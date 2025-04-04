@@ -39,10 +39,10 @@ void __quantum__qis__r1__body(double angle, Qubit *qubit) {
   m_target->apply_opcode("r1", {angle}, {reinterpret_cast<std::size_t>(qubit)});
 }
 
-#define ONE_QUBIT_TEMPLATE(NAME) \
-void QIS_FUNCTION_BODY_NAME(NAME)(Qubit *qubit) { \
-  m_target->apply_opcode(#NAME, {}, {reinterpret_cast<std::size_t>(qubit)});\
-}
+#define ONE_QUBIT_TEMPLATE(NAME)                                               \
+  void QIS_FUNCTION_BODY_NAME(NAME)(Qubit * qubit) {                           \
+    m_target->apply_opcode(#NAME, {}, {reinterpret_cast<std::size_t>(qubit)}); \
+  }
 
 ONE_QUBIT_TEMPLATE(x)
 ONE_QUBIT_TEMPLATE(y)
