@@ -7,7 +7,7 @@
  ******************************************************************************/
 #pragma once
 
-#include "cudaq/driver/channel.h"
+#include "cudaq/driver/controller/channel.h"
 #include "cudaq/driver/controller/quake_compiler.h"
 #include "cudaq/utils/extension_point.h"
 
@@ -48,6 +48,8 @@ public:
                          std::size_t size);
   virtual std::vector<char> memcpy_from(std::size_t handle, std::size_t size);
 
+  virtual void load_callback(const std::string &callbackName, std::size_t devId);
+
   virtual launch_result launch_callback(std::size_t deviceId,
                                         const std::string &funcName,
                                         std::size_t argsHandle);
@@ -62,6 +64,5 @@ public:
 
 void initialize(const std::string &controllerType, int argc, char **argv);
 bool should_stop();
-
 
 } // namespace cudaq::driver

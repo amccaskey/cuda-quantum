@@ -37,6 +37,7 @@ void controller::connect(const std::string &cfgStr) {
   // FIXME add this to the config
   compiler = quake_compiler::get("default_compiler");
   compiler->initialize(config);
+
 }
 
 // Allocate memory on devId. Return a unique handle
@@ -156,11 +157,21 @@ std::vector<char> controller::launch_kernel(std::size_t kernelHandle,
   return retRes;
 }
 
+void controller::load_callback(const std::string& callbackName, std::size_t devId) {
+  auto mlirCode = compiler->get_callback_code(callbackName);
+  communication_channels[devId]->load_callback(callbackName, mlirCode);
+}
+
 launch_result controller::launch_callback(std::size_t devId,
                                           const std::string &funcName,
                                           std::size_t argsHandle) {
   // FIXME check devId is valid
-  return communication_channels[devId]->launch_callback(funcName, argsHandle);
+  auto iter = memory_pool.find(argsHandle);
+  if (iter == memory_pool.end())
+    throw std::runtime_error("Invalid args handle");
+  
+  cudaq::info("WE ARE CALLING THE LAUNCH CALLBACK ON THE CHANNEL ");
+  return communication_channels[devId]->launch_callback(funcName, iter->second);
 }
 
 void initialize(const std::string &controllerType, int argc, char **argv) {
@@ -173,19 +184,29 @@ bool should_stop() { return m_controller->should_stop(); }
 
 extern "C" {
 
-cudaq::KernelThunkResultType __nvqpp__device_callback_run(std::size_t deviceId,
-                                                   const char *funcName,
-                                                   void *args,
-                                                   std::size_t argsSize) {
+// This is the launch proxy when calling a device function from a QPU
+// kernel. The marshaling code will call this function. This function will then
+// call the desired callback function on the host side. The argsBuffer uses the
+// same pointer-free encoding as altLaunchKernel.
+cudaq::KernelThunkResultType
+__nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
+                             cudaq::KernelThunkResultType unmarshalFunc,
+                             void *argsBuffer, std::uint64_t argsBufferSize,
+                             std::uint64_t returnOffset) {
   using namespace cudaq::driver;
-  cudaq::info("classical callback {} {}", std::string(funcName), argsSize);
+  cudaq::info("classical callback func={} args_size={}", std::string(funcName),
+              argsBufferSize);
   // Tell the controller to allocate memory on deviceId
-  auto argsHandle = m_controller->malloc(argsSize, deviceId);
+  auto argsHandle = m_controller->malloc(argsBufferSize, deviceId);
 
   // Send the data to that device pointer across the channel
-  std::vector<char> asVec(static_cast<char *>(args),
-                          static_cast<char *>(args) + argsSize);
-  m_controller->memcpy_to(argsHandle, asVec, argsSize);
+  void * ref = &argsBuffer;
+  std::vector<char> asVec(static_cast<char *>(ref),
+                          static_cast<char *>(ref) + argsBufferSize);
+  m_controller->memcpy_to(argsHandle, asVec, argsBufferSize);
+
+  // Load the callback
+  m_controller->load_callback(funcName, deviceId);
 
   // Launch the callback
   auto [resPtr, errc, errmsg] =

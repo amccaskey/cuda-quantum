@@ -80,10 +80,6 @@ public:
       } else if (auto ccGlobalOp = dyn_cast<cudaq::cc::GlobalOp>(op)) {
         LLVM_DEBUG(llvm::dbgs() << "adding global constants: " << op);
         declarations.push_back(&op);
-      } else if (auto llvmGlobalOp = dyn_cast<LLVM::GlobalOp>(op)) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "adding llvm dialect global constants: " << op);
-        declarations.push_back(&op);
       }
     }
 
@@ -113,7 +109,6 @@ public:
       // called by our cudaq kernel
       // Set of dependent kernels that we've included.
       // Note: the `CallGraphNode` does include 'this' function.
-      StringRef marshalFunc;
       mlir::CallGraphNode *node =
           callGraph.lookupNode(funcOp.getCallableRegion());
       // Iterate over all dependent kernels starting at this node.
@@ -124,20 +119,10 @@ public:
           auto *callableRegion = it->getCallableRegion();
           auto parentFuncOp =
               callableRegion->getParentOfType<mlir::func::FuncOp>();
-          auto name = parentFuncOp.getName();
-          LLVM_DEBUG(llvm::dbgs()
-                     << "  Adding dependent function " << name << '\n');
+          LLVM_DEBUG(llvm::dbgs() << "  Adding dependent function "
+                                  << parentFuncOp->getName() << '\n');
           parentFuncOp.print(strOut, opf);
           strOut << '\n';
-          if (name.startswith("marshal.")) {
-            auto mod = parentFuncOp->getParentOfType<ModuleOp>();
-            std::string unmarshalName = "unmarshal." + name.drop_front(8).str();
-            auto unMarshalOp = mod.lookupSymbol<func::FuncOp>(unmarshalName);
-            if (unMarshalOp) {
-              unMarshalOp.print(strOut, opf);
-              strOut << '\n';
-            }
-          }
         }
       }
 
@@ -163,7 +148,6 @@ public:
         strOut << *op << '\n';
       strOut << "\n}\n" << '\0';
 
-      llvm::errs() << "DEVICE CODE IS THIS:\n" << funcCode << "\n";
       auto devCode = builder.create<LLVM::GlobalOp>(
           loc, cudaq::opt::factory::getStringType(ctx, funcCode.size()),
           /*isConstant=*/true, LLVM::Linkage::Private,
