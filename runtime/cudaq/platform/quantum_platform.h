@@ -237,14 +237,6 @@ streamlinedLaunchKernel(const char *kernelName,
 hybridLaunchKernel(const char *kernelName, KernelThunkType kernel, void *args,
                    std::uint64_t argsSize, std::uint64_t resultOffset,
                    const std::vector<void *> &rawArgs);
-
-// This is the launch proxy when calling a device function from a QPU
-// kernel. The marshaling code will call this function. This function will then
-// call the desired callback function on the host side. The argsBuffer uses the
-// same pointer-free encoding as altLaunchKernel.
-// [[nodiscard]] CallbackResultType __nvqpp__device_callback_run(
-//     const char *callbackName, UnmarshalFuncType unmarshalFunc, void *argsBuffer,
-//     std::uint64_t argsBufferSize, std::uint64_t returnOffset);
 }
 
 } // namespace cudaq

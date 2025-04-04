@@ -9,8 +9,11 @@
 #include "common/Logger.h"
 #include "cudaq/Support/TargetConfig.h"
 
-#include "cudaq/driver/channel.h"
+#include "cudaq/driver/controller/channel.h"
+
+#define CUDAQ_RTTI_DISABLED
 #include "cudaq/utils/cudaq_utils.h"
+#undef CUDAQ_RTTI_DISABLED 
 
 #include "rpc/client.h"
 

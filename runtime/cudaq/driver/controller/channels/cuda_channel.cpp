@@ -7,9 +7,11 @@
  ******************************************************************************/
 
 #include "cudaq/Support/TargetConfig.h"
-#include "cudaq/driver/channel.h"
+#include "cudaq/driver/controller/channel.h"
 
 #include <cuda_runtime.h>
+
+#include <dlfcn.h>
 
 namespace cudaq::driver {
 
@@ -80,6 +82,12 @@ public:
   // launching kernels
   // https://www.perplexity.ai/search/i-have-the-symbol-name-for-my-lV9vIec5Rn.Z1EV7BDItAQ
 
+  launch_result launch_callback(const std::string &funcName,
+                                device_ptr& argsHandle)  override {
+    // auto * h = dlopen("/workspaces/cuda-quantum/build/add.o", RTLD_GLOBAL);
+    // auto * ptr = dlsym(h, funcName );
+    return {};
+  }
   CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, cuda_channel);
 };
 

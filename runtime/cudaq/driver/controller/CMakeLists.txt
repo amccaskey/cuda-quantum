@@ -11,6 +11,8 @@ set(LIBRARY_NAME cudaq-driver-controller)
 add_library(${LIBRARY_NAME} 
   SHARED 
     controller.cpp
+    channels/rpc_controller_channel.cpp 
+    channels/shared_memory.cpp 
     controller_qir_impl.cpp
     controllers/rpc_controller.cpp
     compilers/default_compiler.cpp
@@ -22,12 +24,30 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
 
 target_compile_options(cudaq-driver-controller PRIVATE -fno-rtti)
 
-target_link_libraries(cudaq-driver-controller 
-  PUBLIC 
+
+if (CUDA_FOUND) 
+  target_sources(${LIBRARY_NAME} PRIVATE channels/cuda_channel.cpp)
+
+
+target_link_libraries(${LIBRARY_NAME}
+PRIVATE 
+  rpc 
+  fmt::fmt-header-only 
+  cudaq-common
+  CUDA::cudart_static
+  MLIRIR
+  MLIRPass 
+  MLIRExecutionEngine 
+  CCDialect
+  QuakeDialect
+  OptCodeGen
+  OptTransforms
+  )
+else() 
+target_link_libraries(${LIBRARY_NAME}
   PRIVATE 
     rpc 
     fmt::fmt-header-only 
-    cudaq-driver
     cudaq-common
     MLIRIR
     MLIRPass 
@@ -37,3 +57,4 @@ target_link_libraries(cudaq-driver-controller
     OptCodeGen
     OptTransforms
     )
+  endif()

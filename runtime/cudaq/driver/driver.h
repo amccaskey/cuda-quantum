@@ -7,7 +7,7 @@
  ******************************************************************************/
 #pragma once
 
-#include "channel.h"
+#include "controller/channel.h"
 
 #include <cstddef>
 #include <numeric>

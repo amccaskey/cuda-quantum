@@ -59,8 +59,10 @@ class channel : public data_marshaller, public extension_point<channel> {
 public:
   channel() = default;
   virtual ~channel() = default;
+  virtual void load_callback(const std::string &funcName,
+                             const std::string &unmarshallerCode) {}
   virtual launch_result launch_callback(const std::string &funcName,
-                                        handle argsHandle) const {
+                                        device_ptr &argsHandle) {
     throw std::runtime_error("launch callback not supported on this channel.");
     return {};
   }
