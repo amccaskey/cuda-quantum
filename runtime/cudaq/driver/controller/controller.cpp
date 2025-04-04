@@ -135,6 +135,22 @@ handle controller::load_kernel(const std::string &quake) {
   return compiler->compile(quake);
 }
 
+std::vector<std::string> controller::get_callbacks(handle hdl) {
+  cudaq::info("get_callbacks() requested from controller for kernel {}", hdl);
+
+  auto cbs = compiler->get_callbacks(hdl);
+  std::vector<std::string> ret;
+  for (auto &c : cbs)
+    ret.push_back(c.callbackName);
+  return ret;
+}
+
+void controller::distribute_symbol_locations(
+    const std::vector<std::string> &locs) {
+  for (auto &channel : communication_channels)
+    channel->add_symbol_locations(locs);
+}
+
 // launch and return a handle to the result, -1 if void
 std::vector<char> controller::launch_kernel(handle kernelHandle,
                                             std::size_t argsHandle) {
@@ -147,6 +163,15 @@ std::vector<char> controller::launch_kernel(handle kernelHandle,
   cudaq::info("Launching Kernel {}, args size {}", kernelHandle,
               iter->second.size);
 
+  // Get this kernel's callbacks
+  auto callbacks = compiler->get_callbacks(kernelHandle);
+
+  // Make callback code available to devices
+  for (auto &callback : callbacks)
+    for (auto &channel : communication_channels)
+      channel->load_callback(callback.callbackName,
+                             callback.unmarshalFuncOpCode);
+
   // Launch the kernel
   compiler->launch(kernelHandle, thunkArgs);
 
@@ -154,12 +179,6 @@ std::vector<char> controller::launch_kernel(handle kernelHandle,
   std::vector<char> retRes(iter->second.size);
   std::memcpy(retRes.data(), thunkArgs, iter->second.size);
   return retRes;
-}
-
-void controller::load_callback(const std::string &callbackName,
-                               std::size_t devId) {
-  auto mlirCode = compiler->get_callback_code(callbackName);
-  communication_channels[devId]->load_callback(callbackName, mlirCode);
 }
 
 launch_result controller::launch_callback(std::size_t devId,
@@ -170,7 +189,6 @@ launch_result controller::launch_callback(std::size_t devId,
   if (iter == memory_pool.end())
     throw std::runtime_error("Invalid args handle");
 
-  cudaq::info("WE ARE CALLING THE LAUNCH CALLBACK ON THE CHANNEL ");
   return communication_channels[devId]->launch_callback(funcName, iter->second);
 }
 
@@ -194,13 +212,6 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
                              std::uint64_t argsBufferSize,
                              std::uint64_t returnOffset) {
   using namespace cudaq::driver;
-  struct tt {
-    int i;
-    int j;
-    int k;
-  };
-  auto *asT = reinterpret_cast<tt *>(argsBuffer);
-
   cudaq::info("classical callback func={} args_size={}", std::string(funcName),
               argsBufferSize);
   // Tell the controller to allocate memory on deviceId
@@ -211,19 +222,12 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
                           static_cast<char *>(argsBuffer) + argsBufferSize);
   m_controller->memcpy_to(argsHandle, asVec, argsBufferSize);
 
-  // Load the callback
-  m_controller->load_callback(funcName, deviceId);
-
   // Launch the callback
   auto [resPtr, errc, errmsg] =
       m_controller->launch_callback(deviceId, funcName, argsHandle);
 
-  asT = reinterpret_cast<tt*>(resPtr.data);
-  printf("HOWDY: %d\n", asT->k);
-  
   std::memcpy(argsBuffer, resPtr.data, argsBufferSize);
-  
-  // Return the result
-  return {};//resPtr.data, resPtr.size};
+
+  return {}; 
 }
 }

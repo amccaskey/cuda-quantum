@@ -34,6 +34,8 @@ protected:
   std::unique_ptr<quake_compiler> compiler;
   std::map<intptr_t, device_ptr> memory_pool;
 
+  handle executingKernel;
+
 public:
   virtual void initialize(int argc, char **argv) = 0;
   virtual bool should_stop() = 0;
@@ -48,14 +50,15 @@ public:
                          std::size_t size);
   virtual std::vector<char> memcpy_from(handle handle, std::size_t size);
 
-  virtual void load_callback(const std::string &callbackName, std::size_t devId);
-
   virtual launch_result launch_callback(std::size_t deviceId,
                                         const std::string &funcName,
                                         handle argsHandle);
   // load the kernel into controller memory,
   // can perform target-specific compilation.
   virtual handle load_kernel(const std::string &quake);
+  
+  virtual std::vector<std::string> get_callbacks(handle hdl) ;
+  virtual void distribute_symbol_locations(const std::vector<std::string>& locs) ;
 
   // launch and return the result data
   virtual std::vector<char> launch_kernel(handle kernelHandle,

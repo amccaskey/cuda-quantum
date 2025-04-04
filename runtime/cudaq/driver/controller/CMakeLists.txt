@@ -5,18 +5,26 @@
 # This source code and the accompanying materials are made available under     #
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
+add_subdirectory(compilers)
 
 set(LIBRARY_NAME cudaq-driver-controller) 
 
 add_library(${LIBRARY_NAME} 
   SHARED 
+    # Base library
     controller.cpp
-    channels/rpc_controller_channel.cpp 
-    channels/shared_memory.cpp 
     controller_qir_impl.cpp
+    
+    # Channel Subtypes, Device and Controller
+    channels/controller/rpc_controller_channel.cpp 
+    channels/device/shared_memory.cpp 
+    
+    # Controller Subtypes
     controllers/rpc_controller.cpp
-    compilers/default_compiler.cpp
-    targets/default_target.cpp)
+    
+    # Targets 
+    targets/default_target.cpp
+    )
 
 target_include_directories(${LIBRARY_NAME} PUBLIC 
     $<INSTALL_INTERFACE:include>
@@ -24,37 +32,24 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
 
 target_compile_options(cudaq-driver-controller PRIVATE -fno-rtti)
 
-
 if (CUDA_FOUND) 
-  target_sources(${LIBRARY_NAME} PRIVATE channels/cuda_channel.cpp)
+  target_sources(${LIBRARY_NAME} PRIVATE channels/device/cuda_channel.cpp)
 
-
-target_link_libraries(${LIBRARY_NAME}
-PRIVATE 
-  rpc 
-  fmt::fmt-header-only 
-  cudaq-common
-  CUDA::cudart_static
-  MLIRIR
-  MLIRPass 
-  MLIRExecutionEngine 
-  CCDialect
-  QuakeDialect
-  OptCodeGen
-  OptTransforms
-  )
-else() 
-target_link_libraries(${LIBRARY_NAME}
+  target_link_libraries(${LIBRARY_NAME}
   PRIVATE 
     rpc 
     fmt::fmt-header-only 
     cudaq-common
-    MLIRIR
-    MLIRPass 
-    MLIRExecutionEngine 
-    CCDialect
-    QuakeDialect
-    OptCodeGen
-    OptTransforms
+    CUDA::cudart_static
+    LLVMSupport
+  )
+else() 
+
+  target_link_libraries(${LIBRARY_NAME}
+    PRIVATE 
+      rpc 
+      fmt::fmt-header-only 
+      cudaq-common
+      LLVMSupport
     )
-  endif()
+endif()
