@@ -8,6 +8,8 @@
 #pragma once
 
 #include "common/Logger.h"
+
+#include "cudaq/driver/device_ptr.h"
 #include "cudaq/utils/extension_point.h"
 
 #include <string>
@@ -24,46 +26,26 @@ namespace cudaq::driver {
 static constexpr std::size_t host_qpu_channel_id =
     std::numeric_limits<std::size_t>::max();
 
-struct device_ptr {
-  // The pointer to the data
-  void *data = nullptr;
-  // The size in bytes of the data
-  std::size_t size;
-  // The device ID the data resides on
-  std::size_t deviceId = -1;
-};
-
-// Handle to a remote resource
-using handle = std::size_t;
-using error_code = std::size_t;
-
-struct launch_result {
-  device_ptr result;
-  error_code error;
-  std::string msg;
-};
-
 class data_marshaller {
 public:
   virtual void connect(std::size_t assignedID,
                        const config::TargetConfig &config) = 0;
   virtual device_ptr malloc(std::size_t size, std::size_t devId) = 0;
   virtual void free(device_ptr &d) = 0;
-  virtual void free(std::size_t argsHandle) = 0;
 
   virtual void memcpy(device_ptr &dest, const void *src) = 0;
   virtual void memcpy(void *dest, device_ptr &src) = 0;
 };
 
-class channel : public data_marshaller, public extension_point<channel> {
+class device_channel : public data_marshaller, public extension_point<device_channel> {
 public:
-  channel() = default;
-  virtual ~channel() = default;
+  device_channel() = default;
+  virtual ~device_channel() = default;
   virtual void load_callback(const std::string &funcName,
                              const std::string &unmarshallerCode) {}
   virtual launch_result launch_callback(const std::string &funcName,
                                         device_ptr &argsHandle) {
-    throw std::runtime_error("launch callback not supported on this channel.");
+    throw std::runtime_error("launch callback not supported on this device_channel.");
     return {};
   }
 };

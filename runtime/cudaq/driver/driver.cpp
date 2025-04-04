@@ -7,6 +7,7 @@
  ******************************************************************************/
 
 #include "driver.h"
+#include "controller/channel.h"
 
 #include <memory>
 #include <numeric>
@@ -32,6 +33,12 @@ void initialize(const config::TargetConfig &cfg) {
   // can swap out the host->control channel
   details::host_qpu_channel = controller_channel::get("rpc_controller_channel");
   details::host_qpu_channel->connect(host_qpu_channel_id, cfg);
+}
+
+device_ptr malloc(std::size_t size) {
+  // If devId not equal to driver id, then this is a request to
+  // the driver to allocate the memory on the correct device
+  return details::host_qpu_channel->malloc(size, host_qpu_channel_id);
 }
 
 device_ptr malloc(std::size_t size, std::size_t devId) {
