@@ -30,18 +30,18 @@ void controller::connect(const std::string &cfgStr) {
   for (std::size_t id = 0; auto &device : config.Devices) {
     cudaq::info("controller adding classical connected device with name {}.",
                 device.Name);
-    communication_channels.emplace_back(channel::get(device.Config.Channel));
+    communication_channels.emplace_back(
+        device_channel::get(device.Config.Channel));
     communication_channels.back()->connect(id++, config);
   }
 
   // FIXME add this to the config
   compiler = quake_compiler::get("default_compiler");
   compiler->initialize(config);
-
 }
 
 // Allocate memory on devId. Return a unique handle
-std::size_t controller::malloc(std::size_t size, std::size_t devId) {
+handle controller::malloc(std::size_t size, std::size_t devId) {
   cudaq::info("controller malloc requested. size = {}, devId = {}", size,
               devId);
   device_ptr ptr;
@@ -68,7 +68,7 @@ std::size_t controller::malloc(std::size_t size, std::size_t devId) {
   return uniqueInt;
 }
 
-void controller::free(std::size_t handle) {
+void controller::free(handle handle) {
   cudaq::info("controller deallocating device pointer with handle {}.", handle);
   auto iter = memory_pool.find(handle);
   if (iter == memory_pool.end())
@@ -88,8 +88,7 @@ void controller::free(std::size_t handle) {
 }
 
 // memcpy from driver to host (hence the return)
-std::vector<char> controller::memcpy_from(std::size_t handle,
-                                          std::size_t size) {
+std::vector<char> controller::memcpy_from(handle handle, std::size_t size) {
   auto iter = memory_pool.find(handle);
   if (iter == memory_pool.end())
     throw std::runtime_error("Invalid memcpy handle");
@@ -111,7 +110,7 @@ std::vector<char> controller::memcpy_from(std::size_t handle,
   return result;
 }
 
-void controller::memcpy_to(std::size_t handle, std::vector<char> &data,
+void controller::memcpy_to(handle handle, std::vector<char> &data,
                            std::size_t size) {
   auto iter = memory_pool.find(handle);
   if (iter == memory_pool.end())
@@ -137,7 +136,7 @@ handle controller::load_kernel(const std::string &quake) {
 }
 
 // launch and return a handle to the result, -1 if void
-std::vector<char> controller::launch_kernel(std::size_t kernelHandle,
+std::vector<char> controller::launch_kernel(handle kernelHandle,
                                             std::size_t argsHandle) {
   // Get the arguments from the memory pool
   auto iter = memory_pool.find(argsHandle);
@@ -157,7 +156,8 @@ std::vector<char> controller::launch_kernel(std::size_t kernelHandle,
   return retRes;
 }
 
-void controller::load_callback(const std::string& callbackName, std::size_t devId) {
+void controller::load_callback(const std::string &callbackName,
+                               std::size_t devId) {
   auto mlirCode = compiler->get_callback_code(callbackName);
   communication_channels[devId]->load_callback(callbackName, mlirCode);
 }
@@ -169,7 +169,7 @@ launch_result controller::launch_callback(std::size_t devId,
   auto iter = memory_pool.find(argsHandle);
   if (iter == memory_pool.end())
     throw std::runtime_error("Invalid args handle");
-  
+
   cudaq::info("WE ARE CALLING THE LAUNCH CALLBACK ON THE CHANNEL ");
   return communication_channels[devId]->launch_callback(funcName, iter->second);
 }
@@ -190,19 +190,25 @@ extern "C" {
 // same pointer-free encoding as altLaunchKernel.
 cudaq::KernelThunkResultType
 __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
-                             cudaq::KernelThunkResultType unmarshalFunc,
-                             void *argsBuffer, std::uint64_t argsBufferSize,
+                             void *unmarshalFunc, void *argsBuffer,
+                             std::uint64_t argsBufferSize,
                              std::uint64_t returnOffset) {
   using namespace cudaq::driver;
+  struct tt {
+    int i;
+    int j;
+    int k;
+  };
+  auto *asT = reinterpret_cast<tt *>(argsBuffer);
+
   cudaq::info("classical callback func={} args_size={}", std::string(funcName),
               argsBufferSize);
   // Tell the controller to allocate memory on deviceId
   auto argsHandle = m_controller->malloc(argsBufferSize, deviceId);
 
   // Send the data to that device pointer across the channel
-  void * ref = &argsBuffer;
-  std::vector<char> asVec(static_cast<char *>(ref),
-                          static_cast<char *>(ref) + argsBufferSize);
+  std::vector<char> asVec(static_cast<char *>(argsBuffer),
+                          static_cast<char *>(argsBuffer) + argsBufferSize);
   m_controller->memcpy_to(argsHandle, asVec, argsBufferSize);
 
   // Load the callback
@@ -212,7 +218,12 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
   auto [resPtr, errc, errmsg] =
       m_controller->launch_callback(deviceId, funcName, argsHandle);
 
+  asT = reinterpret_cast<tt*>(resPtr.data);
+  printf("HOWDY: %d\n", asT->k);
+  
+  std::memcpy(argsBuffer, resPtr.data, argsBufferSize);
+  
   // Return the result
-  return {resPtr.data, resPtr.size};
+  return {};//resPtr.data, resPtr.size};
 }
 }

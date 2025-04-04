@@ -30,7 +30,7 @@ namespace cudaq::driver {
 
 class controller : public extension_point<controller> {
 protected:
-  std::vector<std::unique_ptr<channel>> communication_channels;
+  std::vector<std::unique_ptr<device_channel>> communication_channels;
   std::unique_ptr<quake_compiler> compiler;
   std::map<intptr_t, device_ptr> memory_pool;
 
@@ -40,25 +40,25 @@ public:
   virtual void connect(const std::string &cfg);
 
   // Allocate memory on devId. Return a unique handle
-  virtual std::size_t malloc(std::size_t size, std::size_t devId);
+  virtual handle malloc(std::size_t size, std::size_t devId);
   // Free allocated memory
-  virtual void free(std::size_t handle);
+  virtual void free(handle handle);
 
-  virtual void memcpy_to(std::size_t handle, std::vector<char> &data,
+  virtual void memcpy_to(handle handle, std::vector<char> &data,
                          std::size_t size);
-  virtual std::vector<char> memcpy_from(std::size_t handle, std::size_t size);
+  virtual std::vector<char> memcpy_from(handle handle, std::size_t size);
 
   virtual void load_callback(const std::string &callbackName, std::size_t devId);
 
   virtual launch_result launch_callback(std::size_t deviceId,
                                         const std::string &funcName,
-                                        std::size_t argsHandle);
+                                        handle argsHandle);
   // load the kernel into controller memory,
   // can perform target-specific compilation.
   virtual handle load_kernel(const std::string &quake);
 
   // launch and return the result data
-  virtual std::vector<char> launch_kernel(std::size_t kernelHandle,
+  virtual std::vector<char> launch_kernel(handle kernelHandle,
                                           std::size_t argsHandle);
 };
 

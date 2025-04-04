@@ -722,7 +722,7 @@ if ${ENABLE_LOWER_TO_CFG}; then
 	OPT_PASSES=$(add_pass_to_pipeline "${OPT_PASSES}" "expand-measurements,func.func(lower-to-cfg)")
 fi
 if ${RUN_OPT}; then
-	OPT_PASSES=$(add_pass_to_pipeline "${OPT_PASSES}" "distributed-device-call,canonicalize,cse")
+	OPT_PASSES=$(add_pass_to_pipeline "${OPT_PASSES}" "distributed-device-call{magic-unicorn=1},canonicalize,cse")
 fi
 
 # If TARGET_PASS_PIPELINE is set, then use that exact pipeline (while still

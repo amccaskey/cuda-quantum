@@ -16,7 +16,7 @@
 namespace cudaq::driver {
 
 /// @brief The
-class cuda_channel : public channel {
+class cuda_channel : public device_channel {
 protected:
   int cudaDevice = 0;
 
@@ -41,7 +41,7 @@ protected:
   }
 
 public:
-  using channel::channel;
+  using device_channel::device_channel;
 
   void connect(std::size_t assignedID,
                const config::TargetConfig &config) override {
@@ -65,8 +65,6 @@ public:
     runOnCorrectDevice([&]() { cudaFree(d.data); });
   }
 
-  void free(std::size_t argsHandle) override {}
-
   void memcpy(device_ptr &arg, const void *src) override {
     cudaq::info("cuda channel copying data to GPU.");
     runOnCorrectDevice(
@@ -88,7 +86,7 @@ public:
     // auto * ptr = dlsym(h, funcName );
     return {};
   }
-  CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, cuda_channel);
+  CUDAQ_EXTENSION_CREATOR_FUNCTION(device_channel, cuda_channel);
 };
 
 CUDAQ_REGISTER_EXTENSION_TYPE(cuda_channel)

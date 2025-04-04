@@ -165,7 +165,6 @@ public:
   void free(device_ptr &d) override {
     client->call("free", fakePtrsToRemoteHandles[d.data]);
   }
-  void free(std::size_t argsHandle) override {}
 
   // copy to QPU
   void memcpy(device_ptr &src, const void *dst) override {

@@ -13,17 +13,17 @@
 
 #include <dlfcn.h>
 
-INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::channel)
+INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::device_channel)
 INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::controller_channel)
 
 namespace cudaq::driver {
 
-class shared_memory : public channel {
+class shared_memory : public device_channel {
   std::unique_ptr<quake_compiler> unmarshalCompiler;
   std::map<std::string, std::size_t> handles;
 
 public:
-  using channel::channel;
+  using device_channel::device_channel;
 
   void connect(std::size_t assignedID,
                const config::TargetConfig &config) override {
@@ -38,7 +38,6 @@ public:
   }
 
   void free(device_ptr &d) override { std::free(d.data); }
-  void free(std::size_t argsHandle) override {}
 
   void memcpy(device_ptr &arg, const void *src) override {
     cudaq::info("shared memory channel memcpy data {}", arg.size);
@@ -59,24 +58,13 @@ public:
                                 device_ptr &args) override {
     // Here we are given the function name "add"
     // We want to get the "unmarshal.add" function and run it
-    cudaq::info("HELLO WE ARE LAUNCHING {}", funcName);
+    cudaq::info("shared_memory channel launching callback {}", funcName);
     auto handle = handles[funcName];
     unmarshalCompiler->launch_callback(handle, args.data);
-    // auto *handle = dlopen("/workspaces/cuda-quantum/build/a.out", RTLD_LAZY);
-    // if (!handle)
-    //   printf("BAD DLOPEN %s\n", dlerror());
-    // std::string unmarshalName = "unmarshal." + funcName;
-    // auto *symbol = dlsym(handle, unmarshalName.c_str());
-    // const char *error = dlerror();
-    // printf("Error here? %s\n", error);
-    // auto fcn =
-    //     reinterpret_cast<cudaq::CallbackResultType (*)(void *,
-    //     bool)>(symbol);
-    // auto res = fcn(args.data, false);
     return {args, 0, ""};
   }
 
-  CUDAQ_EXTENSION_CREATOR_FUNCTION(channel, shared_memory);
+  CUDAQ_EXTENSION_CREATOR_FUNCTION(device_channel, shared_memory);
 };
 
 CUDAQ_REGISTER_EXTENSION_TYPE(shared_memory)
