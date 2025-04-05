@@ -66,7 +66,7 @@ public:
     // We want to get the "unmarshal.add" function and run it
     cudaq::info("shared_memory channel launching callback {}", funcName);
     auto handle = handles[funcName];
-    unmarshalCompiler->launch_callback(handle, args.data);
+    unmarshalCompiler->launch(handle, args.data);
     return {args, 0, ""};
   }
 

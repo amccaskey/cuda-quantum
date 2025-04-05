@@ -77,6 +77,17 @@ public:
         [&]() { cudaMemcpy(dst, src.data, src.size, cudaMemcpyDeviceToHost); });
   }
 
+  void add_symbol_locations(const std::vector<std::string> &locs) override {
+    printf("IVE BEEN GIVEN THESE SYMBOLS\n");
+    for (auto& v : locs) {
+      printf("%s\n", v.c_str());
+    }
+  }
+
+  /// @brief Load the callback of given name with the given MLIR FuncOp code.
+  void load_callback(const std::string &funcName,
+                     const std::string &unmarshallerCode) override {}
+
   // launching kernels
   // https://www.perplexity.ai/search/i-have-the-symbol-name-for-my-lV9vIec5Rn.Z1EV7BDItAQ
 
