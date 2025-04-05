@@ -16,28 +16,46 @@ class TargetConfig;
 
 namespace cudaq::driver {
 
-struct Callback {
+// A callback is a simple struct to hold the name 
+// of a classical callback in a kernel, and the 
+// MLIR FuncOp code for it.
+struct callback {
   std::string callbackName;
   std::string unmarshalFuncOpCode;
-  std::string getUnmarshalName() { return "unmarshal." + callbackName; }
 };
 
+// The quake_compiler is an extension point for compiling 
+// both Quake kernel code and required callback unmarshal 
+// functions to executable object code
 class quake_compiler : public extension_point<quake_compiler> {
 protected:
+
+  /// @brief The execution target.
   std::unique_ptr<target> m_target;
 
 public:
+  /// @brief Initialize the compiler, give it the target config
   virtual void initialize(const config::TargetConfig &) = 0;
-  virtual std::size_t compile(const std::string &quake) = 0;
-  virtual std::size_t
+  
+  /// @brief Compile the Quake code to executable code and 
+  /// return a handle to the compiled kernel
+  virtual handle compile(const std::string &quake) = 0;
+
+  /// @brief Compile the MLIR code for the unmarshal function 
+  /// for a given classical callback, provide potential external 
+  /// shared library locations to locate callable symbols. Return 
+  /// a handle to the unmarshal functino
+  virtual handle
   compile_unmarshaler(const std::string &mlirCode,
                       const std::vector<std::string> &symbolLocations) = 0;
 
-  virtual std::vector<Callback> get_callbacks(handle moduleHandle) = 0;
-  virtual std::string get_callback_code(const std::string &name) = 0;
-  // Launch the kernel thunk, results are posted to the thunkArgs pointer
-  virtual void launch(std::size_t kernelHandle, void *thunkArgs) = 0;
-  virtual void launch_callback(handle unmarshaller, void *thunkArgs) = 0;
+  /// @brief Return all callbacks required by the kernel/module 
+  /// at the given handle.
+  virtual std::vector<callback> get_callbacks(handle moduleHandle) = 0;
+
+  /// @brief Launch the kernel thunk, results are posted to the thunkArgs pointer
+  virtual void launch(handle moduleHandle, void *thunkArgs) = 0;
+
 };
 
 } // namespace cudaq::driver

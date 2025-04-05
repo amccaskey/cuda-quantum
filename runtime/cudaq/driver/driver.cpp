@@ -29,8 +29,6 @@ namespace details {
 // Has to be the driver_channel subtype
 static std::unique_ptr<controller_channel> host_qpu_channel;
 
-} // namespace details
-
 std::optional<std::string> trace_symbol(const char *name) {
   void *addr = dlsym(RTLD_DEFAULT, name);
   Dl_info info;
@@ -39,6 +37,8 @@ std::optional<std::string> trace_symbol(const char *name) {
 
   return std::nullopt;
 }
+
+} // namespace details
 
 void initialize(const config::TargetConfig &cfg) {
   // setup the host to qpu control communication channel
@@ -77,8 +77,9 @@ handle load_kernel(const std::string &quake) {
   // 2. Extract the library path for those symbols.
   // 3. When compiling the code, lower device_calls to
   //    the marshal/unmarshal intrinsics. Save these in a map
-  // 4. When a callback is invoked, we need to send the
-  //    unmarshal to the other end of the channel and JIT
+  //
+  // When a kernel is launched, we need to send any possible
+  //    unmarshalers to the other end of the channel and JIT
   auto kernelHandle = details::host_qpu_channel->load_kernel(quake);
 
   // get the names of any callbacks in the kernel
@@ -89,7 +90,7 @@ handle load_kernel(const std::string &quake) {
   // where it resides
   std::vector<std::string> symbolLocations;
   for (auto &c : callbackSymbols)
-    if (auto loc = trace_symbol(c.c_str()); loc.has_value()) {
+    if (auto loc = details::trace_symbol(c.c_str()); loc.has_value()) {
       symbolLocations.push_back(loc.value());
       cudaq::info("driver found required callback symbol {} at {}.", c,
                   loc.value());

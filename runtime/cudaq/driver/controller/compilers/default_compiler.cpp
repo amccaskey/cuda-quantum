@@ -29,36 +29,27 @@ using namespace mlir;
 INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::quake_compiler)
 
 namespace cudaq::driver {
+
+/// @brief Set the target on the QIR implementation
 void setTarget(target *);
 
 static std::once_flag mlir_init_flag;
 
+/// @brief A Loaded Module tracks the kernel thunk function name,
+/// the number of required qubits, the MLIR ExecutionEngine, and
+/// invoked callback functions.
 struct LoadedModule {
   std::string thunkName = "";
   std::optional<std::size_t> numRequiredQubits = std::nullopt;
   std::unique_ptr<ExecutionEngine> jitEngine;
-  std::vector<Callback> callbacks;
+  std::vector<callback> callbacks;
 };
 
-struct LoadedKernel {
-  std::string thunkName = "";
-  std::optional<std::size_t> numRequiredQubits = std::nullopt;
-  std::unique_ptr<ExecutionEngine> jitEngine;
-};
-
-struct LoadedUnmarshaler {
-  std::string unmarshalFuncName = "";
-  std::unique_ptr<ExecutionEngine> jitEngine;
-};
 
 class default_compiler : public quake_compiler {
 protected:
   std::unique_ptr<MLIRContext> context;
   std::map<handle, LoadedModule> loadedKernels;
-  std::map<handle, LoadedUnmarshaler> loadedUnmarshalers;
-
-  // Map CallbackName to its FuncOp code string
-  std::map<std::string, std::string> unmarshalFuncOpStrs;
   std::string qirType = "qir-adaptive";
 
   std::string getKernelThunkName(OwningOpRef<ModuleOp> &module) {
@@ -73,7 +64,7 @@ protected:
     return thunkName;
   }
 
-  std::vector<Callback> storeUnmarshalCode(OwningOpRef<ModuleOp> &module) {
+  std::vector<callback> extractCallbacks(OwningOpRef<ModuleOp> &module) {
     std::vector<std::string> unmarshalFuncNames;
     module->walk([&unmarshalFuncNames](func::FuncOp op) {
       if (op.getName().startswith("unmarshal.")) {
@@ -83,7 +74,7 @@ protected:
       return mlir::WalkResult::advance();
     });
 
-    std::vector<Callback> callbacks;
+    std::vector<callback> callbacks;
     for (auto &unmarshalFuncName : unmarshalFuncNames) {
       auto funcOp = module->lookupSymbol<func::FuncOp>(unmarshalFuncName);
       if (!funcOp)
@@ -103,8 +94,6 @@ protected:
         zeroDynRes.print(strOut, opf);
       }
 
-      unmarshalFuncOpStrs.insert(
-          {StringRef(unmarshalFuncName).drop_front(10).str(), funcCode});
 
       callbacks.emplace_back(StringRef(unmarshalFuncName).drop_front(10).str(),
                              funcCode);
@@ -185,7 +174,7 @@ public:
     setTarget(m_target.get());
   }
 
-  std::vector<Callback> get_callbacks(handle moduleHandle) override {
+  std::vector<callback> get_callbacks(handle moduleHandle) override {
     return loadedKernels.at(moduleHandle).callbacks;
   }
 
@@ -230,9 +219,11 @@ public:
       cudaq::info("Failed to create execution engine");
       return 0;
     }
-    loadedUnmarshalers.insert(
-        {nextHandle,
-         LoadedUnmarshaler{unmarshalFuncName, std::move(maybeEngine.get())}});
+
+    loadedKernels.insert({nextHandle, LoadedModule{unmarshalFuncName,
+                                                   std::nullopt,
+                                                   std::move(maybeEngine.get()),
+                                                   {}}});
 
     auto retHandle = nextHandle;
     cudaq::info("Unmarshal Callback loaded successfully with handle: {}",
@@ -265,7 +256,7 @@ public:
     // store the FuncOp code for each. Removes the
     // body of the unmarshal op since we don't
     // execute it here and we don't have the symbols it needs
-    auto callbacks = storeUnmarshalCode(module);
+    auto callbacks = extractCallbacks(module);
 
     // Lower the kernel code to adaptive QIR
     cudaq::opt::addPipelineConvertToQIR(pm, qirType);
@@ -300,18 +291,10 @@ public:
     return retHandle;
   }
 
-  std::string get_callback_code(const std::string &name) override {
-    auto iter = unmarshalFuncOpStrs.find(name);
-    if (iter == unmarshalFuncOpStrs.end())
-      return ""; // what to do here?
-
-    return unmarshalFuncOpStrs[name];
-  }
-
-  void launch(std::size_t kernelHandle, void *thunkArgs) override {
+  void launch(std::size_t moduleHandle, void *thunkArgs) override {
     // Get the loaded kernel.
     auto &[thunkName, numRequiredQubits, execEngine, callbacks] =
-        loadedKernels.at(kernelHandle);
+        loadedKernels.at(moduleHandle);
 
     // Need to tell the target to allocate numRequiredQubits
     if (numRequiredQubits)
@@ -340,29 +323,6 @@ public:
     return;
   }
 
-  void launch_callback(std::size_t kernelHandle, void *thunkArgs) override {
-    // Get the loaded kernel.
-    auto &[thunkName, execEngine] = loadedUnmarshalers.at(kernelHandle);
-
-    // Construct the args
-    KernelThunkResultType res;
-    bool flag = false;
-    auto execEngineResult = mlir::ExecutionEngine::result(res);
-    std::vector<void *> args{&thunkArgs, &flag, &execEngineResult};
-
-    // Invoke the thunk function
-    auto err = execEngine->invokePacked(thunkName, args);
-    if (err) {
-      std::string errorMsg;
-      llvm::raw_string_ostream os(errorMsg);
-      llvm::handleAllErrors(std::move(err),
-                            [&](const llvm::ErrorInfoBase &ei) { ei.log(os); });
-      throw std::runtime_error("Kernel execution failed: " + errorMsg);
-    }
-
-    // potential result is in the thunk args.
-    return;
-  }
   CUDAQ_EXTENSION_CREATOR_FUNCTION(quake_compiler, default_compiler);
 };
 
