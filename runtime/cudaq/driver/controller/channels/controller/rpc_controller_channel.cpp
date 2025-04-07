@@ -102,7 +102,6 @@ namespace cudaq::driver {
 class rpc_controller_channel : public controller_channel {
 protected:
   bool startedLocalServer = false;
-  std::unordered_map<void *, std::size_t> fakePtrsToRemoteHandles;
 
 public:
   using controller_channel::controller_channel;
@@ -151,41 +150,26 @@ public:
 
   device_ptr malloc(std::size_t size, std::size_t devId) override {
     auto result = client->call("malloc", size, devId);
-    std::mt19937 rng(std::time(nullptr));
-    std::uniform_int_distribution<std::size_t> dist(1, 1e12);
-
-    // Allocate memory for an integer
-    auto *random_ptr = new std::size_t(dist(rng));
-    fakePtrsToRemoteHandles.insert(
-        {reinterpret_cast<void *>(random_ptr), result.as<std::size_t>()});
     // need to create some sort of mapping
-    return {random_ptr, size, devId};
+    return {result.as<std::size_t>(), size, devId};
   }
 
-  void free(device_ptr &d) override {
-    client->call("free", fakePtrsToRemoteHandles[d.data]);
-  }
+  void free(device_ptr &d) override { client->call("free", d.handle); }
 
   // copy to QPU
   void memcpy(device_ptr &src, const void *dst) override {
-    auto it = fakePtrsToRemoteHandles.find(src.data);
-    if (it == fakePtrsToRemoteHandles.end())
-      throw std::runtime_error("Invalid device pointer");
-
     auto size = src.size;
     std::vector<char> buffer(size);
     std::memcpy(buffer.data(), dst, size);
-    client->call("memcpy_to", it->second, buffer, size);
+    cudaq::info("RPC Channel calling memcpy_to with {}", src.handle);
+    client->call("memcpy_to", src.handle, buffer, size);
   }
 
   void memcpy(void *dst, device_ptr &src) override {
     // Get remote handle for destination pointer
-    auto it = fakePtrsToRemoteHandles.find(src.data);
-    if (it == fakePtrsToRemoteHandles.end())
-      throw std::runtime_error("Invalid device pointer");
     auto size = src.size;
     std::vector<char> result =
-        client->call("memcpy_from", it->second, size).as<std::vector<char>>();
+        client->call("memcpy_from", src.handle, size).as<std::vector<char>>();
     std::memcpy(dst, result.data(), size);
   }
 
@@ -207,18 +191,11 @@ public:
 
   launch_result launch_kernel(handle kernelHandle,
                               device_ptr &argsHandle) const {
-    auto it = fakePtrsToRemoteHandles.find(argsHandle.data);
-    if (it == fakePtrsToRemoteHandles.end())
-      throw std::runtime_error("Invalid device pointer");
     auto size = argsHandle.size;
-    auto resultData = client->call("launch_kernel", kernelHandle, it->second)
-                          .as<std::vector<char>>();
-
-    device_ptr ptr;
-    ptr.data = std::malloc(resultData.size());
-    ptr.size = resultData.size();
-    std::memcpy(ptr.data, resultData.data(), ptr.size);
-    return {ptr, 0, ""};
+    auto resultData =
+        client->call("launch_kernel", kernelHandle, argsHandle.handle)
+            .as<std::vector<char>>();
+    return {resultData};
   }
 
   ~rpc_controller_channel() {

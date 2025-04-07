@@ -23,6 +23,8 @@ class shared_memory : public device_channel {
   std::map<std::string, std::size_t> handles;
   std::vector<std::string> symbol_locations;
 
+  std::map<handle, void *> local_memory_pool;
+
 public:
   using device_channel::device_channel;
 
@@ -39,17 +41,21 @@ public:
 
   device_ptr malloc(std::size_t size, std::size_t devId) override {
     cudaq::info("shared memory channel allocating data {} {}", size, devId);
-    return {std::malloc(size), size, devId};
+    auto *raw = std::malloc(size);
+    local_memory_pool.insert({reinterpret_cast<uintptr_t>(raw), raw});
+    return {reinterpret_cast<uintptr_t>(raw), size, devId};
   }
 
-  void free(device_ptr &d) override { std::free(d.data); }
+  void free(device_ptr &d) override {
+    std::free(local_memory_pool.at(d.handle));
+  }
 
   void memcpy(device_ptr &arg, const void *src) override {
     cudaq::info("shared memory channel memcpy data {}", arg.size);
-    std::memcpy(arg.data, src, arg.size);
+    std::memcpy(local_memory_pool.at(arg.handle), src, arg.size);
   }
   void memcpy(void *dst, device_ptr &src) override {
-    std::memcpy(dst, src.data, src.size);
+    std::memcpy(dst, local_memory_pool.at(src.handle), src.size);
   }
 
   void load_callback(const std::string &funcName,
@@ -66,8 +72,13 @@ public:
     // We want to get the "unmarshal.add" function and run it
     cudaq::info("shared_memory channel launching callback {}", funcName);
     auto handle = handles[funcName];
-    unmarshalCompiler->launch(handle, args.data);
-    return {args, 0, ""};
+    unmarshalCompiler->launch(handle, local_memory_pool.at(args.handle));
+    // FIXME I'm not sure this is necessary, the
+    // channels are local to the controller, and handle any
+    // remote aspects in an encapsulated way
+    std::vector<char> resVec(args.size);
+    std::memcpy(resVec.data(), local_memory_pool.at(args.handle), args.size);
+    return {resVec};
   }
 
   CUDAQ_EXTENSION_CREATOR_FUNCTION(device_channel, shared_memory);

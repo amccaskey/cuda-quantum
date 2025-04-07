@@ -49,34 +49,34 @@ handle controller::malloc(std::size_t size, std::size_t devId) {
     cudaq::info("allocating data locally on controller.");
     // Malloc is on this memory space
     // allocate the data and return a handle
-    ptr.data = std::malloc(size);
+    auto *raw = std::malloc(size);
+    ptr.handle = reinterpret_cast<uintptr_t>(raw);
     ptr.size = size;
     ptr.deviceId = devId;
+
+    // Store the data here
+    memory_pool.insert({ptr.handle, raw});
   } else {
     cudaq::info("forwarding malloc to device {}", devId);
     ptr = communication_channels[devId]->malloc(size, devId);
   }
 
-  // Get a unique handle
-  auto uniqueInt = reinterpret_cast<intptr_t>(ptr.data);
+  allocated_device_ptrs.insert({ptr.handle, ptr});
 
-  // Store the data here
-  memory_pool.insert({uniqueInt, ptr});
-
-  cudaq::info("return unique handle to allocated data {}.", uniqueInt);
+  cudaq::info("return unique handle to allocated data {}.", ptr.handle);
   // Return the handle
-  return uniqueInt;
+  return ptr.handle;
 }
 
 void controller::free(handle handle) {
   cudaq::info("controller deallocating device pointer with handle {}.", handle);
-  auto iter = memory_pool.find(handle);
-  if (iter == memory_pool.end())
+  auto iter = allocated_device_ptrs.find(handle);
+  if (iter == allocated_device_ptrs.end())
     throw std::runtime_error("invalid data to free");
 
   if (iter->second.deviceId == std::numeric_limits<std::size_t>::max()) {
     cudaq::info("deallocating local controller data");
-    std::free(iter->second.data);
+    std::free(memory_pool.at(iter->first));
     // FIXME delete the device_ptr
     memory_pool.erase(iter->first);
     return;
@@ -89,9 +89,10 @@ void controller::free(handle handle) {
 
 // memcpy from driver to host (hence the return)
 std::vector<char> controller::memcpy_from(handle handle, std::size_t size) {
-  auto iter = memory_pool.find(handle);
-  if (iter == memory_pool.end())
-    throw std::runtime_error("Invalid memcpy handle");
+  auto iter = allocated_device_ptrs.find(handle);
+  if (iter == allocated_device_ptrs.end())
+    throw std::runtime_error("Invalid memcpy handle: " +
+                             std::to_string(handle));
 
   device_ptr &dest = iter->second;
   std::vector<char> result(size);
@@ -102,7 +103,7 @@ std::vector<char> controller::memcpy_from(handle handle, std::size_t size) {
                   : "device " + std::to_string(dest.deviceId));
 
   if (dest.deviceId == std::numeric_limits<std::size_t>::max()) {
-    std::memcpy(result.data(), dest.data, size);
+    std::memcpy(result.data(), memory_pool[handle], size);
   } else {
     communication_channels[dest.deviceId]->memcpy(result.data(), dest);
   }
@@ -112,9 +113,10 @@ std::vector<char> controller::memcpy_from(handle handle, std::size_t size) {
 
 void controller::memcpy_to(handle handle, std::vector<char> &data,
                            std::size_t size) {
-  auto iter = memory_pool.find(handle);
-  if (iter == memory_pool.end())
-    throw std::runtime_error("Invalid memcpy handle");
+  auto iter = allocated_device_ptrs.find(handle);
+  if (iter == allocated_device_ptrs.end())
+    throw std::runtime_error("Invalid memcpy handle: " +
+                             std::to_string(handle));
 
   device_ptr &dest = iter->second;
   cudaq::info("memcpy data with handle {} and size {} to {}.", handle, size,
@@ -123,7 +125,7 @@ void controller::memcpy_to(handle handle, std::vector<char> &data,
                   : "device " + std::to_string(dest.deviceId));
   if (dest.deviceId == std::numeric_limits<std::size_t>::max()) {
     // Local controller copy
-    std::memcpy(dest.data, data.data(), size);
+    std::memcpy(memory_pool[handle], data.data(), size);
   } else {
     // Forward to device's communication channel
     communication_channels[dest.deviceId]->memcpy(dest, data.data());
@@ -158,10 +160,10 @@ std::vector<char> controller::launch_kernel(handle kernelHandle,
   auto iter = memory_pool.find(argsHandle);
   if (iter == memory_pool.end())
     throw std::runtime_error("Invalid args handle");
-  auto *thunkArgs = iter->second.data;
+  auto *thunkArgs = iter->second;
+  auto size = allocated_device_ptrs[argsHandle].size;
 
-  cudaq::info("Launching Kernel {}, args size {}", kernelHandle,
-              iter->second.size);
+  cudaq::info("Launching Kernel {}, args size {}", kernelHandle, size);
 
   // Get this kernel's callbacks
   auto callbacks = compiler->get_callbacks(kernelHandle);
@@ -176,8 +178,8 @@ std::vector<char> controller::launch_kernel(handle kernelHandle,
   compiler->launch(kernelHandle, thunkArgs);
 
   // Return the result data
-  std::vector<char> retRes(iter->second.size);
-  std::memcpy(retRes.data(), thunkArgs, iter->second.size);
+  std::vector<char> retRes(size);
+  std::memcpy(retRes.data(), thunkArgs, size);
   return retRes;
 }
 
@@ -185,8 +187,8 @@ launch_result controller::launch_callback(std::size_t devId,
                                           const std::string &funcName,
                                           std::size_t argsHandle) {
   // FIXME check devId is valid
-  auto iter = memory_pool.find(argsHandle);
-  if (iter == memory_pool.end())
+  auto iter = allocated_device_ptrs.find(argsHandle);
+  if (iter == allocated_device_ptrs.end())
     throw std::runtime_error("Invalid args handle");
 
   return communication_channels[devId]->launch_callback(funcName, iter->second);
@@ -223,11 +225,11 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
   m_controller->memcpy_to(argsHandle, asVec, argsBufferSize);
 
   // Launch the callback
-  auto [resPtr, errc, errmsg] =
+  auto [resPtr, error] =
       m_controller->launch_callback(deviceId, funcName, argsHandle);
 
-  std::memcpy(argsBuffer, resPtr.data, argsBufferSize);
-
+  // handle maybe error
+  std::memcpy(argsBuffer, resPtr.data(), argsBufferSize);
   return {};
 }
 }

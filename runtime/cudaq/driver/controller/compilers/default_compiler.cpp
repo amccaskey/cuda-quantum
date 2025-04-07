@@ -45,7 +45,6 @@ struct LoadedModule {
   std::vector<callback> callbacks;
 };
 
-
 class default_compiler : public quake_compiler {
 protected:
   std::unique_ptr<MLIRContext> context;
@@ -93,7 +92,6 @@ protected:
         strOut << '\n';
         zeroDynRes.print(strOut, opf);
       }
-
 
       callbacks.emplace_back(StringRef(unmarshalFuncName).drop_front(10).str(),
                              funcCode);

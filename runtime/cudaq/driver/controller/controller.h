@@ -45,8 +45,9 @@ protected:
   /// @brief Abstract compiler for mapping Quake code to executable object code.
   std::unique_ptr<quake_compiler> compiler;
 
-  /// @brief Map handles to concrete device_ptrs.
-  std::map<intptr_t, device_ptr> memory_pool;
+  /// @brief Map handles to concrete local data.
+  std::map<intptr_t, void *> memory_pool;
+  std::map<intptr_t, device_ptr> allocated_device_ptrs;
 
 public:
   /// @brief Initialize this controller with command line input

@@ -19,6 +19,7 @@ namespace cudaq::driver {
 class cuda_channel : public device_channel {
 protected:
   int cudaDevice = 0;
+  std::map<std::size_t, void *> local_memory_pool;
 
   template <typename Applicator>
   auto runOnCorrectDevice(const Applicator &applicator)
@@ -56,33 +57,33 @@ public:
       void *ptr = nullptr;
       cudaMalloc(&ptr, size);
       cudaMemset(ptr, 0, size);
-      return {ptr, size, devId};
+      local_memory_pool.insert({reinterpret_cast<intptr_t>(ptr), ptr});
+      return {reinterpret_cast<uintptr_t>(ptr), size, devId};
     });
   }
 
   void free(device_ptr &d) override {
     cudaq::info("cuda channel freeing data.");
-    runOnCorrectDevice([&]() { cudaFree(d.data); });
+    runOnCorrectDevice([&]() { cudaFree(local_memory_pool.at(d.handle)); });
   }
 
   void memcpy(device_ptr &arg, const void *src) override {
     cudaq::info("cuda channel copying data to GPU.");
-    runOnCorrectDevice(
-        [&]() { cudaMemcpy(arg.data, src, arg.size, cudaMemcpyHostToDevice); });
+    runOnCorrectDevice([&]() {
+      cudaMemcpy(local_memory_pool.at(arg.handle), src, arg.size,
+                 cudaMemcpyHostToDevice);
+    });
   }
 
   void memcpy(void *dst, device_ptr &src) override {
     cudaq::info("cuda channel copying data from GPU.");
-    runOnCorrectDevice(
-        [&]() { cudaMemcpy(dst, src.data, src.size, cudaMemcpyDeviceToHost); });
+    runOnCorrectDevice([&]() {
+      cudaMemcpy(dst, local_memory_pool.at(src.handle), src.size,
+                 cudaMemcpyDeviceToHost);
+    });
   }
 
-  void add_symbol_locations(const std::vector<std::string> &locs) override {
-    printf("IVE BEEN GIVEN THESE SYMBOLS\n");
-    for (auto& v : locs) {
-      printf("%s\n", v.c_str());
-    }
-  }
+  void add_symbol_locations(const std::vector<std::string> &locs) override {}
 
   /// @brief Load the callback of given name with the given MLIR FuncOp code.
   void load_callback(const std::string &funcName,

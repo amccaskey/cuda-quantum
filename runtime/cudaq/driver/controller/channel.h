@@ -92,9 +92,6 @@ public:
   controller_channel() = default;
   virtual ~controller_channel() = default;
 
-  /// @brief Load the provided quantum kernel (target-specific JIT compilation)
-  virtual handle load_kernel(const std::string &quake) const = 0;
-
   /// @brief Return the callback function names that the given kernel may
   /// invoke.
   virtual std::vector<std::string> get_callbacks(handle kernelHandle) = 0;
@@ -103,8 +100,11 @@ public:
   /// communication channels.
   virtual void
   distribute_symbol_locations(const std::vector<std::string> &locations) = 0;
-  
-  /// @brief Launch the quantum kernel with given thunk args. 
+
+  /// @brief Load the provided quantum kernel (target-specific JIT compilation)
+  virtual handle load_kernel(const std::string &quake) const = 0;
+
+  /// @brief Launch the quantum kernel with given thunk args.
   virtual launch_result launch_kernel(handle kernelHandle,
                                       device_ptr &argsHandle) const = 0;
 };

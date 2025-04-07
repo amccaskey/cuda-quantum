@@ -22,4 +22,9 @@ Result device_call(DeviceCode &&deviceCode, Args &&...args) {
   return std::invoke(std::move(deviceCode), std::forward<Args>(args)...);
 }
 
+template <typename DeviceCode, typename... Args>
+void device_call(DeviceCode &&deviceCode, Args &&...args) {
+  return std::invoke(std::move(deviceCode), std::forward<Args>(args)...);
+}
+
 } // namespace cudaq

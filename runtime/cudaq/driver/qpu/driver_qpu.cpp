@@ -37,8 +37,11 @@ public:
     auto res = driver::launch_kernel(kernelHandle, argsDevPtr);
     driver::free(argsDevPtr);
 
-    if (res.result.data != nullptr)
-      std::memcpy(args, res.result.data, argsSize);
+    if (res.error)
+      throw std::runtime_error("Error was encountered in launch_kernel: " +
+                               res.error.value());
+    if (!res.data.empty())
+      std::memcpy(args, res.data.data(), argsSize);
     return {};
   }
 
