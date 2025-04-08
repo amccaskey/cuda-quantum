@@ -10,7 +10,6 @@
 #include "cudaq/driver/controller/channel.h"
 #include "cudaq/driver/controller/quake_compiler.h"
 #include "cudaq/utils/extension_point.h"
-
 #include <map>
 
 /// The Controller Interface provides an extension point
@@ -107,3 +106,67 @@ void initialize(const std::string &controllerType, int argc, char **argv);
 bool should_stop();
 
 } // namespace cudaq::driver
+
+#if CUDAQ_USE_STD20
+// This code to create automatic conversions of device_ptr arguments is only
+// available in C++20.
+
+namespace cudaq::details {
+// Concepts to test for device_ptr arguments.
+template <typename T>
+concept DevicePtr =
+    std::same_as<std::decay_t<std::remove_cvref_t<T>>, cudaq::device_ptr>;
+template <typename T>
+concept NotDevicePtr = !DevicePtr<T>;
+
+// Conversion functions.
+template <NotDevicePtr T>
+T convert(T &&t) {
+  return std::forward<T>(t);
+}
+template <NotDevicePtr T>
+T convert(const T &t) {
+  return t;
+}
+
+template <DevicePtr T>
+void *convert(T &&devicePtr) {
+  // FIXME: add code to lookup the pointer from the devicePtr.
+  return nullptr;
+}
+template <DevicePtr T>
+void *convert(const T &devicePtr) {
+  // FIXME: add code to lookup the pointer from the devicePtr.
+  return nullptr;
+}
+
+template <typename Call, typename... Args>
+void gpu_call_dispatcher(Call call, Args... args) {
+  auto tup = std::make_tuple(details::convert<Args>(args)...);
+  return std::apply(call, tup);
+}
+} // namespace cudaq::details
+
+#define AUTOGENERATE_ARGUMENT_CONVERSION(FUN, ...)                             \
+  cudaq::details::gpu_call_dispatcher(FUN, __VA_ARGS__)
+
+/// Users can autogenerate glue code to call a device callback on a GPU using
+/// the above template functions and the `AUTOGENERATE_ARGUMENT_CONVERSION`
+/// macro. This can be done as in the following example.
+
+//   // A CUDA function kernel.
+//   __global__ void my_gpu_function(int value, void* buffer);
+//
+//   // Our device_call trampoline function.
+//   void my_gpu_trampoline(int value, cudaq::device_ptr adaptor) {
+//     AUTOGENERATE_ARGUMENT_CONVERSION(my_gpu_function, value, adaptor);
+//   }
+//
+//   // In our CUDA-Q kernel, we would then use a device_call such as
+//   __qpu__ void quantum_kernel() {
+//     ...
+//     cudaq::device_call(my_gpu_trampoline, 12, myDevPtr);
+//     ...
+//   }
+
+#endif
