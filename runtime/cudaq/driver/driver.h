@@ -46,6 +46,11 @@ void initialize(const config::TargetConfig &config);
 /// controller.
 device_ptr malloc(std::size_t size);
 
+template<typename T> 
+device_ptr malloc() {
+    return malloc(sizeof(T));
+    
+}
 /// @brief Allocate data of the given number of size bytes on the
 /// user-specified classical device. Return a device_ptr.
 device_ptr malloc(std::size_t size, std::size_t deviceId);
