@@ -165,7 +165,8 @@ void gpu_call_dispatcher(Call call, Args... args) {
 //   // In our CUDA-Q kernel, we would then use a device_call such as
 //   __qpu__ void quantum_kernel() {
 //     ...
-//     cudaq::device_call(my_gpu_trampoline, 12, myDevPtr);
+//     cudaq::device_call<numBlocks, threadsPerBlock>(
+//                        my_gpu_trampoline, 12, myDevPtr);
 //     ...
 //   }
 
