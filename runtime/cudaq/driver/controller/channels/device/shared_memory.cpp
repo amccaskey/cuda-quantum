@@ -35,7 +35,7 @@ public:
     unmarshalCompiler->initialize(config);
   }
 
-  void add_symbol_locations(const std::vector<std::string> &locs) {
+  void add_symbol_locations(const std::vector<std::string> &locs) override {
     symbol_locations = locs;
   }
 

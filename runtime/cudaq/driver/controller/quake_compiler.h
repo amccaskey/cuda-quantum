@@ -33,6 +33,8 @@ protected:
   std::unique_ptr<target> m_target;
 
 public:
+  virtual ~quake_compiler() {}
+
   /// @brief Initialize the compiler, give it the target config
   virtual void initialize(const config::TargetConfig &) = 0;
 

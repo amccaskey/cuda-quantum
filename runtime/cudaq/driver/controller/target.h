@@ -17,6 +17,8 @@ namespace cudaq::driver {
 
 class target : public extension_point<target> {
 public:
+  virtual ~target() {}
+
   virtual void initialize(const config::TargetConfig &) = 0;
 
   // loading calibrated waveforms?

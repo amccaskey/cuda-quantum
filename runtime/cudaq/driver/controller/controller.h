@@ -49,6 +49,8 @@ protected:
   std::map<intptr_t, device_ptr> allocated_device_ptrs;
 
 public:
+  virtual ~controller() {}
+
   /// @brief Initialize this controller with command line input
   virtual void initialize(int argc, char **argv) = 0;
 
