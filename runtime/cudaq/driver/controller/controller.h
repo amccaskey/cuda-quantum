@@ -84,11 +84,6 @@ public:
   /// callback functions it may invoke.
   virtual std::vector<std::string> get_callbacks(handle hdl);
 
-  /// @brief Take host-side shared library paths and distribute them to
-  /// classical devices over the communication channels.
-  virtual void
-  distribute_symbol_locations(const std::vector<std::string> &locs);
-
   /// @brief Load the kernel into controller memory and perform target-specific
   /// compilation.
   virtual handle load_kernel(const std::string &quake);

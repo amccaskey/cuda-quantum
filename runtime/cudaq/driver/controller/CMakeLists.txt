@@ -17,10 +17,13 @@ add_library(${LIBRARY_NAME}
     
     # Channel Subtypes, Device and Controller
     channels/controller/rpc_controller_channel.cpp 
+    channels/controller/shared_memory_channel.cpp
     channels/device/shared_memory.cpp 
+    channels/device/rpc_channel.cpp
     
     # Controller Subtypes
     controllers/rpc_controller.cpp
+    controllers/shared_memory_controller.cpp
     
     # Targets 
     targets/default_target.cpp
@@ -53,3 +56,5 @@ else()
       LLVMSupport
     )
 endif()
+
+add_subdirectory(channels/device/daemons)

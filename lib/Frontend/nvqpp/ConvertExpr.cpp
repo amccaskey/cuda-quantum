@@ -314,6 +314,13 @@ static SmallVector<Value> convertKernelArgs(OpBuilder &builder, Location loc,
             result.push_back(builder.create<cudaq::cc::CastOp>(loc, kPtrTy, v));
             continue;
           }
+
+      if (auto vStructTy = dyn_cast<cudaq::cc::StructType>(eleTy)) {
+        if (vStructTy.getName().getValue().equals("device_ptr")) {
+          result.push_back(v);
+          continue;
+        }
+      }
     }
     if (auto vVecTy = dyn_cast<quake::VeqType>(vTy))
       if (auto kVecTy = dyn_cast<quake::VeqType>(kTy)) {
@@ -325,6 +332,7 @@ static SmallVector<Value> convertKernelArgs(OpBuilder &builder, Location loc,
           continue;
         }
       }
+
     LLVM_DEBUG(llvm::dbgs() << "convert: " << v << "\nto:" << kTy << '\n');
     TODO_loc(loc, "argument type conversion");
   }

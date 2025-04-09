@@ -327,6 +327,9 @@ void MappingTraits<cudaq::config::DeviceConfigEntry>::mapping(
     IO &io, cudaq::config::DeviceConfigEntry &info) {
   io.mapRequired("channel", info.Channel);
   io.mapOptional("cuda_device", info.CudaDevice);
+  io.mapOptional("channel-ip", info.ChannelIP);
+  io.mapOptional("channel-port", info.ChannelPort);
+  io.mapOptional("exposed-libraries", info.ExposedLibraries);
 }
 
 void MappingTraits<cudaq::config::BackendFeatureMap>::mapping(
@@ -347,6 +350,7 @@ void MappingTraits<cudaq::config::TargetConfig>::mapping(
   io.mapOptional("config", info.BackendConfig);
   io.mapOptional("configuration-matrix", info.ConfigMap);
   io.mapOptional("devices", info.Devices);
+  io.mapOptional("host-control-channel", info.HostControlChannel);
   io.mapOptional("controller-ip", info.ControllerIP);
   io.mapOptional("controller-port", info.ControllerPort);
 }

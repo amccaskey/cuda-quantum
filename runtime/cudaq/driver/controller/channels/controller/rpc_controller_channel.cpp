@@ -10,6 +10,7 @@
 #include "cudaq/Support/TargetConfig.h"
 
 #include "cudaq/driver/controller/channel.h"
+#include "cudaq/driver/controller/utils/process.h"
 
 #define CUDAQ_RTTI_DISABLED
 #include "cudaq/utils/cudaq_utils.h"
@@ -21,70 +22,6 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-
-std::pair<pid_t, std::string> launchProcess(const char *command) {
-  // Create temporary files for storing stdout and stderr
-  char tempStdout[] = "/tmp/stdout_XXXXXX";
-  char tempStderr[] = "/tmp/stderr_XXXXXX";
-
-  int fdOut = mkstemp(tempStdout);
-  int fdErr = mkstemp(tempStderr);
-
-  if (fdOut == -1 || fdErr == -1) {
-    throw std::runtime_error("Failed to create temporary files");
-  }
-
-  // Construct command to redirect both stdout and stderr to temporary files
-  std::string argString = std::string(command) + " 1>" + tempStdout + " 2>" +
-                          tempStderr + " & echo $!";
-
-  // Launch the process
-  FILE *pipe = popen(argString.c_str(), "r");
-  if (!pipe) {
-    close(fdOut);
-    close(fdErr);
-    unlink(tempStdout);
-    unlink(tempStderr);
-    throw std::runtime_error("Error launching process: " +
-                             std::string(command));
-  }
-
-  // Read PID
-  char buffer[128];
-  std::string pidStr = "";
-  while (!feof(pipe)) {
-    if (fgets(buffer, 128, pipe) != nullptr)
-      pidStr += buffer;
-  }
-  pclose(pipe);
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  // Read any error output
-  std::string errorOutput;
-  FILE *errorFile = fopen(tempStderr, "r");
-  if (errorFile) {
-    while (fgets(buffer, 128, errorFile) != nullptr) {
-      errorOutput += buffer;
-    }
-    fclose(errorFile);
-  }
-
-  // Clean up temporary files
-  close(fdOut);
-  close(fdErr);
-  unlink(tempStdout);
-  unlink(tempStderr);
-
-  // Convert PID string to integer
-  pid_t pid = 0;
-  try {
-    pid = std::stoi(pidStr);
-  } catch (const std::exception &e) {
-    throw std::runtime_error("Failed to get process ID: " + errorOutput);
-  }
-
-  return std::make_pair(pid, errorOutput);
-}
 
 bool is_server_available() {
   try {
@@ -117,10 +54,7 @@ public:
     auto port = config.ControllerPort.value_or(8080);
 
     if (!config.ControllerIP) {
-      std::filesystem::path libPath{cudaq::getCUDAQLibraryPath()};
-      auto cudaqLibPath = libPath.parent_path();
-      auto cudaqControllerTool =
-          cudaqLibPath.parent_path() / "bin" / "cudaq-controller";
+      auto cudaqControllerTool = cudaq::driver::getCUDAQControllerPath();
       auto argString = cudaqControllerTool.string();
 
       auto [ret, msg] = launchProcess(argString.c_str());
@@ -182,11 +116,6 @@ public:
   std::vector<std::string> get_callbacks(handle kernelHandle) override {
     return client->call("get_callbacks", kernelHandle)
         .as<std::vector<std::string>>();
-  }
-
-  void
-  distribute_symbol_locations(const std::vector<std::string> &locs) override {
-    client->call("distribute_symbol_locations", locs);
   }
 
   launch_result launch_kernel(handle kernelHandle,

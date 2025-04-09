@@ -33,10 +33,13 @@ public:
     cudaq::info("shared_memory channel connected.");
     unmarshalCompiler = quake_compiler::get("default_compiler");
     unmarshalCompiler->initialize(config);
-  }
 
-  void add_symbol_locations(const std::vector<std::string> &locs) override {
-    symbol_locations = locs;
+    symbol_locations =
+        config.Devices[assignedID].Config.ExposedLibraries.value_or(
+            std::vector<std::string>{});
+    printf("EXPOSED:\n");
+    for (auto &s : symbol_locations)
+      printf("TEST: %s\n", s.c_str());
   }
 
   device_ptr malloc(std::size_t size, std::size_t devId) override {

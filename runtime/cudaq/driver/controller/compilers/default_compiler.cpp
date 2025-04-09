@@ -31,7 +31,7 @@ INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::quake_compiler)
 namespace cudaq::driver {
 
 /// @brief Set the target on the QIR implementation
-void setTarget(target *);
+extern void setTarget(target *);
 
 static std::once_flag mlir_init_flag;
 

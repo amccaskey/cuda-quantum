@@ -103,6 +103,9 @@ struct BackendEndConfigEntry {
 struct DeviceConfigEntry {
   std::string Channel;
   std::optional<int> CudaDevice;
+  std::optional<std::string> ChannelIP;
+  std::optional<int> ChannelPort;
+  std::optional<std::vector<std::string>> ExposedLibraries;
 };
 
 /// Feature option mapping for NVIDIA target.
@@ -146,6 +149,7 @@ struct TargetConfig {
   /// Additional configuration mapping (if this is a multi-configuration target)
   std::vector<BackendFeatureMap> ConfigMap;
   std::vector<DeviceConfig> Devices;
+  std::optional<std::string> HostControlChannel;
   std::optional<std::string> ControllerIP;
   std::optional<int> ControllerPort;
 };

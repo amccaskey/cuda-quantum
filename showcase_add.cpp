@@ -53,7 +53,7 @@
 //
 // CUDAQ_LOG_LEVEL=info ./a.out
 
-extern "C" int add(int i, int j);
+extern "C" int add(int i, int j) {return 0;}
 
 __qpu__ auto test() {
   cudaq::qubit q;

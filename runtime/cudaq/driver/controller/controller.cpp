@@ -17,7 +17,13 @@ INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::controller)
 namespace cudaq::driver {
 
 // The concrete controller.
-std::unique_ptr<controller> m_controller;
+std::unique_ptr<controller, void (*)(controller *)>
+    m_controller(nullptr, [](controller *) {});
+
+void set_controller_caller_retains_ownership(controller *c) {
+  m_controller = std::unique_ptr<controller, void (*)(controller *)>(
+      c, [](controller *cc) {});
+}
 
 void controller::connect(const std::string &cfgStr) {
   // parse back to target yaml
@@ -147,12 +153,6 @@ std::vector<std::string> controller::get_callbacks(handle hdl) {
   return ret;
 }
 
-void controller::distribute_symbol_locations(
-    const std::vector<std::string> &locs) {
-  for (auto &channel : communication_channels)
-    channel->add_symbol_locations(locs);
-}
-
 // launch and return a handle to the result, -1 if void
 std::vector<char> controller::launch_kernel(handle kernelHandle,
                                             std::size_t argsHandle) {
@@ -195,7 +195,9 @@ launch_result controller::launch_callback(std::size_t devId,
 }
 
 void initialize(const std::string &controllerType, int argc, char **argv) {
-  m_controller = controller::get(controllerType);
+  m_controller = std::unique_ptr<controller, void (*)(controller *)>(
+      controller::get(controllerType).release(),
+      [](controller *c) { delete c; });
   m_controller->initialize(argc, argv);
 }
 
@@ -231,5 +233,9 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
   // handle maybe error
   std::memcpy(argsBuffer, resPtr.data(), argsBufferSize);
   return {};
+}
+void *__nvqpp__callback_get_raw_ptr(cudaq::device_ptr *p) {
+  printf("we are here22 %lu %lu %lu\n", p->handle, p->deviceId, p->size);
+  return nullptr;
 }
 }

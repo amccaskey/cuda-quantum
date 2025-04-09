@@ -23,7 +23,7 @@ int main() {
   }
 
   {
-    // allocate data and set the data
+    // allocate data and set the data on the controller
     double value = 2.2;
     auto devPtr = driver::malloc(sizeof(double));
     driver::memcpy(devPtr, &value);
@@ -36,7 +36,7 @@ int main() {
   }
 
   {
-    // Allocate data on the GPU device (device 0)
+    // Allocate data on the 0th device
     // Host is not connected to this device, but the
     // controller is and will forward the request
     auto gpuDevPtr = driver::malloc(sizeof(double), 0);
@@ -44,7 +44,7 @@ int main() {
   }
 
   {
-    // Allocate data on the GPU device (device 0)
+    // Allocate data on the 0th device
     // Host is not connected to this device, but the
     // controller is and will forward the request
     auto gpuDevPtr = driver::malloc(sizeof(double), 0);
@@ -59,7 +59,7 @@ int main() {
   }
 
   {
-    // Allocate data on the GPU device (device 0)
+    // Allocate data on the 0th device 
     // Host is not connected to this device, but the
     // controller is and will forward the request
     auto gpuDevPtr = driver::malloc(sizeof(double), 1);

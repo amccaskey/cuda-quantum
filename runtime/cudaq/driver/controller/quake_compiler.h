@@ -7,6 +7,7 @@
  ******************************************************************************/
 #pragma once
 
+#include "cudaq/driver/device_ptr.h"
 #include "cudaq/driver/controller/target.h"
 #include "cudaq/utils/extension_point.h"
 

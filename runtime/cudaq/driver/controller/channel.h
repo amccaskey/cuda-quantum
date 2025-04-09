@@ -26,11 +26,11 @@ namespace cudaq::driver {
 static constexpr std::size_t host_qpu_channel_id =
     std::numeric_limits<std::size_t>::max();
 
-/// @brief The data_marshaller exposes a simple interface for
+/// @brief The memory_manager exposes a simple interface for
 /// data movement across devices (device_ptrs). Implementations of this provide
 /// concrete mechanisms for allocating and deallocating data,
 /// and copying values to and from.
-class data_marshaller {
+class memory_manager {
 public:
   /// @brief Connect to the process / memory space where
   /// the data should live.
@@ -64,14 +64,11 @@ public:
 /// concrete communication channels from the QPU controller.
 /// device_channels are also responsible for one-time load / JIT
 /// of classical callbacks and invoking those callbacks.
-class device_channel : public data_marshaller,
+class device_channel : public memory_manager,
                        public extension_point<device_channel> {
 public:
   device_channel() = default;
   virtual ~device_channel() = default;
-
-  /// @brief Receive known symbol locations (library paths) from the controller.
-  virtual void add_symbol_locations(const std::vector<std::string> &) = 0;
 
   /// @brief Load the callback of given name with the given MLIR FuncOp code.
   virtual void load_callback(const std::string &funcName,
@@ -86,7 +83,7 @@ public:
 /// to model data movement from host to QPU control. Moreover, it
 /// exposes an API for loading and launching CUDA-Q quantum kernels, and
 /// retrieving available callback function names.
-class controller_channel : public data_marshaller,
+class controller_channel : public memory_manager,
                            public extension_point<controller_channel> {
 public:
   controller_channel() = default;
@@ -95,11 +92,6 @@ public:
   /// @brief Return the callback function names that the given kernel may
   /// invoke.
   virtual std::vector<std::string> get_callbacks(handle kernelHandle) = 0;
-
-  /// @brief Distribute symbol locations to available devices via controller
-  /// communication channels.
-  virtual void
-  distribute_symbol_locations(const std::vector<std::string> &locations) = 0;
 
   /// @brief Load the provided quantum kernel (target-specific JIT compilation)
   virtual handle load_kernel(const std::string &quake) const = 0;

@@ -83,8 +83,6 @@ public:
     });
   }
 
-  void add_symbol_locations(const std::vector<std::string> &locs) override {}
-
   /// @brief Load the callback of given name with the given MLIR FuncOp code.
   void load_callback(const std::string &funcName,
                      const std::string &unmarshallerCode) override {}

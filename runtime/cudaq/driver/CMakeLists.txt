@@ -23,5 +23,5 @@ target_include_directories(${LIBRARY_NAME} PUBLIC
   target_link_libraries(cudaq-driver 
     PUBLIC cudaq-driver-controller
     PRIVATE 
-      fmt::fmt-header-only LLVMSupport rpc
+      fmt::fmt-header-only 
   )

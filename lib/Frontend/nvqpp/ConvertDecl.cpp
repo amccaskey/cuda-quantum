@@ -169,7 +169,8 @@ bool QuakeBridgeVisitor::interceptRecordDecl(clang::RecordDecl *x) {
       auto fnTy = cast<FunctionType>(popType());
       return pushType(cc::IndirectCallableType::get(fnTy));
     }
-    if (!isInNamespace(x, "solvers") && !isInNamespace(x, "qec")) {
+    if (!isInNamespace(x, "solvers") && !isInNamespace(x, "qec") &&
+        !isInNamespace(x, "driver")) {
       auto loc = toLocation(x);
       TODO_loc(loc, "unhandled type, " + name + ", in cudaq namespace");
     }
