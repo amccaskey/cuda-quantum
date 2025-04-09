@@ -305,7 +305,6 @@ public:
     auto module = devFunc->getParentOfType<ModuleOp>();
     auto newDevFuncTy = cudaq::opt::factory::toHostSideFuncType(
         devFuncTy, /*addThisPtr=*/false, module);
-    llvm::errs() << newDevFuncTy << '\n' << devFuncTy << '\n';
     std::size_t offset = 0;
     for (auto iter : llvm::enumerate(devFuncTy.getInputs())) {
       auto [a, t] = cudaq::opt::marshal::processCallbackInputValue(
