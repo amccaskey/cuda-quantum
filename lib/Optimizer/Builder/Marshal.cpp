@@ -518,17 +518,22 @@ Value populateStringAddendum(Location loc, OpBuilder &builder, Value host,
   Value size = genStringLength<FromQPU>(loc, builder, host, module);
   builder.create<cudaq::cc::StoreOp>(loc, size, sizeSlot);
   auto ptrI8Ty = cudaq::cc::PointerType::get(builder.getI8Type());
-  auto fromPtr = builder.create<cudaq::cc::CastOp>(loc, ptrI8Ty, host);
-  StringRef helperName = module->getAttr(cudaq::runtime::sizeofStringAttrName)
-                             ? cudaq::runtime::getPauliWordData
-                             : cudaq::runtime::bindingGetStringData;
-  auto dataPtr = builder.create<func::CallOp>(loc, ptrI8Ty, helperName,
-                                              ValueRange{fromPtr});
+  Value dataPtr;
+  if constexpr (FromQPU) {
+    dataPtr = builder.create<cudaq::cc::StdvecDataOp>(loc, ptrI8Ty, host);
+  } else /*constexpr*/ {
+    auto fromPtr = builder.create<cudaq::cc::CastOp>(loc, ptrI8Ty, host);
+    StringRef helperName = module->getAttr(cudaq::runtime::sizeofStringAttrName)
+                               ? cudaq::runtime::getPauliWordData
+                               : cudaq::runtime::bindingGetStringData;
+    auto call = builder.create<func::CallOp>(loc, ptrI8Ty, helperName,
+                                             ValueRange{fromPtr});
+    dataPtr = call.getResult(0);
+  }
   auto notVolatile = builder.create<arith::ConstantIntOp>(loc, 0, 1);
   auto toPtr = builder.create<cudaq::cc::CastOp>(loc, ptrI8Ty, addendum);
-  builder.create<func::CallOp>(
-      loc, std::nullopt, cudaq::llvmMemCopyIntrinsic,
-      ValueRange{toPtr, dataPtr.getResult(0), size, notVolatile});
+  builder.create<func::CallOp>(loc, std::nullopt, cudaq::llvmMemCopyIntrinsic,
+                               ValueRange{toPtr, dataPtr, size, notVolatile});
   auto ptrI8Arr = getByteAddressableType(builder);
   auto addBytes = builder.create<cudaq::cc::CastOp>(loc, ptrI8Arr, addendum);
   return builder.create<cudaq::cc::ComputePtrOp>(
@@ -947,6 +952,20 @@ std::pair<Value, Value>
 constructDynamicInputValue(Location loc, OpBuilder &builder, Type devTy,
                            Value ptr, Value trailingData) {
   assert(cudaq::cc::isDynamicType(devTy) && "must be dynamic type");
+  if constexpr (FromQPU) {
+    if (auto charSpanTy = dyn_cast<cudaq::cc::CharspanType>(devTy)) {
+      // From host, so construct the stdvec span with it.
+      auto eleTy = charSpanTy.getElementType();
+      auto castTrailingData = builder.create<cudaq::cc::CastOp>(
+          loc, cudaq::cc::PointerType::get(eleTy), trailingData);
+      Value vecLength = builder.create<cudaq::cc::LoadOp>(loc, ptr);
+      auto result = builder.create<cudaq::cc::StdvecInitOp>(
+          loc, charSpanTy, castTrailingData, vecLength);
+      auto nextTrailingData =
+	 incrementTrailingDataPointer(loc, builder, trailingData, vecLength);
+      return {result, nextTrailingData};
+    }
+  }
   // There are 2 cases.
   // 1. The dynamic type is a std::span of any legal device argument type.
   // 2. The dynamic type is a struct containing at least 1 std::span.
@@ -1103,10 +1122,26 @@ processInputValueImpl(Location loc, OpBuilder &builder, Value trailingData,
     if constexpr (FromQPU) {
       auto dynamo = constructDynamicInputValue<FromQPU>(
           loc, builder, inTy, packedPtr, trailingData);
-      if (isa<cudaq::cc::SpanLikeType>(inTy)) {
+      if (isa<cudaq::cc::StdvecType>(inTy)) {
         Value retVal = dynamo.first;
         Value tmp = builder.create<cudaq::cc::AllocaOp>(loc, retVal.getType());
         builder.create<cudaq::cc::StoreOp>(loc, retVal, tmp);
+        return {tmp, dynamo.second};
+      }
+      if (isa<cudaq::cc::CharspanType>(inTy)) {
+        auto module = packedPtr->getParentOfType<ModuleOp>();
+        auto arrTy = cudaq::opt::factory::genHostStringType(module);
+        Value retVal = dynamo.first;
+        Value tmp = builder.create<cudaq::cc::AllocaOp>(loc, arrTy);
+        auto ptrTy = cudaq::cc::PointerType::get(builder.getI8Type());
+        Value castTmp = builder.create<cudaq::cc::CastOp>(loc, ptrTy, tmp);
+        Value len = builder.create<cudaq::cc::StdvecSizeOp>(
+            loc, builder.getI64Type(), dynamo.first);
+        Value data =
+            builder.create<cudaq::cc::StdvecDataOp>(loc, ptrTy, dynamo.first);
+        builder.create<func::CallOp>(loc, TypeRange{},
+                                     cudaq::runtime::bindingInitializeString,
+                                     ArrayRef<Value>{castTmp, data, len});
         return {tmp, dynamo.second};
       }
       return dynamo;

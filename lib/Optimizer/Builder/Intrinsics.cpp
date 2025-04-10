@@ -322,6 +322,10 @@ static constexpr IntrinsicCode intrinsicTable[] = {
   func.func private @__nvqpp_cudaq_state_numberOfQubits(%p : !cc.ptr<!quake.state>) -> i64
   )#"},
 
+    {cudaq::runtime::bindingDeconstructString,
+     {},
+     "func.func private @__nvqpp_deconstructString(!cc.ptr<i8>)"},
+
     {"__nvqpp_getStateVectorData_fp32", {}, R"#(
   func.func private @__nvqpp_getStateVectorData_fp32(%p : i64, %o : i64) -> !cc.ptr<complex<f32>>
   )#"},
@@ -347,6 +351,11 @@ static constexpr IntrinsicCode intrinsicTable[] = {
     {cudaq::runtime::bindingGetStringSize,
      {},
      "func.func private @__nvqpp_getStringSize(%p: !cc.ptr<i8>) -> i64"},
+
+    {cudaq::runtime::bindingInitializeString,
+     {},
+     "func.func private @__nvqpp_initializeStringFromSpan(!cc.ptr<i8>, "
+     "!cc.ptr<i8>, i64)"},
 
     // __nvqpp_initializer_list_to_vector_bool
     {cudaq::stdvecBoolCtorFromInitList,

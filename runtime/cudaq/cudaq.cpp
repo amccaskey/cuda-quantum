@@ -525,5 +525,21 @@ void __nvqpp_vector_bool_free_temporary_initlists(
 /// should not be a compatibility issue.
 const char *__nvqpp_getStringData(const std::string &s) { return s.data(); }
 std::uint64_t __nvqpp_getStringSize(const std::string &s) { return s.size(); }
+
+void __nvqpp_initializeStringFromSpan(std::string &s, const char *data,
+                                      std::uint64_t length) {
+  // s is an uninitialized stack slot. Set it to 0.
+  std::memset(&s, 0, sizeof(std::string));
+  // Use ctor to build a string.
+  std::string newStr{data, length};
+  // Swap their innards.
+  std::swap(s, newStr);
+}
+
+void __nvqpp_deconstructString(std::string &s) {
+   // Reclaim the storage of the string object.
+   std::string empty;
+   std::swap(s, empty);
+}
 }
 } // namespace cudaq::support

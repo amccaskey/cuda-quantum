@@ -306,10 +306,14 @@ public:
     auto newDevFuncTy = cudaq::opt::factory::toHostSideFuncType(
         devFuncTy, /*addThisPtr=*/false, module);
     std::size_t offset = 0;
+    SmallVector<Value> stringArgs;
     for (auto iter : llvm::enumerate(devFuncTy.getInputs())) {
       auto [a, t] = cudaq::opt::marshal::processCallbackInputValue(
           loc, rewriter, trailingData, argsBuffer, iter.value(), iter.index(),
           bufferTy);
+      // Save any strings, as we need to deconstruct them after the call.
+      if (isa<cudaq::cc::CharspanType>(iter.value()))
+        stringArgs.push_back(a);
       trailingData = t;
       if (auto strTy = dyn_cast<cudaq::cc::StructType>(iter.value())) {
         if (cudaq::opt::factory::isX86_64(module) &&
@@ -338,6 +342,14 @@ public:
 
     auto callDevFunc = rewriter.create<func::CallOp>(
         loc, newDevFuncTy.getResults(), devFunc.getName(), args);
+
+    // Deconstruct any strings.
+    for (Value v : stringArgs) {
+      Value cast = rewriter.create<cudaq::cc::CastOp>(loc, ptrTy, v);
+      rewriter.create<func::CallOp>(loc, TypeRange{},
+                                    cudaq::runtime::bindingDeconstructString,
+                                    ValueRange{cast});
+    }
 
     // If the device function has a return value, then store it to the result
     // space in the buffer.
@@ -446,6 +458,18 @@ public:
     if (failed(irBuilder.loadIntrinsic(module, cudaq::llvmMemCopyIntrinsic))) {
       module.emitError(std::string("could not load ") +
                        cudaq::llvmMemCopyIntrinsic);
+      return;
+    }
+    if (failed(irBuilder.loadIntrinsic(
+            module, cudaq::runtime::bindingInitializeString))) {
+      module.emitError(std::string("could not load ") +
+                       cudaq::runtime::bindingInitializeString);
+      return;
+    }
+    if (failed(irBuilder.loadIntrinsic(
+            module, cudaq::runtime::bindingDeconstructString))) {
+      module.emitError(std::string("could not load ") +
+                       cudaq::runtime::bindingDeconstructString);
       return;
     }
 
