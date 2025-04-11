@@ -7,7 +7,7 @@
  ******************************************************************************/
 #pragma once
 
-#include "channel.h"
+#include "device_ptr.h"
 
 #include <cstddef>
 #include <numeric>
@@ -46,9 +46,10 @@ void initialize(const config::TargetConfig &config);
 /// controller.
 device_ptr malloc(std::size_t size);
 
-template <typename T>
+template<typename T> 
 device_ptr malloc() {
-  return malloc(sizeof(T));
+    return malloc(sizeof(T));
+    
 }
 /// @brief Allocate data of the given number of size bytes on the
 /// user-specified classical device. Return a device_ptr.
@@ -65,8 +66,20 @@ device_ptr malloc_set(T t) {
 /// @brief Free the memory held by the given device_ptr.
 void free(device_ptr &d);
 
+/// @brief Free the memory held by the provided device_ptrs.
+template <typename... Args>
+void free(Args &&...args) {
+  details::apply_to_all(free, args...);
+}
+
 /// @brief Copy the given src data into the QPU device data element.
 void memcpy(device_ptr &dest, const void *src);
+
+/// @brief Copy the concrete value to the given device_ptr.
+template <typename T>
+void memcpy(device_ptr &dest, const T srcVal) {
+  memcpy(dest, static_cast<const void *>(&srcVal));
+}
 
 /// @brief Copy the data on QPU device to the given host pointer dest
 void memcpy(void *dest, device_ptr &src);
@@ -86,8 +99,6 @@ handle load_kernel(const std::string &quake);
 /// @brief Launch the kernel remotely held at the given handle, with
 /// the given runtime arguments.
 launch_result launch_kernel(handle kernelHandle, device_ptr args);
-
-void shutdown(); 
 
 } // namespace driver
 

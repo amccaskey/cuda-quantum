@@ -350,7 +350,7 @@ void MappingTraits<cudaq::config::TargetConfig>::mapping(
   io.mapOptional("config", info.BackendConfig);
   io.mapOptional("configuration-matrix", info.ConfigMap);
   io.mapOptional("devices", info.Devices);
-  io.mapOptional("host-control-channel", info.HostControlChannel);
+  io.mapOptional("control-dispatcher", info.HostControlChannel);
   io.mapOptional("controller-ip", info.ControllerIP);
   io.mapOptional("controller-port", info.ControllerPort);
 }

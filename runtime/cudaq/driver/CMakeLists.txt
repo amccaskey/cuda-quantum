@@ -6,22 +6,26 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(controller)
-
-add_subdirectory(qpu)
-
 set(LIBRARY_NAME cudaq-driver) 
 
 add_library(${LIBRARY_NAME} 
   SHARED 
-    driver.cpp 
+    driver.cpp
+    driver_qpu.cpp
+    target.cpp
+    ../platform/common/QuantumExecutionQueue.cpp
     )
 
 target_include_directories(${LIBRARY_NAME} PUBLIC 
     $<INSTALL_INTERFACE:include>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
-  target_link_libraries(cudaq-driver 
-    PUBLIC cudaq-driver-controller
+
+target_link_libraries(${LIBRARY_NAME} 
     PRIVATE 
+      rpc
+      cudaq-common
       fmt::fmt-header-only 
   )
+
+add_subdirectory(channels)
+add_subdirectory(dispatchers)

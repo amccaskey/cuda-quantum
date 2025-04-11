@@ -1,3 +1,4 @@
+
 # ============================================================================ #
 # Copyright (c) 2022 - 2025 NVIDIA Corporation & Affiliates.                   #
 # All rights reserved.                                                         #
@@ -6,22 +7,21 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-include(HandleLLVMOptions)
+set(LIBRARY_NAME cudaq-ethernet-dispatcher) 
 
-if (NOT CUDAQ_DISABLE_TOOLS)
-  add_subdirectory(cudaq-opt)
-  add_subdirectory(cudaq-translate)
+add_library(${LIBRARY_NAME} 
+  SHARED 
+    ethernet_dispatcher.cpp 
+    )
 
-  if (NOT CUDAQ_DISABLE_CPP_FRONTEND)
-    add_subdirectory(cudaq-lsp-server)
-    add_subdirectory(cudaq-quake)
-    add_subdirectory(fixup-linkage)
-    add_subdirectory(nvqpp)
-    add_subdirectory(cudaq-target-conf)
-  endif()
-endif()
+target_include_directories(${LIBRARY_NAME} PUBLIC 
+    $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
+target_link_libraries(${LIBRARY_NAME}
+    PRIVATE 
+      cudaq-common
+      rpc 
+      fmt::fmt-header-only 
+  )
 
-if (CUDAQ_ENABLE_REMOTE_SIM)
-  # Add cudaq-qpud executable/tool (including Python wheels)
-  add_subdirectory(cudaq-qpud)
-endif()
+add_subdirectory(controller)

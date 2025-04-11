@@ -8,7 +8,10 @@
 
 #pragma once
 
+#include "cudaq/utils/extension_point.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
+
+#include <map>
 #include <memory>
 
 namespace mlir {
@@ -19,6 +22,10 @@ class ModuleOp;
 
 namespace llvm {
 class Module;
+}
+
+namespace cudaq::config {
+class TargetConfig;
 }
 
 namespace cudaq {
@@ -82,6 +89,51 @@ struct TranslateFromMLIRRegistration {
   TranslateFromMLIRRegistration(
       llvm::StringRef name, llvm::StringRef description,
       const cudaq::TranslateFromMLIRFunction &function);
+};
+
+// A callback is a simple struct to hold the name
+// of a classical callback in a kernel, and the
+// MLIR FuncOp code for it.
+struct callback {
+  std::string callbackName;
+  std::string unmarshalFuncOpCode;
+};
+
+// The quake_compiler is an extension point for compiling
+// both Quake kernel code and required callback unmarshal
+// functions to executable object code
+class quake_compiler : public extension_point<quake_compiler> {
+public:
+  virtual ~quake_compiler() {}
+
+  /// @brief Initialize the compiler, give it the target config
+  virtual void initialize(const config::TargetConfig &,
+                          const std::map<std::string, bool> extra = {}) = 0;
+
+  /// @brief Compile the Quake code to executable code and
+  /// return a handle to the compiled kernel
+  virtual std::size_t
+  compile(const std::string &quake,
+          const std::vector<std::string> &symbolLocations) = 0;
+
+  /// @brief Compile the MLIR code for the unmarshal function
+  /// for a given classical callback, provide potential external
+  /// shared library locations to locate callable symbols. Return
+  /// a handle to the unmarshal functino
+  virtual std::size_t
+  compile_unmarshaler(const std::string &mlirCode,
+                      const std::vector<std::string> &symbolLocations) = 0;
+
+  /// @brief Return all callbacks required by the kernel/module
+  /// at the given handle.
+  virtual std::vector<callback> get_callbacks(std::size_t moduleHandle) = 0;
+
+  /// @brief Launch the kernel thunk, results are posted to the thunkArgs
+  /// pointer
+  virtual void launch(std::size_t moduleHandle, void *thunkArgs) = 0;
+
+  virtual std::optional<std::size_t>
+  get_required_num_qubits(std::size_t hdl) = 0;
 };
 
 } // namespace cudaq
