@@ -58,6 +58,8 @@ struct VerifyQIRProfilePass
 
         if (funcName.equals("__nvqpp__device_callback_run"))
           return WalkResult::advance();
+        if (funcName.equals("__nvqpp__device_extract_device_ptr"))
+          return WalkResult::advance();
         if (!funcName.startswith("__quantum_") ||
             funcName.equals(cudaq::opt::QIRCustomOp)) {
           call.emitOpError("unexpected call in QIR base profile");

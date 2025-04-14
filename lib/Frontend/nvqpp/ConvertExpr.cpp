@@ -2068,8 +2068,39 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
       auto devFunc = module.lookupSymbol<func::FuncOp>(symbol);
       devFunc->setAttr(cudaq::deviceCallAttrName, builder.getUnitAttr());
       auto devFuncTy = cast<FunctionType>(funcConst.getType());
-      auto callArgs =
-          convertKernelArgs(builder, loc, 1, args, devFuncTy.getInputs());
+
+      // Functor checks if type is device_ptr.
+      auto isDevicePtr = [](Type argTy) {
+        auto ptrTy = dyn_cast<cc::PointerType>(argTy);
+        if (!ptrTy)
+          return false;
+        auto eleTy = ptrTy.getElementType();
+        auto structTy = dyn_cast<cc::StructType>(eleTy);
+        if (!structTy)
+          return false;
+
+        if (!structTy.getName().getValue().equals("device_ptr"))
+          return false;
+
+        return true;
+      };
+
+      SmallVector<Value> processedArgs{args[0]};
+      for (std::size_t i = 1; i < args.size(); i++) {
+        if (isDevicePtr(args[i].getType())) {
+          // Extract the i8* for this device_ptr
+          Value result = builder.create<cc::ExtractDevicePtrOp>(
+              loc, cc::PointerType::get(builder.getI8Type()), args[i]);
+          // Cast it to T*
+          auto casted = builder.create<cc::CastOp>(
+              loc, devFuncTy.getInputs()[i - 1], result);
+          processedArgs.push_back(casted);
+        } else
+          processedArgs.push_back(args[i]);
+      }
+
+      auto callArgs = convertKernelArgs(builder, loc, 1, processedArgs,
+                                        devFuncTy.getInputs());
       auto devCall = builder.create<cc::DeviceCallOp>(
           loc, devFuncTy.getResults(), symbol, callArgs);
       if (devFuncTy.getResults().empty())

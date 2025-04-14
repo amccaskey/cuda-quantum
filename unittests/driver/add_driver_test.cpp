@@ -12,3 +12,5 @@ extern "C" int add(int i, int j) {
   printf("Calling from the add function!!! add(%d,%d) = %d\n", i, j, i + j);
   return i + j;
 }
+
+extern "C" void cuda_kernel(int *i) { *i += 4; }

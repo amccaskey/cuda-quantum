@@ -80,23 +80,11 @@ handle malloc(std::size_t size, std::size_t devId) {
     auto hdl = to_handle(std::malloc(size));
     memory_pool.insert({hdl, {hdl, size, devId}});
     return hdl;
-
-    // // Malloc is on this memory space
-    // // allocate the data and return a handle
-    // auto *raw = std::malloc(size);
-    // ptr.handle = reinterpret_cast<uintptr_t>(raw);
-    // ptr.size = size;
-    // ptr.deviceId = devId;
-
-    // // Store the data here
-    // memory_pool.insert({ptr.handle, raw});
   }
 
   cudaq::info("forwarding malloc to device {}", devId);
   ptr = communication_channels[devId]->malloc(size);
   memory_pool.insert({ptr.handle, ptr});
-
-  //   allocated_device_ptrs.insert({ptr.handle, ptr});
 
   cudaq::info("return unique handle to allocated data {}.", ptr.handle);
   // Return the handle
@@ -112,9 +100,7 @@ void free(handle handle) {
   auto &devPtr = iter->second;
   if (devPtr.deviceId == std::numeric_limits<std::size_t>::max()) {
     cudaq::info("deallocating local controller data");
-    std::free(to_ptr(devPtr)); // memory_pool.at(iter->first));
-    // FIXME delete the device_ptr
-    // memory_pool.erase(iter->first);
+    std::free(to_ptr(devPtr)); 
     return;
   }
 
@@ -237,6 +223,22 @@ std::vector<char> launch_callback(std::size_t devId,
 } // namespace cudaq::driver
 
 extern "C" {
+
+void *__nvqpp__device_extract_device_ptr(cudaq::device_ptr *devPtr) {
+  using namespace cudaq::driver;
+
+  // Here we know we are in shared memory only
+  if (devPtr->deviceId == std::numeric_limits<std::size_t>::max())
+    return to_ptr(*devPtr);
+
+  auto &channel = communication_channels[devPtr->deviceId];
+  // Should this only be valid for CUDA and Shmem channels?
+  if (channel->runs_on_separate_process())
+    throw std::runtime_error("error extracting callback pointer argument - "
+                             "channel is separate process.");
+
+  return channel->get_raw_pointer(*devPtr);
+}
 
 cudaq::KernelThunkResultType
 __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,

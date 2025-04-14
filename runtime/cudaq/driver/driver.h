@@ -18,24 +18,6 @@ class TargetConfig;
 }
 namespace driver {
 
-namespace details {
-template <typename F, typename First, typename... Rest>
-void apply_to_all(F &&func, First &&first, Rest &&...rest) {
-  // Ensure all arguments have the same decayed type
-  using CommonType = std::decay_t<First>;
-  static_assert((std::is_same_v<std::decay_t<Rest>, CommonType> && ...),
-                "All arguments must be of the same type");
-
-  // Apply function to each argument in order
-  func(std::forward<First>(first));
-  (..., func(std::forward<Rest>(rest))); // Fold expression
-}
-} // namespace details
-// FIXME what about
-// query info on QPU architecture
-// get device, query device info
-// do we need a - class device {};
-
 /// @brief Initialize the CUDA-Q Driver API based on the
 /// current user-selected target. The target defines
 /// the QPU architecture, including the classical devices
@@ -56,8 +38,8 @@ device_ptr malloc(std::size_t size, std::size_t deviceId);
 
 /// @brief Allocate and set the data with given value. Return a device_ptr.
 template <typename T>
-device_ptr malloc_set(T t) {
-  auto ret = malloc(sizeof(T));
+device_ptr malloc_set(T t, std::size_t device = -1) {
+  auto ret = malloc(sizeof(T), device);
   memcpy(ret, &t);
   return ret;
 }
@@ -87,7 +69,9 @@ handle load_kernel(const std::string &quake);
 /// the given runtime arguments.
 launch_result launch_kernel(handle kernelHandle, device_ptr args);
 
-void shutdown(); 
+/// @brief shutdown the driver API. This should
+/// kick of the disconnection of all channels.
+void shutdown();
 
 } // namespace driver
 

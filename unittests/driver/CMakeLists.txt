@@ -54,3 +54,36 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
   target_link_options(ethernet_host_shmem_channel_driver_tester PRIVATE -Wl,--no-as-needed)
 endif()
 gtest_discover_tests(ethernet_host_shmem_channel_driver_tester)
+
+
+add_executable(shmem_full_pass_ptrs_tester shmem_full_pass_ptrs_tester.cpp)
+
+target_link_libraries(shmem_full_pass_ptrs_tester
+  PRIVATE
+    cudaq-platform-default
+    cudaq-driver
+    cudaq-builder
+    add_driver_test
+    gtest_main
+)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
+  target_link_options(shmem_full_pass_ptrs_tester PRIVATE -Wl,--no-as-needed)
+endif()
+gtest_discover_tests(shmem_full_pass_ptrs_tester)
+
+
+add_executable(ethernet_host_shmem_channel_pass_ptrs_tester ethernet_host_shmem_channel_pass_ptrs_tester.cpp)
+
+target_link_libraries(ethernet_host_shmem_channel_pass_ptrs_tester
+  PRIVATE
+    cudaq-platform-default
+    cudaq-driver
+    cudaq-builder
+    cudaq-ethernet-dispatcher
+    add_driver_test
+    gtest_main
+)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
+  target_link_options(ethernet_host_shmem_channel_pass_ptrs_tester PRIVATE -Wl,--no-as-needed)
+endif()
+gtest_discover_tests(ethernet_host_shmem_channel_pass_ptrs_tester)

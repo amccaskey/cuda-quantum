@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <cudaq/driver/device_ptr.h>
+
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -27,16 +29,14 @@ void device_call(DeviceCode &&deviceCode, Args &&...args) {
   return std::invoke(std::move(deviceCode), std::forward<Args>(args)...);
 }
 
-
-#if 0
 // This code to create automatic conversions of device_ptr arguments is only
 // available in C++20.
 
-namespace cudaq::details {
+namespace details {
 // Concepts to test for device_ptr arguments.
 template <typename T>
 concept DevicePtr =
-    std::same_as<std::decay_t<std::remove_cvref_t<T>>, cudaq::driver::device_ptr>;
+    std::same_as<std::decay_t<std::remove_cvref_t<T>>, driver::device_ptr>;
 template <typename T>
 concept NotDevicePtr = !DevicePtr<T>;
 
@@ -62,14 +62,10 @@ void *convert(const T &devicePtr) {
 }
 
 template <typename Call, typename... Args>
-void gpu_call_dispatcher(Call call, Args... args) {
-  auto tup = std::make_tuple(details::convert<Args>(args)...);
-  return std::apply(call, tup);
+void gpu_call_dispatcher(Call &&call, Args &&...args) {
+  return std::apply(call, convert<Args>(args)...);
 }
-} // namespace cudaq::details
-
-#define AUTOGENERATE_ARGUMENT_CONVERSION(FUN, ...)                             \
-  cudaq::details::gpu_call_dispatcher(FUN, __VA_ARGS__)
+} // namespace details
 
 /// Users can autogenerate glue code to call a device callback on a GPU using
 /// the above template functions and the `AUTOGENERATE_ARGUMENT_CONVERSION`
@@ -91,7 +87,7 @@ void gpu_call_dispatcher(Call call, Args... args) {
 //     ...
 //   }
 
-#endif
-
-
 } // namespace cudaq
+
+#define AUTOGENERATE_ARGUMENT_CONVERSION(FUN, ...)                             \
+  cudaq::details::gpu_call_dispatcher(FUN, __VA_ARGS__)

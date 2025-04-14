@@ -101,19 +101,20 @@ TEST(DriverTester, checkLaunchKernel) {
 
   const std::string quake = R"#(
   module {
-  func.func private @add(i32, i32) -> i32 attributes {"cudaq-devicecall"}
-  func.func @__nvqpp__mlirgen__function_testKernel.testKernel(%arg0: i32, %arg1: i32) -> i32 attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
-    %0 = cc.alloca i32
-    cc.store %arg0, %0 : !cc.ptr<i32>
-    %1 = cc.alloca i32
-    cc.store %arg1, %1 : !cc.ptr<i32>
-    %2 = quake.alloca !quake.ref
-    quake.h %2 : (!quake.ref) -> ()
-    %3 = cc.load %0 : !cc.ptr<i32>
-    %4 = cc.load %1 : !cc.ptr<i32>
-    %5 = cc.device_call @add(%3, %4) : (i32, i32) -> i32
-    return %5 : i32
+  func.func @__nvqpp__mlirgen__function_test.test(%arg0: !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
+    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>
+    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+    %1 = quake.alloca !quake.ref
+    quake.h %1 : (!quake.ref) -> ()
+    %2 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>
+    %3 = cc.cast %2 : (!cc.ptr<i8>) -> !cc.ptr<i32>
+    %4 = cc.alloca !cc.ptr<i32>
+    cc.store %3, %4 : !cc.ptr<!cc.ptr<i32>>
+    %5 = cc.load %4 : !cc.ptr<!cc.ptr<i32>>
+    cc.device_call @cuda_kernel(%5) : (!cc.ptr<i32>) -> ()
+    return
   }
+  func.func private @cuda_kernel(!cc.ptr<i32>) attributes {"cudaq-devicecall"}
   func.func private @__nvqpp_zeroDynamicResult() -> !cc.struct<{!cc.ptr<i8>, i64}> {
     %c0_i64 = arith.constant 0 : i64
     %0 = cc.cast %c0_i64 : (i64) -> !cc.ptr<i8>
@@ -122,20 +123,12 @@ TEST(DriverTester, checkLaunchKernel) {
     %3 = cc.insert_value %2[1], %c0_i64 : (!cc.struct<{!cc.ptr<i8>, i64}>, i64) -> !cc.struct<{!cc.ptr<i8>, i64}>
     return %3 : !cc.struct<{!cc.ptr<i8>, i64}>
   }
-  func.func @function_testKernel.testKernel.thunk(%arg0: !cc.ptr<i8>, %arg1: i1) -> !cc.struct<{!cc.ptr<i8>, i64}> {
-    %0 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.struct<{i32, i32, i32}>>
-    %1 = cc.sizeof !cc.struct<{i32, i32, i32}> : i64
-    %2 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.array<i8 x ?>>
-    %3 = cc.compute_ptr %2[%1] : (!cc.ptr<!cc.array<i8 x ?>>, i64) -> !cc.ptr<i8>
-    %4 = cc.compute_ptr %0[0] : (!cc.ptr<!cc.struct<{i32, i32, i32}>>) -> !cc.ptr<i32>
-    %5 = cc.load %4 : !cc.ptr<i32>
-    %6 = cc.compute_ptr %0[1] : (!cc.ptr<!cc.struct<{i32, i32, i32}>>) -> !cc.ptr<i32>
-    %7 = cc.load %6 : !cc.ptr<i32>
-    %8 = call @__nvqpp__mlirgen__function_testKernel.testKernel(%5, %7) : (i32, i32) -> i32
-    %9 = cc.compute_ptr %0[2] : (!cc.ptr<!cc.struct<{i32, i32, i32}>>) -> !cc.ptr<i32>
-    cc.store %8, %9 : !cc.ptr<i32>
-    %10 = call @__nvqpp_zeroDynamicResult() : () -> !cc.struct<{!cc.ptr<i8>, i64}>
-    return %10 : !cc.struct<{!cc.ptr<i8>, i64}>
+  func.func @function_test.test.thunk(%arg0: !cc.ptr<i8>, %arg1: i1) -> !cc.struct<{!cc.ptr<i8>, i64}> {
+    %0 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+    %1 = cc.load %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+    call @__nvqpp__mlirgen__function_test.test(%1) : (!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) -> ()
+    %2 = call @__nvqpp_zeroDynamicResult() : () -> !cc.struct<{!cc.ptr<i8>, i64}>
+    return %2 : !cc.struct<{!cc.ptr<i8>, i64}>
   }
   }
   )#";
@@ -144,15 +137,17 @@ TEST(DriverTester, checkLaunchKernel) {
   auto hdl = cudaq::driver::load_kernel(quake);
 
   // Manually setup the Thunk Args for the Kernel
-  struct IntIntRetIntArgs {
-    int i;
-    int j;
-    int k;
+  struct ThunkArgs {
+    cudaq::device_ptr devPtr;
   };
-  IntIntRetIntArgs thunkArgsConcrete{1, 2, 0};
+
+  // Allocate data on the 0th device
+  auto devPtr = cudaq::driver::malloc_set((int)2, 0);
+
+  ThunkArgs thunkArgsConcrete{devPtr};
 
   // Tell the controller to allocate data for the Thunk Args
-  auto thunkArgsDevPtr = cudaq::driver::malloc(sizeof(IntIntRetIntArgs));
+  auto thunkArgsDevPtr = cudaq::driver::malloc(sizeof(ThunkArgs));
 
   // Set the Thunk Args data on the controller
   cudaq::driver::memcpy(thunkArgsDevPtr, &thunkArgsConcrete);
@@ -163,11 +158,12 @@ TEST(DriverTester, checkLaunchKernel) {
   // Get the Thunk Args data back from the controller
   cudaq::driver::memcpy(&thunkArgsConcrete, thunkArgsDevPtr);
 
-  // We expect 1+2 =3
-  EXPECT_EQ(thunkArgsConcrete.k, 3);
+  // We expect 2+4=6
+  EXPECT_EQ(cudaq::driver::memcpy<int>(thunkArgsConcrete.devPtr), 6);
 
   // Free the controller data
   cudaq::driver::free(thunkArgsDevPtr);
+  cudaq::driver::free(devPtr);
 }
 
 int main(int argc, char **argv) {

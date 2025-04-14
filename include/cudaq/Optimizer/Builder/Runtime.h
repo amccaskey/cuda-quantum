@@ -82,5 +82,6 @@ static constexpr const char bindingDeconstructString[] =
 // Runtime layer of a `device_call` application.
 static constexpr const char callDeviceCallback[] =
     "__nvqpp__device_callback_run";
-
+static constexpr const char extractDevPtr[] =
+    "__nvqpp__device_extract_device_ptr";
 } // namespace cudaq::runtime

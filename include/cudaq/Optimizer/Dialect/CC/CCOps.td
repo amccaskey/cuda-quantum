@@ -1691,6 +1691,27 @@ def cc_DeviceCallOp :
   }];
 }
 
+
+def cc_ExtractDevicePtrOp :
+    CCOp<"extract_ptr", []> {
+  let summary = "Extract raw pointers from a CUDA-Q driver device_ptr.";
+  let description = [{
+    In a tightly coupled environment, the quantum code may allocate data 
+    on the controller or available classical devices. This data is modeled via CUDA-Q Driver 
+    device_ptr instances. These instances provide a handle to the data on a specific device. 
+    This op allows one to extract the actual raw pointer from the device pointer handle. 
+  }];
+
+  let arguments = (ins
+    cc_PointerType:$devicePtr
+  );
+  let results = (outs cc_PointerType);
+  
+  let assemblyFormat = [{
+    $devicePtr `:` functional-type(operands, results) attr-dict
+  }];
+}
+
 def cc_VarargCallOp :
     CCOp<"call_vararg", [CallOpInterface, SymbolUserOpInterface]> {
   let summary = "Create a call to an llvm.func with variadic arguments.";

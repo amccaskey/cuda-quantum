@@ -102,6 +102,20 @@ public:
   }
 };
 
+class ExtractDevPtrOpPat
+    : public OpRewritePattern<cudaq::cc::ExtractDevicePtrOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(cudaq::cc::ExtractDevicePtrOp extractOp,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<func::CallOp>(
+        extractOp, TypeRange{extractOp.getResult().getType()},
+        cudaq::runtime::extractDevPtr, ValueRange{extractOp.getDevicePtr()});
+    return success();
+  }
+};
+
 class DistributedDeviceCallPat
     : public OpRewritePattern<cudaq::cc::DeviceCallOp> {
 public:
@@ -420,6 +434,15 @@ public:
     auto *ctx = &getContext();
     RewritePatternSet patterns(ctx);
     ModuleOp module = getOperation();
+    auto irBuilder = cudaq::IRBuilder::atBlockEnd(module.getBody());
+    if (failed(
+            irBuilder.loadIntrinsic(module, cudaq::runtime::extractDevPtr))) {
+      module.emitError(std::string{"could not load "} +
+                       cudaq::runtime::CudaqRegisterCallbackName);
+      return;
+    }
+
+    patterns.add<ExtractDevPtrOpPat>(ctx);
 
     if (useMagicUnicorn) {
       // For this solution, we replace the device_call operations with calls to
@@ -438,7 +461,6 @@ public:
     // approach. This consists of having the compiler generate the marshal and
     // unmarshal code and call through the runtime's hook function, which should
     // be specialized for whatever target configuration happens to be selected.
-    auto irBuilder = cudaq::IRBuilder::atBlockEnd(module.getBody());
     if (failed(irBuilder.loadIntrinsic(
             module, cudaq::runtime::CudaqRegisterCallbackName))) {
       module.emitError(std::string{"could not load "} +
