@@ -36,9 +36,8 @@ void connect(std::size_t assignedID, const std::string &cfg) {
   // FIXME add this to the config
   compiler = driver::quake_compiler::get("default_compiler");
   compiler->initialize(config);
-  symbolLocations =
-      config.Devices[assignedID].Config.ExposedLibraries.value_or(
-          std::vector<std::string>{});
+  symbolLocations = config.Devices[assignedID].Config.ExposedLibraries.value_or(
+      std::vector<std::string>{});
 }
 
 std::size_t malloc(std::size_t size, std::size_t devId) {

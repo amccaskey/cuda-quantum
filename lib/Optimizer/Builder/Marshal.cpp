@@ -962,7 +962,7 @@ constructDynamicInputValue(Location loc, OpBuilder &builder, Type devTy,
       auto result = builder.create<cudaq::cc::StdvecInitOp>(
           loc, charSpanTy, castTrailingData, vecLength);
       auto nextTrailingData =
-	 incrementTrailingDataPointer(loc, builder, trailingData, vecLength);
+          incrementTrailingDataPointer(loc, builder, trailingData, vecLength);
       return {result, nextTrailingData};
     }
   }

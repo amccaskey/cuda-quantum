@@ -85,10 +85,10 @@ public:
             std::vector<std::string>{});
   }
 
-  /// @brief Return the raw pointer corresponding to the 
+  /// @brief Return the raw pointer corresponding to the
   /// provided device_ptr.
-  void * get_raw_pointer(device_ptr& devPtr) override {
-    return reinterpret_cast<void*>(devPtr.handle);
+  void *get_raw_pointer(device_ptr &devPtr) override {
+    return reinterpret_cast<void *>(devPtr.handle);
   }
 
   /// @brief Allocate memory on the device and return a device pointer handle.

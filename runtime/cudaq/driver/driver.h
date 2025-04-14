@@ -76,3 +76,5 @@ void shutdown();
 } // namespace driver
 
 } // namespace cudaq
+
+#include "device.h"

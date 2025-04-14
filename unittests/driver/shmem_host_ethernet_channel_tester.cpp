@@ -6,8 +6,8 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
+#include "cudaq.h"
 #include "cudaq/Support/TargetConfig.h"
-#include "cudaq/driver/driver.h"
 #include <gtest/gtest.h>
 
 #include <cudaq/builder.h>

@@ -100,12 +100,12 @@ public:
   /// @return True if it runs on a separate process; false otherwise.
   virtual bool runs_on_separate_process() { return false; }
 
-  /// @brief Return the raw pointer corresponding to the provided 
-  /// device_pointer. This should only be valid for channels 
-  /// that do not run on a separate process (e.g. shmem and cuda). 
+  /// @brief Return the raw pointer corresponding to the provided
+  /// device_pointer. This should only be valid for channels
+  /// that do not run on a separate process (e.g. shmem and cuda).
   /// @param devPtr The CUDA-Q device pointer handle.
-  /// @return Raw pointer 
-  virtual void * get_raw_pointer(device_ptr& devPtr) = 0; 
+  /// @return Raw pointer
+  virtual void *get_raw_pointer(device_ptr &devPtr) = 0;
 
   /// @brief Allocate memory on this channel's associated device.
   /// @param size The size of the memory to allocate in bytes.

@@ -119,6 +119,7 @@ target_link_libraries(cudaq-mlir-runtime
     MLIRPass
     MLIRTranslateLib
     MLIRSupport
+    MLIRGPUOps
     MLIROptLib
     MLIRExecutionEngine
     MLIRTransforms

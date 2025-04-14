@@ -6,8 +6,8 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
+#include "cudaq.h"
 #include "cudaq/Support/TargetConfig.h"
-#include "cudaq/driver/driver.h"
 #include <gtest/gtest.h>
 
 #include <cudaq/builder.h>
@@ -44,7 +44,7 @@ public:
 };
 
 TEST(DriverTester, checkShmem) {
-  // Putting this here, we need MLIR startup to work 
+  // Putting this here, we need MLIR startup to work
   // for all cases, builder + driver, no builder + driver
   auto kernel = cudaq::make_kernel();
 
@@ -132,9 +132,9 @@ TEST(DriverTester, checkLaunchKernel) {
   }
   )#";
 
-  // Load the Kernel 
+  // Load the Kernel
   auto hdl = cudaq::driver::load_kernel(quake);
-  
+
   // Manually setup the Thunk Args for the Kernel
   struct IntIntRetIntArgs {
     int i;
@@ -145,17 +145,17 @@ TEST(DriverTester, checkLaunchKernel) {
 
   // Tell the controller to allocate data for the Thunk Args
   auto thunkArgsDevPtr = cudaq::driver::malloc(sizeof(IntIntRetIntArgs));
-  
-  // Set the Thunk Args data on the controller 
+
+  // Set the Thunk Args data on the controller
   cudaq::driver::memcpy(thunkArgsDevPtr, &thunkArgsConcrete);
 
   // Launch the Kernel!
   cudaq::driver::launch_kernel(hdl, thunkArgsDevPtr);
-  
-  // Get the Thunk Args data back from the controller 
-  cudaq::driver::memcpy(&thunkArgsConcrete, thunkArgsDevPtr); 
 
-  // We expect 1+2 =3 
+  // Get the Thunk Args data back from the controller
+  cudaq::driver::memcpy(&thunkArgsConcrete, thunkArgsDevPtr);
+
+  // We expect 1+2 =3
   EXPECT_EQ(thunkArgsConcrete.k, 3);
 
   // Free the controller data

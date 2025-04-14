@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstddef>
+#include <limits>
 #include <optional>
 #include <string>
 #include <vector>
@@ -26,13 +27,13 @@ using error_code = std::size_t;
 /// and size
 struct device_ptr {
   /// @brief Opaque handle to device memory block
-  std::size_t handle = -1;
+  std::size_t handle = std::numeric_limits<std::size_t>::max();
 
   /// @brief Size of allocated memory in bytes
   std::size_t size;
 
   /// @brief Physical device identifier
-  std::size_t deviceId = -1;
+  std::size_t deviceId = std::numeric_limits<std::size_t>::max();
 
   /// @brief Type conversion operator for device memory access
   /// @tparam T Target data type for pointer conversion

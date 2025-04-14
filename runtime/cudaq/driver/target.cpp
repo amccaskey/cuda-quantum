@@ -126,7 +126,6 @@ CUDAQ_REGISTER_EXTENSION_TYPE(default_target)
 
 } // namespace cudaq::driver
 
-
 #define CONCAT(a, b) CONCAT_INNER(a, b)
 #define CONCAT_INNER(a, b) a##b
 #define QIS_FUNCTION_NAME(GATENAME) CONCAT(__quantum__qis__, GATENAME)

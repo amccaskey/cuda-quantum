@@ -537,9 +537,9 @@ void __nvqpp_initializeStringFromSpan(std::string &s, const char *data,
 }
 
 void __nvqpp_deconstructString(std::string &s) {
-   // Reclaim the storage of the string object.
-   std::string empty;
-   std::swap(s, empty);
+  // Reclaim the storage of the string object.
+  std::string empty;
+  std::swap(s, empty);
 }
 }
 } // namespace cudaq::support

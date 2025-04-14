@@ -100,7 +100,7 @@ void free(handle handle) {
   auto &devPtr = iter->second;
   if (devPtr.deviceId == std::numeric_limits<std::size_t>::max()) {
     cudaq::info("deallocating local controller data");
-    std::free(to_ptr(devPtr)); 
+    std::free(to_ptr(devPtr));
     return;
   }
 

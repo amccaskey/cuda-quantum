@@ -8,26 +8,45 @@
 
 #pragma once
 
-#include <cudaq/driver/device_ptr.h>
-
 #include <functional>
 #include <type_traits>
 #include <utility>
 
-#define __qpu_device__ __attribute__((annotate("quantum_device")))
-
 namespace cudaq {
 
-template <typename Result, typename DeviceCode, typename... Args>
-  requires std::is_invocable_r_v<Result, DeviceCode, Args...>
-Result device_call(DeviceCode &&deviceCode, Args &&...args) {
-  return std::invoke(std::move(deviceCode), std::forward<Args>(args)...);
+template <typename DeviceCode, typename... Args>
+auto device_call(DeviceCode &&code, Args &&...args)
+    -> std::invoke_result_t<DeviceCode, Args...> {
+  return std::invoke(std::forward<DeviceCode>(code),
+                     std::forward<Args>(args)...);
 }
 
 template <typename DeviceCode, typename... Args>
-void device_call(DeviceCode &&deviceCode, Args &&...args) {
-  return std::invoke(std::move(deviceCode), std::forward<Args>(args)...);
+auto device_call(std::size_t device_id, DeviceCode &&code, Args &&...args)
+    -> std::invoke_result_t<DeviceCode, Args...> {
+  return std::invoke(std::forward<DeviceCode>(code),
+                     std::forward<Args>(args)...);
 }
+
+// --- GPU Overloads ---
+template <std::size_t BlockSize, std::size_t GridSize, typename DeviceCode,
+          typename... Args>
+auto device_call(DeviceCode &&code, Args &&...args)
+    -> std::invoke_result_t<DeviceCode, Args...> {
+  return std::invoke(std::forward<DeviceCode>(code),
+                     std::forward<Args>(args)...);
+}
+template <std::size_t BlockSize, std::size_t GridSize, typename DeviceCode,
+          typename... Args>
+auto device_call(std::size_t device_id, DeviceCode &&code, Args &&...args)
+    -> std::invoke_result_t<DeviceCode, Args...> {
+  return std::invoke(std::forward<DeviceCode>(code),
+                     std::forward<Args>(args)...);
+}
+
+} // namespace cudaq
+
+#if 0
 
 // This code to create automatic conversions of device_ptr arguments is only
 // available in C++20.
@@ -91,3 +110,5 @@ void gpu_call_dispatcher(Call &&call, Args &&...args) {
 
 #define AUTOGENERATE_ARGUMENT_CONVERSION(FUN, ...)                             \
   cudaq::details::gpu_call_dispatcher(FUN, __VA_ARGS__)
+
+#endif

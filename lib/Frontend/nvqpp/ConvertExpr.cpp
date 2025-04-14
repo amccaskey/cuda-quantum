@@ -2085,6 +2085,36 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
         return true;
       };
 
+      auto maybeGPULaunchParams =
+          [&]() -> std::optional<std::pair<std::size_t, std::size_t>> {
+        if (!functionDecl->isTemplateInstantiation())
+          return std::nullopt;
+
+        auto *tsi = functionDecl->getTemplateSpecializationInfo();
+        if (!tsi)
+          return std::nullopt;
+
+        const auto *tArgs = tsi->TemplateArguments;
+        if (tArgs->size() - args.size() != 2)
+          return std::nullopt;
+
+        std::size_t blockSize, gridSize;
+        const clang::TemplateArgument &blockSizeArg = tArgs->get(0);
+        if (blockSizeArg.getKind() == clang::TemplateArgument::Integral)
+          blockSize = blockSizeArg.getAsIntegral().getLimitedValue();
+        else
+          return std::nullopt;
+
+        // Extract GridSize (second argument)
+        const clang::TemplateArgument &gridSizeArg = tArgs->get(1);
+        if (gridSizeArg.getKind() == clang::TemplateArgument::Integral)
+          gridSize = gridSizeArg.getAsIntegral().getLimitedValue();
+        else
+          return std::nullopt;
+
+        return std::make_pair(blockSize, gridSize);
+      }();
+
       SmallVector<Value> processedArgs{args[0]};
       for (std::size_t i = 1; i < args.size(); i++) {
         if (isDevicePtr(args[i].getType())) {
@@ -2101,8 +2131,17 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
 
       auto callArgs = convertKernelArgs(builder, loc, 1, processedArgs,
                                         devFuncTy.getInputs());
-      auto devCall = builder.create<cc::DeviceCallOp>(
-          loc, devFuncTy.getResults(), symbol, callArgs);
+      cc::DeviceCallOp devCall;
+      if (maybeGPULaunchParams) {
+        auto [blockSize, gridSize] = maybeGPULaunchParams.value();
+        auto blockAttr = builder.getI64IntegerAttr(blockSize);
+        auto gridAttr = builder.getI64IntegerAttr(gridSize);
+        devCall = builder.create<cc::DeviceCallOp>(
+            loc, devFuncTy.getResults(), symbol, callArgs, blockAttr, gridAttr);
+      } else {
+        devCall = builder.create<cc::DeviceCallOp>(loc, devFuncTy.getResults(),
+                                                   symbol, callArgs);
+      }
       if (devFuncTy.getResults().empty())
         return true;
       return pushValue(devCall.getResult(0));

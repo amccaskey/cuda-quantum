@@ -1667,12 +1667,20 @@ def cc_DeviceCallOp :
 
   let arguments = (ins
     FlatSymbolRefAttr:$callee,
-    Variadic<AnyType>:$args
+    Variadic<AnyType>:$args,
+    OptionalAttr<I64Attr>:$blockSize,
+    OptionalAttr<I64Attr>:$gridSize
   );
   let results = (outs Variadic<AnyType>);
   let assemblyFormat = [{
-    $callee `(` $args `)` `:` functional-type(operands, results) attr-dict
+    $callee (`<` $blockSize^ `,` $gridSize `>`)? `(` $args `)` `:` functional-type(operands, results) attr-dict
   }];
+
+  let builders = [
+    OpBuilder<(ins "mlir::TypeRange":$resTys, "llvm::StringRef":$callee, "mlir::ValueRange":$values), [{
+      return build($_builder, $_state, resTys, callee, values, mlir::IntegerAttr{}, mlir::IntegerAttr{});
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     operand_range getArgOperands() {
