@@ -397,7 +397,7 @@ cudaq::KernelThunkResultType __nvqpp__device_callback_run(
     // Send the args
     channel->send(argPtr, argsBuffer);
     // Launch the callback
-    channel->launch_callback(funcName, argPtr);
+    channel->launch_callback(funcName, argPtr, blockSize, gridSize);
     // Update the local args pointer
     channel->recv(argsBuffer, argPtr);
     // Free the data

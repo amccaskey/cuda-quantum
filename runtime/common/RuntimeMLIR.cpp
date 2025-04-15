@@ -71,8 +71,6 @@ TranslateFromMLIRRegistration::TranslateFromMLIRRegistration(
 
 #include "RuntimeMLIRCommonImpl.h"
 
-static std::once_flag mlir_init_flag;
-
 namespace cudaq {
 
 std::unique_ptr<MLIRContext> initializeMLIR() {
