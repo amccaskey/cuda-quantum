@@ -88,9 +88,9 @@ public:
 
   void *get_raw_pointer(device_ptr &devPtr) override {
     auto cudaPtr = local_memory_pool.at(devPtr.handle);
-    int i = 0;
-    cudaMemcpy(&i, cudaPtr, 4, cudaMemcpyDeviceToHost);
-    printf("HERE WE ARE GETTING THE ARG: %d\n", i);
+    std::vector<float> i(100);
+    cudaMemcpy(i.data(), cudaPtr, sizeof(float) * 100, cudaMemcpyDeviceToHost);
+    printf("HERE WE ARE GETTING THE ARG: %lf %lf\n", i[0], i[10]);
     return local_memory_pool.at(devPtr.handle);
   }
   bool requires_unmarshaller() override { return false; }
@@ -172,23 +172,25 @@ public:
   }
 
   launch_result launch_callback(const std::string &funcName,
-                                const device_ptr &args) override {
-    cudaq::info("Launching gpu callback with name {} and args size {}, {}",
-                funcName, args.size, args.handle);
+                                const device_ptr &args,
+                                std::optional<std::size_t> blockSize,
+                                std::optional<std::size_t> gridSize) override {
+    cudaq::info("Launching gpu callback with name {} and args size {}, {} - "
+                "block/grid = {}/{}",
+                funcName, args.size, args.handle, *blockSize, *gridSize);
     auto *cuFunc = loadedCallbacks.at(funcName);
     auto size = args.size;
-    auto *rawArgs = reinterpret_cast<void *>(
-        args.handle); // local_memory_pool.at(args.handle);
-    int i = 0;
-    struct test {
-      int *ii;
-    };
-    auto *casted = reinterpret_cast<test *>(rawArgs);
-    cudaMemcpy(&i, casted->ii, 4, cudaMemcpyDeviceToHost);
-    printf("HERE WE ARE GETTING THE ARG: %d\n", i);
+    auto *rawArgs = reinterpret_cast<void *>(args.handle);
     void *config[] = {CU_LAUNCH_PARAM_BUFFER_POINTER, rawArgs,
                       CU_LAUNCH_PARAM_BUFFER_SIZE, &size, CU_LAUNCH_PARAM_END};
-    auto status = cuLaunchKernel(*cuFunc, 1, 1, 1, 1, 1, 1, 0, 0, NULL, config);
+    auto status = cuLaunchKernel(*cuFunc, *blockSize, 1, 1, *gridSize, 1, 1, 0,
+                                 0, NULL, config);
+    if (status != CUDA_SUCCESS) {
+      const char *errN;
+      cuGetErrorName(status, &errN);
+      fprintf(stderr, "Failed to launch CUDA kernel: %s, %s\n",
+              funcName.c_str(), errN);
+    }
     return {};
   }
 

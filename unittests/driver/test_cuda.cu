@@ -7,6 +7,12 @@ __global__ void incrementInt(int *i) {
   *i += 1;
   printf("Calling GPU %d.\n", *i);
 }
+__global__ void vectorAdd(float *a, float *b, float *c, int n) {
+  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  if (i < n) {
+    c[i] = a[i] + b[i];
+  }
+}
 }
 
 // int main() {

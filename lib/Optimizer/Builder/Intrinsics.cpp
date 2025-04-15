@@ -246,7 +246,8 @@ static constexpr IntrinsicCode intrinsicTable[] = {
     {cudaq::runtime::callDeviceCallback,
      {},
      "func.func private @__nvqpp__device_callback_run(i64, !cc.ptr<i8>, "
-     "!cc.ptr<i8>, !cc.ptr<i8>, i64, i64) -> !cc.struct<{!cc.ptr<i8>, i64}>"},
+     "!cc.ptr<i8>, !cc.ptr<i8>, i64, i64, i64, i64) -> "
+     "!cc.struct<{!cc.ptr<i8>, i64}>"},
 
     {cudaq::runtime::extractDevPtr,
      {},

@@ -4,17 +4,14 @@
 #include <stdio.h>
 
 extern "C" {
-// __global__
-void incrementInt(int *i);
-//  {
-//   printf("Calling GPU.\n");
-//   *i += 1;
-// }
+// void incrementInt(int *i);
+void vectorAdd(const float *a, const float *b, float *c, int n);
 
-__qpu__ void callGpu(cudaq::device_ptr in) {
+__qpu__ void callVectorAdd(cudaq::device_ptr a, cudaq::device_ptr b,
+                           cudaq::device_ptr c, int n) {
   cudaq::qubit q;
   h(q);
-  cudaq::device_call<1, 1>(incrementInt, in);
+  cudaq::device_call<256, 256>(vectorAdd, a, b, c, n);
 }
 }
 

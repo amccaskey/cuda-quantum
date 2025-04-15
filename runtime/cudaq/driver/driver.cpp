@@ -143,7 +143,9 @@ public:
   /// execution.
   /// @return Result of callback execution (empty result if successful).
   launch_result launch_callback(const std::string &funcName,
-                                const device_ptr &args) override {
+                                const device_ptr &args,
+                                std::optional<std::size_t> blockSize,
+                                std::optional<std::size_t> gridSize) override {
     auto iter = unmarshallers.find(funcName);
     if (iter != unmarshallers.end()) {
       unmarshallers.at(funcName)(to_ptr(args), false);
@@ -374,11 +376,10 @@ void *__nvqpp__device_extract_device_ptr(cudaq::device_ptr *devPtr) {
 
   return channel->get_raw_pointer(*devPtr);
 }
-cudaq::KernelThunkResultType
-__nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
-                             void *unmarshalFunc, void *argsBuffer,
-                             std::uint64_t argsBufferSize,
-                             std::uint64_t returnOffset) {
+cudaq::KernelThunkResultType __nvqpp__device_callback_run(
+    std::uint64_t deviceId, const char *funcName, void *unmarshalFunc,
+    void *argsBuffer, std::uint64_t argsBufferSize, std::uint64_t returnOffset,
+    std::uint64_t blockSize, std::uint64_t gridSize) {
   using namespace cudaq::driver;
   cudaq::info("classical callback with shmem (host-side) func={} args_size={}",
               std::string(funcName), argsBufferSize);
@@ -414,9 +415,10 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
   channel->load_callback(funcName, castedFunc);
 
   // Launch the callback, result data stored to argsBuffer.
-  channel->launch_callback(funcName,
-                           {cudaq::driver::details::to_handle(argsBuffer),
-                            argsBufferSize, deviceId});
+  channel->launch_callback(
+      funcName,
+      {cudaq::driver::details::to_handle(argsBuffer), argsBufferSize, deviceId},
+      blockSize, gridSize);
 
   return {};
 }

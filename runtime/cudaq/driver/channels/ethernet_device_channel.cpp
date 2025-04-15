@@ -148,7 +148,9 @@ public:
   /// @return Result of callback execution containing any returned data or
   /// errors.
   launch_result launch_callback(const std::string &funcName,
-                                const device_ptr &args) override {
+                                const device_ptr &args,
+                                std::optional<std::size_t> blockSize,
+                                std::optional<std::size_t> gridSize) override {
     cudaq::info("Ethernet Channel launching callback - {}", funcName);
     auto handle = funcNamesToHandles.at(funcName);
     auto resultData = client->call("launch_callback", handle, args.handle)

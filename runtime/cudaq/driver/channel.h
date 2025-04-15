@@ -157,8 +157,10 @@ public:
   /// @param argsHandle Device pointer containing arguments for the callback
   /// execution.
   /// @return Result of the callback execution (e.g., success or error code).
-  virtual launch_result launch_callback(const std::string &funcName,
-                                        const device_ptr &argsHandle) = 0;
+  virtual launch_result
+  launch_callback(const std::string &funcName, const device_ptr &argsHandle,
+                  std::optional<std::size_t> blockSize = std::nullopt,
+                  std::optional<std::size_t> gridSize = std::nullopt) = 0;
 };
 
 } // namespace driver

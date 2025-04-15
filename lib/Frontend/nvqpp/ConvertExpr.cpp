@@ -2095,7 +2095,9 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
           return std::nullopt;
 
         const auto *tArgs = tsi->TemplateArguments;
-        if (tArgs->size() - args.size() != 2)
+        // Should have 4 TemplateParams here, 2 for the
+        // block and grid, 2 for the func + variadic pack
+        if (tArgs->size() != 4)
           return std::nullopt;
 
         std::size_t blockSize, gridSize;
@@ -2131,6 +2133,8 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
 
       auto callArgs = convertKernelArgs(builder, loc, 1, processedArgs,
                                         devFuncTy.getInputs());
+
+      // FIXME Handle device id.
       cc::DeviceCallOp devCall;
       if (maybeGPULaunchParams) {
         auto [blockSize, gridSize] = maybeGPULaunchParams.value();

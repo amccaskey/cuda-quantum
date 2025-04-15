@@ -1663,6 +1663,9 @@ def cc_DeviceCallOp :
     classical C++ code on the control driver. This op is therefore used to
     execute classical compute code from within a quantum kernel on the tightly
     integrated (expanded) QPU model.
+
+    FIXME Add device ID to this operation, optional value, defaults to 0
+    FIXME Think about block and grid size being values and not attributes
   }];
 
   let arguments = (ins
