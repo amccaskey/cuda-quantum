@@ -25,3 +25,21 @@ target_link_libraries(${LIBRARY_NAME}
   )
 
 add_subdirectory(daemons)
+
+if (CUDA_FOUND)
+  set(LIBRARY_NAME cudaq-cuda-channel) 
+  add_library(${LIBRARY_NAME} 
+    SHARED 
+      cuda_channel.cu 
+    )
+  target_include_directories(${LIBRARY_NAME} PUBLIC 
+      $<INSTALL_INTERFACE:include>
+      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>)
+  target_link_libraries(${LIBRARY_NAME}
+      PRIVATE 
+        cudaq-common
+        fmt::fmt-header-only 
+        CUDA::cudart_static
+        CUDA::cuda_driver
+    )
+endif()

@@ -251,17 +251,36 @@ __nvqpp__device_callback_run(std::uint64_t deviceId, const char *funcName,
 
   // Get the correct channel
   auto &channel = communication_channels[deviceId];
+  // Could be that our host+controller+channel are all on shared memory
+  // in which case we can just run the unmarshal function pointer
+  // If not, then we need to send the data and call the JIT
+  // compiled unmarshal function
+  if (channel->runs_on_separate_process()) {
+    // Separate process channel, allocate the unmarshal args
+    auto argPtr = channel->malloc(argsBufferSize);
+    // Send the args
+    channel->send(argPtr, argsBuffer);
+    // Launch the callback
+    channel->launch_callback(funcName, argPtr);
+    // Update the local args pointer
+    channel->recv(argsBuffer, argPtr);
+    // Free the data
+    channel->free(argPtr);
+    return {};
+  }
 
-  // Separate process channel, allocate the unmarshal args
-  auto argPtr = channel->malloc(argsBufferSize);
-  // Send the args
-  channel->send(argPtr, argsBuffer);
-  // Launch the callback
-  channel->launch_callback(funcName, argPtr);
-  // Update the local args pointer
-  channel->recv(argsBuffer, argPtr);
-  // Free the data
-  channel->free(argPtr);
+  // This is a local shared memory callback, use the unmarshal function pointer.
+  auto *castedFunc =
+      reinterpret_cast<cudaq::KernelThunkResultType (*)(void *, bool)>(
+          unmarshalFunc);
+
+  // Load the callback (this is simple, just provide the channel with the
+  // function pointer)
+  channel->load_callback(funcName, castedFunc);
+
+  // Launch the callback, result data stored to argsBuffer.
+  channel->launch_callback(funcName, {reinterpret_cast<uintptr_t>(argsBuffer),
+                                      argsBufferSize, deviceId});
   return {};
 }
 }

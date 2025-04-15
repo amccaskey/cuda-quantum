@@ -201,7 +201,7 @@ public:
 
     // Initialize quantum compiler with callback preservation
     compiler = quake_compiler::get("default_compiler");
-    compiler->initialize(config, {{"remove_unmarshals", false}});
+    compiler->initialize(config, {{"remove_unmarshals", true}});
 
     // Configure target execution backend
     backend = target::get("default_target");
@@ -356,6 +356,8 @@ extern "C" {
 void *__nvqpp__device_extract_device_ptr(cudaq::device_ptr *devPtr) {
   using namespace cudaq::driver;
 
+  cudaq::info("Extracting the device pointer for {}, {}", devPtr->handle,
+              devPtr->deviceId);
   // Here we know we are in shared memory only
   if (devPtr->deviceId == host_qpu_channel_id)
     return reinterpret_cast<void *>(devPtr->handle);

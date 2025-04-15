@@ -87,3 +87,41 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
   target_link_options(ethernet_host_shmem_channel_pass_ptrs_tester PRIVATE -Wl,--no-as-needed)
 endif()
 gtest_discover_tests(ethernet_host_shmem_channel_pass_ptrs_tester)
+
+if (CUDA_FOUND) 
+  add_library(test_cuda_kernels OBJECT test_cuda.cu) 
+  set_property(TARGET test_cuda_kernels PROPERTY CUDA_FATBIN_COMPILATION ON)
+  
+  add_executable(shmem_cuda_channel_tester shmem_cuda_channel_tester.cpp)
+
+  target_link_libraries(shmem_cuda_channel_tester
+    PRIVATE
+      cudaq-platform-default
+      cudaq-driver
+      cudaq-builder
+      cudaq-cuda-channel
+      add_driver_test
+      gtest_main
+  )
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
+    target_link_options(shmem_cuda_channel_tester PRIVATE -Wl,--no-as-needed)
+  endif()
+  gtest_discover_tests(shmem_cuda_channel_tester)
+
+  add_executable(ethernet_cuda_channel_tester ethernet_host_cuda_channel_tester.cpp)
+
+  target_link_libraries(ethernet_cuda_channel_tester
+    PRIVATE
+      cudaq-platform-default
+      cudaq-driver
+      cudaq-ethernet-dispatcher
+      cudaq-builder
+      cudaq-cuda-channel
+      add_driver_test
+      gtest_main
+  )
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
+    target_link_options(ethernet_cuda_channel_tester PRIVATE -Wl,--no-as-needed)
+  endif()
+  gtest_discover_tests(ethernet_cuda_channel_tester)
+endif() 

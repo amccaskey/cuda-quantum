@@ -317,6 +317,7 @@ public:
     if (failed(pm.run(*module)))
       return -1;
 
+    // module->dump();
     // Potentially get the number of required qubits.
     std::optional<std::size_t> numRequiredQubits = getNumRequiredQubits(module);
     if (numRequiredQubits)
@@ -329,8 +330,10 @@ public:
 
     std::vector<llvm::StringRef> stringRefs;
     for (const auto &str : symbolLocations) {
-      cudaq::info("Adding Symbol Location {}", str);
-      stringRefs.push_back(llvm::StringRef(str));
+      if (!StringRef(str).endswith(".fatbin")) {
+        cudaq::info("Adding Symbol Location {}", str);
+        stringRefs.push_back(llvm::StringRef(str));
+      }
     }
 
     mlir::ExecutionEngineOptions engineOptions;

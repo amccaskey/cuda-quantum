@@ -40,6 +40,7 @@ public:
   // Override TearDown if any cleanup is needed
   void TearDown() override {
     // Perform any necessary cleanup here (if applicable)
+    cudaq::driver::shutdown();
   }
 };
 
