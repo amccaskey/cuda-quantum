@@ -47,6 +47,7 @@ struct VerifyQIRProfilePass
       return;
     auto *ctx = &getContext();
     bool isBaseProfile = convertTo.getValue() == "qir-base";
+    bool isAdaptive = convertTo.getValue() == "qir-adaptive";
     func.walk([&](Operation *op) {
       if (auto call = dyn_cast<LLVM::CallOp>(op)) {
         auto funcNameAttr = call.getCalleeAttr();
@@ -60,12 +61,13 @@ struct VerifyQIRProfilePass
           return WalkResult::advance();
         if (funcName.equals("__nvqpp__device_extract_device_ptr"))
           return WalkResult::advance();
-        if (!funcName.startswith("__quantum_") ||
-            funcName.equals(cudaq::opt::QIRCustomOp)) {
-          call.emitOpError("unexpected call in QIR base profile");
-          passFailed = true;
-          return WalkResult::advance();
-        }
+        if (!isAdaptive)
+          if (!funcName.startswith("__quantum_") ||
+              funcName.equals(cudaq::opt::QIRCustomOp)) {
+            call.emitOpError("unexpected call in QIR base profile");
+            passFailed = true;
+            return WalkResult::advance();
+          }
 
         // Check that qubits are unique values.
         const std::size_t numOpnds = call.getNumOperands();
