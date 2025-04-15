@@ -41,6 +41,8 @@ void *to_ptr(const device_ptr &d) { return reinterpret_cast<void *>(d.handle); }
 std::size_t to_handle(void *ptr) { return reinterpret_cast<uintptr_t>(ptr); }
 
 void connect(const std::string &cfgStr) {
+  bool needUnmarshallers = true;
+
   // parse back to target yaml
   // Create the communication channels
   llvm::yaml::Input yin(cfgStr.c_str());
@@ -53,6 +55,7 @@ void connect(const std::string &cfgStr) {
                 device.Name);
     communication_channels.emplace_back(channel::get(device.Config.Channel));
     communication_channels.back()->connect(id++, config);
+    needUnmarshallers &= communication_channels.back()->requires_unmarshaller();
 
     auto devLibs =
         device.Config.ExposedLibraries.value_or(std::vector<std::string>{});
@@ -62,7 +65,7 @@ void connect(const std::string &cfgStr) {
 
   // FIXME add this to the config
   compiler = quake_compiler::get("default_compiler");
-  compiler->initialize(config);
+  compiler->initialize(config, {{"remove_unmarshals", !needUnmarshallers}});
 
   backend = target::get("default_target");
   backend->initialize(config);

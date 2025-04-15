@@ -83,6 +83,7 @@ TEST(DriverTester, checkLaunchKernel) {
   )#";
 
   // This is the kernel
+  // extern "C" void incrementInt(int*);
   // __qpu__ void callGpu(cudaq::device_ptr in) {
   //   cudaq::qubit q;
   //   h(q);

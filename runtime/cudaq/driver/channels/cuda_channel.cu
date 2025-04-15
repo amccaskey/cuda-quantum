@@ -93,6 +93,7 @@ public:
     printf("HERE WE ARE GETTING THE ARG: %d\n", i);
     return local_memory_pool.at(devPtr.handle);
   }
+  bool requires_unmarshaller() override { return false; }
 
   void disconnect() override {
     for (std::size_t i = 0; i < fatbinLocations.size(); i++)
@@ -176,12 +177,13 @@ public:
                 funcName, args.size, args.handle);
     auto *cuFunc = loadedCallbacks.at(funcName);
     auto size = args.size;
-    auto *rawArgs = reinterpret_cast<void*>(args.handle);//local_memory_pool.at(args.handle);
+    auto *rawArgs = reinterpret_cast<void *>(
+        args.handle); // local_memory_pool.at(args.handle);
     int i = 0;
     struct test {
-      int * ii;
+      int *ii;
     };
-    auto *casted = reinterpret_cast<test*>(rawArgs);
+    auto *casted = reinterpret_cast<test *>(rawArgs);
     cudaMemcpy(&i, casted->ii, 4, cudaMemcpyDeviceToHost);
     printf("HERE WE ARE GETTING THE ARG: %d\n", i);
     void *config[] = {CU_LAUNCH_PARAM_BUFFER_POINTER, rawArgs,

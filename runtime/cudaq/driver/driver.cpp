@@ -184,6 +184,7 @@ public:
   ///          quantum compiler with callback support, and sets up target
   ///          backend.
   void connect(const config::TargetConfig &config) override {
+    bool needUnmarshallers = true;
     // Configure communication channels for each target device
     for (std::size_t id = 0; auto &device : config.Devices) {
       cudaq::info(
@@ -191,6 +192,9 @@ public:
           device.Name);
       communication_channels.emplace_back(channel::get(device.Config.Channel));
       communication_channels.back()->connect(id++, config);
+
+      needUnmarshallers &=
+          communication_channels.back()->requires_unmarshaller();
 
       // Collect exposed libraries for symbol resolution
       auto devLibs =
@@ -201,7 +205,7 @@ public:
 
     // Initialize quantum compiler with callback preservation
     compiler = quake_compiler::get("default_compiler");
-    compiler->initialize(config, {{"remove_unmarshals", true}});
+    compiler->initialize(config, {{"remove_unmarshals", !needUnmarshallers}});
 
     // Configure target execution backend
     backend = target::get("default_target");

@@ -214,7 +214,7 @@ protected:
     return std::nullopt;
   }
 
-  bool remove_unmarshals = true;
+  bool remove_unmarshals = false;
 
 public:
   void initialize(const config::TargetConfig &config,
