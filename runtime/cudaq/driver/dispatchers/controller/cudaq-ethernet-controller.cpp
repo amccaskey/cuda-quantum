@@ -227,7 +227,7 @@ std::vector<char> launch_callback(std::size_t devId,
 
 extern "C" {
 
-void *__nvqpp__device_extract_device_ptr(cudaq::device_ptr *devPtr) {
+void *__nvqpp__device_extract_device_ptr(cudaq::driver::device_ptr *devPtr) {
   using namespace cudaq::driver;
 
   // Here we know we are in shared memory only

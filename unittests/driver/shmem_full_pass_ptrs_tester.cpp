@@ -131,7 +131,7 @@ TEST(DriverTester, checkLaunchKernel) {
 
   // Manually setup the Thunk Args for the Kernel
   struct ThunkArgs {
-    cudaq::device_ptr devPtr;
+    cudaq::driver::device_ptr devPtr;
   };
 
   // Allocate data on the 0th device

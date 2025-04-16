@@ -105,7 +105,7 @@ TEST(DriverTester, checkLaunchKernel) {
   // Here our kernel takes a device_ptr as input,
   // so the ThunkArgs are the following struct
   struct ThunkArgs {
-    cudaq::device_ptr devPtr;
+    cudaq::driver::device_ptr devPtr;
   };
 
   printf("calling malloc_set on GPU 0\n");

@@ -92,7 +92,7 @@ void shutdown() { details::host_qpu_channel->disconnect(); }
 // --- Shared Memory Intrinsics Implementations
 extern "C" {
 
-void *__nvqpp__device_extract_device_ptr(cudaq::device_ptr *devPtr) {
+void *__nvqpp__device_extract_device_ptr(cudaq::driver::device_ptr *devPtr) {
   using namespace cudaq::driver;
 
   cudaq::info("Extracting the device pointer for {}, {}", devPtr->handle,

@@ -98,7 +98,7 @@ TEST(DriverTester, checkLaunchKernel) {
   // Here our kernel takes a device_ptr as input,
   // so the ThunkArgs are the following struct
   struct ThunkArgs {
-    cudaq::device_ptr devPtr;
+    cudaq::driver::device_ptr devPtr;
   };
 
   printf("calling malloc_set on GPU 0\n");
@@ -196,9 +196,9 @@ TEST(DriverTester, checkRealGPUComputation) {
   // Here our kernel takes a device_ptr as input,
   // so the ThunkArgs are the following struct
   struct ThunkArgs {
-    cudaq::device_ptr aPtr;
-    cudaq::device_ptr bPtr;
-    cudaq::device_ptr cPtr;
+    cudaq::driver::device_ptr aPtr;
+    cudaq::driver::device_ptr bPtr;
+    cudaq::driver::device_ptr cPtr;
     int n;
   };
 
@@ -218,7 +218,7 @@ TEST(DriverTester, checkRealGPUComputation) {
   driver::memcpy(thunkArgsConcrete.cPtr, localC.data());
 
   // Tell the controller to allocate data for the Thunk Args
-  device_ptr thunkArgsDevPtr = driver::malloc(sizeof(ThunkArgs));
+  driver::device_ptr thunkArgsDevPtr = driver::malloc(sizeof(ThunkArgs));
 
   // Set the Thunk Args data on the controller
   driver::memcpy(thunkArgsDevPtr, &thunkArgsConcrete);

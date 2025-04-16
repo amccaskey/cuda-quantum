@@ -40,10 +40,10 @@ struct device_ptr {
   /// @return nullptr (dummy implementation for template compatibility)
   /// @note Current implementation returns null - actual device memory access
   ///       requires platform-specific handling
-  template <typename T>
-  operator T *() {
-    return nullptr;
-  }
+  // template <typename T>
+  // operator T *() {
+  //   return nullptr;
+  // }
 };
 
 /// @brief Structure representing CUDA launch parameters for kernel execution.
@@ -93,5 +93,8 @@ struct launch_result {
 // For language exposure
 namespace cudaq {
 /// @brief Alias for quantum device memory pointer handle
-using device_ptr = driver::device_ptr;
+template <typename T>
+struct device_ptr : public driver::device_ptr {
+  operator T *() { return nullptr; }
+};
 } // namespace cudaq
