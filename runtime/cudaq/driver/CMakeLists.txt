@@ -13,6 +13,10 @@ add_library(${LIBRARY_NAME}
     driver.cpp
     driver_qpu.cpp
     target.cpp
+    
+    channels/shmem_channel.cpp
+    dispatchers/shmem_dispatcher.cpp
+
     ../platform/common/QuantumExecutionQueue.cpp
     )
 

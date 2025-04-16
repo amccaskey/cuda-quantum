@@ -17,6 +17,10 @@ class TargetConfig;
 
 namespace driver {
 
+/// @brief Special identifier for host-QPU communication channel.
+static constexpr std::size_t host_qpu_channel_id =
+    std::numeric_limits<std::size_t>::max();
+
 /// @brief Abstract base class for managing host-control dispatch operations.
 /// This class provides an interface for connecting to a target device,
 /// managing memory allocation, transferring data, and executing quantum
@@ -159,9 +163,29 @@ public:
   /// @return Result of the callback execution (e.g., success or error code).
   virtual launch_result
   launch_callback(const std::string &funcName, const device_ptr &argsHandle,
-                  std::optional<std::size_t> blockSize = std::nullopt,
-                  std::optional<std::size_t> gridSize = std::nullopt) = 0;
+                  cuda_launch_parameters params = cuda_launch_parameters()) = 0;
 };
+
+namespace shmem {
+/// @brief Convert a shared memory device pointer handle to its raw pointer.
+/// @param d Device pointer handle.
+/// @return Raw pointer representation of the device memory.
+inline void *to_ptr(const device_ptr &d) {
+  return reinterpret_cast<void *>(d.handle);
+}
+
+/// @brief Convert a raw pointer to its handle representation.
+/// @param ptr Raw pointer.
+/// @return Handle representation of the pointer.
+inline std::size_t to_handle(void *ptr) {
+  return reinterpret_cast<uintptr_t>(ptr);
+}
+
+/// @brief Collection of communication channels between shared memory host and
+/// devices.
+inline std::vector<std::unique_ptr<channel>> communication_channels;
+
+} // namespace shmem
 
 } // namespace driver
 } // namespace cudaq

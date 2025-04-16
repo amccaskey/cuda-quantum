@@ -46,6 +46,38 @@ struct device_ptr {
   }
 };
 
+/// @brief Structure representing CUDA launch parameters for kernel execution.
+///
+/// Contains configuration for block and grid dimensions used in CUDA kernels.
+struct cuda_launch_parameters {
+  /// @brief Array holding the dimensions of each thread block (x, y, z).
+  const std::size_t blockDim[3];
+
+  /// @brief Array holding the dimensions of the grid (x, y, z).
+  const std::size_t gridDim[3];
+
+  /// @brief Default constructor initializing all dimensions to zero.
+  ///
+  /// Sets both blockDim and gridDim arrays to {0, 0, 0}.
+  cuda_launch_parameters() : blockDim{0, 0, 0}, gridDim{0, 0, 0} {}
+
+  /// @brief Constructor initializing block and grid dimensions with specified
+  /// values.
+  ///
+  /// @param block The size of the block in the x-dimension; y and z are
+  /// defaulted to 1.
+  /// @param grid The size of the grid in the x-dimension; y and z are defaulted
+  /// to 1.
+  cuda_launch_parameters(std::size_t block, std::size_t grid)
+      : blockDim{block, 1, 1}, gridDim{grid, 1, 1} {}
+
+  /// @brief Checks if the launch parameters are valid.
+  ///
+  /// @return true if the first element of blockDim is zero, indicating invalid
+  /// parameters.
+  bool has_parameters() const { return blockDim[0] == 0; }
+};
+
 /// @brief Result container for quantum kernel execution
 /// @details Stores both successful computation results and error information
 struct launch_result {

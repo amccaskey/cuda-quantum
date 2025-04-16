@@ -284,7 +284,7 @@ cudaq::KernelThunkResultType __nvqpp__device_callback_run(
   channel->launch_callback(
       funcName,
       {reinterpret_cast<uintptr_t>(argsBuffer), argsBufferSize, deviceId},
-      blockSize, gridSize);
+      {blockSize, gridSize});
   return {};
 }
 }
