@@ -35,15 +35,6 @@ struct device_ptr {
   /// @brief Physical device identifier
   std::size_t deviceId = std::numeric_limits<std::size_t>::max();
 
-  /// @brief Type conversion operator for device memory access
-  /// @tparam T Target data type for pointer conversion
-  /// @return nullptr (dummy implementation for template compatibility)
-  /// @note Current implementation returns null - actual device memory access
-  ///       requires platform-specific handling
-  // template <typename T>
-  // operator T *() {
-  //   return nullptr;
-  // }
 };
 
 /// @brief Structure representing CUDA launch parameters for kernel execution.
