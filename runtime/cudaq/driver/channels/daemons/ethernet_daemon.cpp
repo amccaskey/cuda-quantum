@@ -23,7 +23,7 @@ static llvm::cl::opt<int>
 
 namespace cudaq {
 
-std::unique_ptr<quake_compiler> compiler;
+std::unique_ptr<mlir_compiler> compiler;
 std::map<std::size_t, std::string> handleToFuncNames;
 std::map<std::size_t, std::pair<void *, std::size_t>> memory_pool;
 std::vector<std::string> symbolLocations;
@@ -34,7 +34,7 @@ void connect(std::size_t assignedID, const std::string &cfg) {
   yin >> config;
 
   // FIXME add this to the config
-  compiler = quake_compiler::get("default_compiler");
+  compiler = mlir_compiler::get("default_qir_compiler");
   compiler->initialize(config);
   symbolLocations = config.Devices[assignedID].Config.ExposedLibraries.value_or(
       std::vector<std::string>{});
@@ -65,7 +65,9 @@ std::vector<char> recv(std::size_t handle, std::size_t size) {
 
 std::size_t load_callback(const std::string &funcName,
                           const std::string &unmarshalCode) {
-  return compiler->compile_unmarshaler(unmarshalCode, symbolLocations);
+  auto hdl = compiler->load(unmarshalCode);
+  compiler->compile(hdl);
+  return hdl;
 }
 
 std::vector<char> launch_callback(std::size_t handle, std::size_t argsHandle) {

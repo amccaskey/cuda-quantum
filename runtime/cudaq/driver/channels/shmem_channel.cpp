@@ -28,7 +28,7 @@ protected:
   std::map<std::string, KernelThunkResultType (*)(void *, bool)> unmarshallers;
 
   /// @brief Compiler instance for processing Quake code.
-  std::unique_ptr<quake_compiler> compiler;
+  std::unique_ptr<mlir_compiler> compiler;
 
   /// @brief Map of compiled unmarshaller functions for callbacks.
   std::map<std::string, std::size_t> compiledUnmarshallers;
@@ -40,7 +40,7 @@ public:
   void connect(std::size_t assignedID,
                const config::TargetConfig &config) override {
     device_id = assignedID;
-    compiler = quake_compiler::get("default_compiler");
+    compiler = mlir_compiler::get("default_qir_compiler");
     compiler->initialize(config);
     symbol_locations =
         config.Devices[assignedID].Config.ExposedLibraries.value_or(
@@ -86,9 +86,9 @@ public:
   /// @param unmarshallerCode MLIR FuncOp code for unmarshalling arguments.
   void load_callback(const std::string &funcName,
                      const std::string &unmarshallerCode) override {
-    compiledUnmarshallers.insert(
-        {funcName,
-         compiler->compile_unmarshaler(unmarshallerCode, symbol_locations)});
+    auto hdl = compiler->load(unmarshallerCode);
+    compiler->compile(hdl);
+    compiledUnmarshallers.insert({funcName, hdl});
   }
 
   /// @brief Load a callback function using an unmarshaller function pointer.

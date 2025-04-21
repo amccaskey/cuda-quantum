@@ -9,6 +9,9 @@
 #pragma once
 
 #include "cudaq/utils/extension_point.h"
+#include "mlir/ExecutionEngine/ExecutionEngine.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 
 #include <map>
@@ -16,8 +19,7 @@
 
 namespace mlir {
 class MLIRContext;
-class ExecutionEngine;
-class ModuleOp;
+class PassManager;
 } // namespace mlir
 
 namespace llvm {
@@ -99,41 +101,44 @@ struct callback {
   std::string unmarshalFuncOpCode;
 };
 
-// The quake_compiler is an extension point for compiling
-// both Quake kernel code and required callback unmarshal
-// functions to executable object code
-class quake_compiler : public extension_point<quake_compiler> {
+class mlir_compiler : public extension_point<mlir_compiler> {
+protected:
+  /// @brief A Loaded Module tracks the kernel thunk function name,
+  /// the number of required qubits, the MLIR ExecutionEngine, and
+  /// invoked callback functions.
+  struct LoadedModule {
+    std::string entryPointName = "";
+    mlir::OwningOpRef<mlir::ModuleOp> m_module;
+    std::unique_ptr<mlir::ExecutionEngine> jitEngine;
+    std::vector<callback> callbacks;
+  };
+
+  std::vector<std::string> symbolLocations;
+  std::unordered_map<std::size_t, LoadedModule> loaded_modules;
+  std::unique_ptr<mlir::MLIRContext> context;
+  virtual void lowerToLLVM(mlir::PassManager &pm,
+                           mlir::OwningOpRef<mlir::ModuleOp> &) = 0;
+
 public:
-  virtual ~quake_compiler() {}
+  virtual ~mlir_compiler() {}
 
   /// @brief Initialize the compiler, give it the target config
-  virtual void initialize(const config::TargetConfig &,
-                          const std::map<std::string, bool> extra = {}) = 0;
+  virtual void initialize(const config::TargetConfig &);
 
-  /// @brief Compile the Quake code to executable code and
-  /// return a handle to the compiled kernel
-  virtual std::size_t
-  compile(const std::string &quake,
-          const std::vector<std::string> &symbolLocations) = 0;
-
-  /// @brief Compile the MLIR code for the unmarshal function
-  /// for a given classical callback, provide potential external
-  /// shared library locations to locate callable symbols. Return
-  /// a handle to the unmarshal functino
-  virtual std::size_t
-  compile_unmarshaler(const std::string &mlirCode,
-                      const std::vector<std::string> &symbolLocations) = 0;
+  std::size_t load(const std::string &mlir);
+  void compile(std::size_t moduleHandle);
+  /// @brief There may be scenarios where the callback is non-local (distributed
+  /// system of devices). Enable one to remove callbacks to avoid
+  /// symbol-not-found JIT errors.
+  void remove_callback(std::size_t moduleHandle, const std::string &funcName);
 
   /// @brief Return all callbacks required by the kernel/module
   /// at the given handle.
-  virtual std::vector<callback> get_callbacks(std::size_t moduleHandle) = 0;
+  std::vector<callback> get_callbacks(std::size_t moduleHandle);
 
   /// @brief Launch the kernel thunk, results are posted to the thunkArgs
   /// pointer
-  virtual void launch(std::size_t moduleHandle, void *thunkArgs) = 0;
-
-  virtual std::optional<std::size_t>
-  get_required_num_qubits(std::size_t hdl) = 0;
+  virtual void launch(std::size_t moduleHandle, void *argsBuffer);
 };
 
 } // namespace cudaq

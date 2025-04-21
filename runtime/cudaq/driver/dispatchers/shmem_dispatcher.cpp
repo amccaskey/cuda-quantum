@@ -29,7 +29,7 @@ extern void setTarget(target *);
 class shmem_iface : public control_dispatcher {
 private:
   /// @brief Quantum compiler for kernel transformation
-  std::unique_ptr<quake_compiler> compiler;
+  std::unique_ptr<mlir_compiler> compiler;
 
   /// @brief Target QPU execution backend
   std::unique_ptr<target> backend;
@@ -45,7 +45,6 @@ public:
   ///          quantum compiler with callback support, and sets up target
   ///          backend.
   void connect(const config::TargetConfig &config) override {
-    bool needUnmarshallers = true;
     // Configure communication channels for each target device
     for (std::size_t id = 0; auto &device : config.Devices) {
       cudaq::info(
@@ -53,9 +52,6 @@ public:
           device.Name);
       communication_channels.emplace_back(channel::get(device.Config.Channel));
       communication_channels.back()->connect(id++, config);
-
-      needUnmarshallers &=
-          communication_channels.back()->requires_unmarshaller();
 
       // Collect exposed libraries for symbol resolution
       auto devLibs =
@@ -65,8 +61,8 @@ public:
     }
 
     // Initialize quantum compiler with callback preservation
-    compiler = quake_compiler::get("default_compiler");
-    compiler->initialize(config, {{"remove_unmarshals", !needUnmarshallers}});
+    compiler = mlir_compiler::get("default_qir_compiler");
+    compiler->initialize(config);
 
     // Configure target execution backend
     backend = target::get("default_target");
@@ -131,13 +127,34 @@ public:
   /// @param quake Kernel code in MLIR/Quake format
   /// @return handle to compiled kernel executable
   handle load_kernel(const std::string &quake) const override {
-    // Maybe update 
-    // load 
-    // analyze 
-    // get callbacks
-    // which channels need / dont need unmarshal code
-    //
-    return compiler->compile(quake, symbolLocations);
+    auto hdl = compiler->load(quake);
+
+    // Do we need the unmarshal functions,
+    // in a distributed system, we may need to remove them
+    // since the symbols won't be local
+    bool needUnmarshallers = true;
+    for (auto &channel : communication_channels)
+      needUnmarshallers &=
+          communication_channels.back()->requires_unmarshaller();
+
+    // Loop over the callbacks and upload
+    // the unmarshal code
+    auto callbacks = compiler->get_callbacks(hdl);
+    for (auto &callback : callbacks) {
+      for (auto &channel : communication_channels)
+        channel->load_callback(callback.callbackName,
+                               callback.unmarshalFuncOpCode);
+
+      // Drop the unmarshal function if we don't need it
+      if (!needUnmarshallers)
+        compiler->remove_callback(hdl, callback.callbackName);
+    }
+
+    // Lower to LLVM
+    compiler->compile(hdl);
+
+    // Return the loaded module handle
+    return hdl;
   }
 
   /// @brief Execute quantum kernel with managed resource allocation
@@ -146,22 +163,6 @@ public:
   /// @return launch_result containing execution results/errors
   launch_result launch_kernel(handle kernelHandle,
                               device_ptr &argsHandle) const override {
-    // Distribute callback unmarshallers to all devices
-    auto callbacks = compiler->get_callbacks(kernelHandle);
-    for (auto &callback : callbacks)
-      for (auto &channel : communication_channels)
-        channel->load_callback(callback.callbackName,
-                               callback.unmarshalFuncOpCode);
-
-    // Dynamic qubit allocation for adaptive execution profiles
-
-    if (auto maybeNumQubits = compiler->get_required_num_qubits(kernelHandle)) {
-      backend->allocate(*maybeNumQubits); // Acquire qubits
-      compiler->launch(kernelHandle, shmem::to_ptr(argsHandle));
-      backend->deallocate(*maybeNumQubits); // Release qubits
-      return {};
-    }
-
     compiler->launch(kernelHandle, shmem::to_ptr(argsHandle));
     return {};
   }
@@ -169,7 +170,8 @@ public:
   CUDAQ_EXTENSION_CREATOR_FUNCTION(control_dispatcher, shmem_iface)
 };
 
-/// @brief Register shared memory interface as control dispatcher implementation
+/// @brief Register shared memory interface as control dispatcher
+/// implementation
 CUDAQ_REGISTER_EXTENSION_TYPE(shmem_iface)
 
 } // namespace cudaq::driver

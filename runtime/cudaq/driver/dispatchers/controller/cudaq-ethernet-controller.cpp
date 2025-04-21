@@ -30,7 +30,7 @@ namespace cudaq::driver {
 extern void setTarget(target *);
 
 std::vector<std::unique_ptr<channel>> communication_channels;
-std::unique_ptr<quake_compiler> compiler;
+std::unique_ptr<mlir_compiler> compiler;
 std::map<intptr_t, device_ptr> memory_pool;
 std::vector<std::string> symbolLocations;
 std::unique_ptr<target> backend;
@@ -64,8 +64,8 @@ void connect(const std::string &cfgStr) {
   }
 
   // FIXME add this to the config
-  compiler = quake_compiler::get("default_compiler");
-  compiler->initialize(config, {{"remove_unmarshals", !needUnmarshallers}});
+  compiler = mlir_compiler::get("default_qir_compiler");
+  compiler->initialize(config);
 
   backend = target::get("default_target");
   backend->initialize(config);
@@ -159,7 +159,31 @@ void send(handle handle, std::vector<char> &data, std::size_t size) {
 
 handle load_kernel(const std::string &quake) {
   cudaq::info("Loading and JIT compiling the kernel!");
-  return compiler->compile(quake, symbolLocations);
+  auto hdl = compiler->load(quake);
+
+  // Do we need the unmarshal functions,
+  // in a distributed system, we may need to remove them
+  // since the symbols won't be local
+  bool needUnmarshallers = true;
+  for (auto &channel : communication_channels)
+    needUnmarshallers &= communication_channels.back()->requires_unmarshaller();
+
+  // Loop over the callbacks and upload
+  // the unmarshal code
+  auto callbacks = compiler->get_callbacks(hdl);
+  for (auto &callback : callbacks) {
+    for (auto &channel : communication_channels) {
+      channel->load_callback(callback.callbackName,
+                             callback.unmarshalFuncOpCode);
+    }
+    // Drop the unmarshal function if we don't need it
+    if (!needUnmarshallers)
+      compiler->remove_callback(hdl, callback.callbackName);
+  }
+
+  compiler->compile(hdl);
+  // Return the loaded module handle
+  return hdl;
 }
 
 std::vector<std::string> get_callbacks(handle hdl) {
@@ -182,28 +206,12 @@ std::vector<char> launch_kernel(handle kernelHandle, std::size_t argsHandle) {
   auto &devPtr = iter->second;
   auto *thunkArgs = to_ptr(devPtr);
   auto size = devPtr.size;
- 
+
   cudaq::info("Launching Kernel {}, args size {}", kernelHandle, size);
-
-  // Get this kernel's callbacks
-  auto callbacks = compiler->get_callbacks(kernelHandle);
-
-  // Make callback code available to devices
-  for (auto &callback : callbacks)
-    for (auto &channel : communication_channels)
-      channel->load_callback(callback.callbackName,
-                             callback.unmarshalFuncOpCode);
-
-  // We assume adaptive profile...
-  auto maybeNumQubits = compiler->get_required_num_qubits(kernelHandle);
-  if (maybeNumQubits)
-    backend->allocate(*maybeNumQubits);
 
   // Launch the kernel
   compiler->launch(kernelHandle, thunkArgs);
 
-  if (maybeNumQubits)
-    backend->deallocate(*maybeNumQubits);
   // Return the result data
   std::vector<char> retRes(size);
   std::memcpy(retRes.data(), thunkArgs, size);

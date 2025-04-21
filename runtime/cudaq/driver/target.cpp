@@ -24,6 +24,8 @@
 
 INSTANTIATE_REGISTRY_NO_ARGS(cudaq::driver::target)
 
+extern "C" void __nvqir__setCircuitSimulator(nvqir::CircuitSimulator *sim);
+
 namespace cudaq::driver {
 
 class default_target : public target {
@@ -68,6 +70,8 @@ public:
     simulator = getUniquePluginInstance<nvqir::CircuitSimulator>(
         std::string("getCircuitSimulator_") + nameToLookFor,
         libraryPath.string().c_str());
+
+    __nvqir__setCircuitSimulator(simulator);
   }
 
   void allocate(std::size_t num) override {

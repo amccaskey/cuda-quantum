@@ -253,7 +253,7 @@ static constexpr IntrinsicCode intrinsicTable[] = {
      {},
      "func.func private "
      "@__nvqpp__device_extract_device_ptr(!cc.ptr<!cc.struct<\"device_ptr\" "
-     "{i64, i64, i64}>>) -> !cc.ptr<i8>"},
+     "{i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>"},
 
     {"__nvqpp_createDynamicResult",
      /* arguments:
