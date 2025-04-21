@@ -109,6 +109,7 @@ void *__nvqpp__device_extract_device_ptr(cudaq::driver::device_ptr *devPtr) {
 
   return channel->get_raw_pointer(*devPtr);
 }
+
 cudaq::KernelThunkResultType __nvqpp__device_callback_run(
     std::uint64_t deviceId, const char *funcName, void *unmarshalFunc,
     void *argsBuffer, std::uint64_t argsBufferSize, std::uint64_t returnOffset,

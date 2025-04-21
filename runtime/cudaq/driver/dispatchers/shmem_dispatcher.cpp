@@ -131,6 +131,12 @@ public:
   /// @param quake Kernel code in MLIR/Quake format
   /// @return handle to compiled kernel executable
   handle load_kernel(const std::string &quake) const override {
+    // Maybe update 
+    // load 
+    // analyze 
+    // get callbacks
+    // which channels need / dont need unmarshal code
+    //
     return compiler->compile(quake, symbolLocations);
   }
 

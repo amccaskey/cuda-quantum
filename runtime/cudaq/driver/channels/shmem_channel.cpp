@@ -47,6 +47,9 @@ public:
             std::vector<std::string>{});
   }
 
+  bool runs_on_separate_process() override { return false; }
+  bool requires_unmarshaller() override { return true; }
+
   /// @brief Return the raw pointer corresponding to the
   /// provided device_ptr.
   void *get_raw_pointer(device_ptr &devPtr) override {

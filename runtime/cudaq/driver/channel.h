@@ -102,8 +102,11 @@ public:
 
   /// @brief Check if this channel operates on a separate process space.
   /// @return True if it runs on a separate process; false otherwise.
-  virtual bool runs_on_separate_process() { return false; }
-  virtual bool requires_unmarshaller() { return true; }
+  virtual bool runs_on_separate_process() = 0; 
+
+  /// @brief Return true if this channel requires nvq++ auto
+  /// generated unmarshal function for callbacks. 
+  virtual bool requires_unmarshaller() = 0; 
 
   /// @brief Return the raw pointer corresponding to the provided
   /// device_pointer. This should only be valid for channels

@@ -182,7 +182,7 @@ std::vector<char> launch_kernel(handle kernelHandle, std::size_t argsHandle) {
   auto &devPtr = iter->second;
   auto *thunkArgs = to_ptr(devPtr);
   auto size = devPtr.size;
-
+ 
   cudaq::info("Launching Kernel {}, args size {}", kernelHandle, size);
 
   // Get this kernel's callbacks
