@@ -6,6 +6,13 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
+FetchContent_Declare(
+  rpclib
+  GIT_REPOSITORY https://github.com/rpclib/rpclib.git
+  GIT_TAG master  
+)
+FetchContent_MakeAvailable(rpclib)
+
 set(LIBRARY_NAME cudaq-driver) 
 
 add_library(${LIBRARY_NAME} 

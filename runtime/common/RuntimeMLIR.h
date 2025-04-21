@@ -101,6 +101,13 @@ struct callback {
   std::string unmarshalFuncOpCode;
 };
 
+/// @brief Abstract base class for MLIR-based quantum-classical compiler
+/// extension points.
+///
+/// This class provides a generic interface for loading, compiling, and
+/// executing MLIR modules, as well as managing associated callbacks and JIT
+/// execution engines. Subclasses should implement the lowering pipeline for
+/// MLIR-to-LLVM dialect conversion.
 class mlir_compiler : public extension_point<mlir_compiler> {
 protected:
   /// @brief A Loaded Module tracks the kernel thunk function name,
@@ -113,9 +120,17 @@ protected:
     std::vector<callback> callbacks;
   };
 
+  /// @brief Library paths for the ExecutionEngine.
   std::vector<std::string> symbolLocations;
+
+  /// @brief The loaded modules, key is their user-held handle
   std::unordered_map<std::size_t, LoadedModule> loaded_modules;
+
+  /// @brief The MLIR Context
   std::unique_ptr<mlir::MLIRContext> context;
+
+  /// @brief Specify the pass pipeline for lowering the ModuleOp to
+  /// LLVM Dialect.
   virtual void lowerToLLVM(mlir::PassManager &pm,
                            mlir::OwningOpRef<mlir::ModuleOp> &) = 0;
 
@@ -125,8 +140,15 @@ public:
   /// @brief Initialize the compiler, give it the target config
   virtual void initialize(const config::TargetConfig &);
 
+  /// @brief Load the MLIR code to a ModuleOp and perform
+  /// analysis on the classical callbacks.
   std::size_t load(const std::string &mlir);
+
+  /// @brief Lower the MLIR ModuleOp to LLVM MLIR Dialect.
+  /// Will give subtypes an opportunity to tailor the lowering pass
+  /// pipeline.
   void compile(std::size_t moduleHandle);
+
   /// @brief There may be scenarios where the callback is non-local (distributed
   /// system of devices). Enable one to remove callbacks to avoid
   /// symbol-not-found JIT errors.

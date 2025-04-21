@@ -77,8 +77,8 @@ public:
 /// quantum operations.
 class channel : public extension_point<channel> {
 protected:
-  std::size_t device_id =
-      0; ///< The ID of the associated channel's target device.
+  /// @brief The ID of the associated channel's target device.
+  std::size_t device_id = 0;
 
   /// Locations of libraries containing symbols required for classical
   /// callbacks.
@@ -102,11 +102,11 @@ public:
 
   /// @brief Check if this channel operates on a separate process space.
   /// @return True if it runs on a separate process; false otherwise.
-  virtual bool runs_on_separate_process() = 0; 
+  virtual bool runs_on_separate_process() = 0;
 
   /// @brief Return true if this channel requires nvq++ auto
-  /// generated unmarshal function for callbacks. 
-  virtual bool requires_unmarshaller() = 0; 
+  /// generated unmarshal function for callbacks.
+  virtual bool requires_unmarshaller() = 0;
 
   /// @brief Return the raw pointer corresponding to the provided
   /// device_pointer. This should only be valid for channels

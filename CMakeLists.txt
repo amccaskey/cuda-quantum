@@ -540,14 +540,6 @@ if(CMAKE_CUDA_COMPILER)
   message(STATUS "Cuda language found.")
 endif()
 
-
-FetchContent_Declare(
-  rpclib
-  GIT_REPOSITORY https://github.com/rpclib/rpclib.git
-  GIT_TAG master  # You can specify a version tag or commit hash here
-)
-FetchContent_MakeAvailable(rpclib)
-
 # Code coverage setup
 # ==============================================================================
 if(CUDAQ_ENABLE_CC)
