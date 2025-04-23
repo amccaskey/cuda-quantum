@@ -48,12 +48,12 @@ TEST(DriverTester, checkLaunchKernel) {
 
   const std::string quake = R"#(
   module {
-  func.func @__nvqpp__mlirgen__function_callGpu.callGpu(%arg0: !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
-    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>
-    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+  func.func @__nvqpp__mlirgen__function_callGpu.callGpu(%arg0: !cc.struct<"device_ptr" {i64, i64, i64}>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
+    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64}>
+    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
     %1 = quake.alloca !quake.ref
     quake.h %1 : (!quake.ref) -> ()
-    %2 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>
+    %2 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>) -> !cc.ptr<i8>
     %3 = cc.cast %2 : (!cc.ptr<i8>) -> !cc.ptr<i32>
     cc.device_call @incrementInt<1, 1> (%3) : (!cc.ptr<i32>) -> ()
     return
@@ -73,9 +73,9 @@ TEST(DriverTester, checkLaunchKernel) {
     %2 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.array<i8 x ?>>
     %3 = cc.compute_ptr %2[%1] : (!cc.ptr<!cc.array<i8 x ?>>, i64) -> !cc.ptr<i8>
     %4 = cc.compute_ptr %0[0] : (!cc.ptr<!cc.struct<{!cc.struct<{i64, i64, i64}>}>>) -> !cc.ptr<!cc.struct<{i64, i64, i64}>>
-    %5 = cc.cast %4 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %6 = cc.load %5 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    call @__nvqpp__mlirgen__function_callGpu.callGpu(%6) : (!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) -> ()
+    %5 = cc.cast %4 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %6 = cc.load %5 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    call @__nvqpp__mlirgen__function_callGpu.callGpu(%6) : (!cc.struct<"device_ptr" {i64, i64, i64}>) -> ()
     %7 = call @__nvqpp_zeroDynamicResult() : () -> !cc.struct<{!cc.ptr<i8>, i64}>
     return %7 : !cc.struct<{!cc.ptr<i8>, i64}>
   }
@@ -136,22 +136,22 @@ TEST(DriverTester, checkRealGPUComputation) {
 
   const std::string quake = R"#(
   module {
-  func.func @__nvqpp__mlirgen__function_callVectorAdd.callVectorAdd(%arg0: !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>, %arg1: !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>, %arg2: !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>, %arg3: i32) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
-    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>
-    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %1 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>
-    cc.store %arg1, %1 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %2 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>
-    cc.store %arg2, %2 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+  func.func @__nvqpp__mlirgen__function_callVectorAdd.callVectorAdd(%arg0: !cc.struct<"device_ptr" {i64, i64, i64}>, %arg1: !cc.struct<"device_ptr" {i64, i64, i64}>, %arg2: !cc.struct<"device_ptr" {i64, i64, i64}>, %arg3: i32) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
+    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64}>
+    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %1 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64}>
+    cc.store %arg1, %1 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %2 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64}>
+    cc.store %arg2, %2 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
     %3 = cc.alloca i32
     cc.store %arg3, %3 : !cc.ptr<i32>
     %4 = quake.alloca !quake.ref
     quake.h %4 : (!quake.ref) -> ()
-    %5 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>
+    %5 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>) -> !cc.ptr<i8>
     %6 = cc.cast %5 : (!cc.ptr<i8>) -> !cc.ptr<f32>
-    %7 = cc.extract_ptr %1 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>
+    %7 = cc.extract_ptr %1 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>) -> !cc.ptr<i8>
     %8 = cc.cast %7 : (!cc.ptr<i8>) -> !cc.ptr<f32>
-    %9 = cc.extract_ptr %2 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>
+    %9 = cc.extract_ptr %2 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>) -> !cc.ptr<i8>
     %10 = cc.cast %9 : (!cc.ptr<i8>) -> !cc.ptr<f32>
     %11 = cc.load %3 : !cc.ptr<i32>
     cc.device_call @vectorAdd<256, 128> (%6, %8, %10, %11) : (!cc.ptr<f32>, !cc.ptr<f32>, !cc.ptr<f32>, i32) -> ()
@@ -172,17 +172,17 @@ TEST(DriverTester, checkRealGPUComputation) {
     %2 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.array<i8 x ?>>
     %3 = cc.compute_ptr %2[%1] : (!cc.ptr<!cc.array<i8 x ?>>, i64) -> !cc.ptr<i8>
     %4 = cc.compute_ptr %0[0] : (!cc.ptr<!cc.struct<{!cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, i32}>>) -> !cc.ptr<!cc.struct<{i64, i64, i64}>>
-    %5 = cc.cast %4 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %6 = cc.load %5 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+    %5 = cc.cast %4 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %6 = cc.load %5 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
     %7 = cc.compute_ptr %0[1] : (!cc.ptr<!cc.struct<{!cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, i32}>>) -> !cc.ptr<!cc.struct<{i64, i64, i64}>>
-    %8 = cc.cast %7 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %9 = cc.load %8 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+    %8 = cc.cast %7 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %9 = cc.load %8 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
     %10 = cc.compute_ptr %0[2] : (!cc.ptr<!cc.struct<{!cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, i32}>>) -> !cc.ptr<!cc.struct<{i64, i64, i64}>>
-    %11 = cc.cast %10 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %12 = cc.load %11 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+    %11 = cc.cast %10 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %12 = cc.load %11 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
     %13 = cc.compute_ptr %0[3] : (!cc.ptr<!cc.struct<{!cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, !cc.struct<{i64, i64, i64}>, i32}>>) -> !cc.ptr<i32>
     %14 = cc.load %13 : !cc.ptr<i32>
-    call @__nvqpp__mlirgen__function_callVectorAdd.callVectorAdd(%6, %9, %12, %14) : (!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>, !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>, !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>, i32) -> ()
+    call @__nvqpp__mlirgen__function_callVectorAdd.callVectorAdd(%6, %9, %12, %14) : (!cc.struct<"device_ptr" {i64, i64, i64}>, !cc.struct<"device_ptr" {i64, i64, i64}>, !cc.struct<"device_ptr" {i64, i64, i64}>, i32) -> ()
     %15 = call @__nvqpp_zeroDynamicResult() : () -> !cc.struct<{!cc.ptr<i8>, i64}>
     return %15 : !cc.struct<{!cc.ptr<i8>, i64}>
   }

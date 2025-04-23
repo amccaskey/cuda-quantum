@@ -2100,21 +2100,21 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
         if (tArgs->size() != 4)
           return std::nullopt;
 
-        std::size_t blockSize, gridSize;
-        const clang::TemplateArgument &blockSizeArg = tArgs->get(0);
-        if (blockSizeArg.getKind() == clang::TemplateArgument::Integral)
-          blockSize = blockSizeArg.getAsIntegral().getLimitedValue();
+        std::size_t numBlocks, numThreads;
+        const clang::TemplateArgument &numBlocksArg = tArgs->get(0);
+        if (numBlocksArg.getKind() == clang::TemplateArgument::Integral)
+          numBlocks = numBlocksArg.getAsIntegral().getLimitedValue();
         else
           return std::nullopt;
 
-        // Extract GridSize (second argument)
-        const clang::TemplateArgument &gridSizeArg = tArgs->get(1);
-        if (gridSizeArg.getKind() == clang::TemplateArgument::Integral)
-          gridSize = gridSizeArg.getAsIntegral().getLimitedValue();
+        // Extract numThreads (second argument)
+        const clang::TemplateArgument &numThreadsArg = tArgs->get(1);
+        if (numThreadsArg.getKind() == clang::TemplateArgument::Integral)
+          numThreads = numThreadsArg.getAsIntegral().getLimitedValue();
         else
           return std::nullopt;
 
-        return std::make_pair(blockSize, gridSize);
+        return std::make_pair(numBlocks, numThreads);
       }();
 
       SmallVector<Value> processedArgs{args[0]};
@@ -2137,11 +2137,11 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
       // FIXME Handle device id.
       cc::DeviceCallOp devCall;
       if (maybeGPULaunchParams) {
-        auto [blockSize, gridSize] = maybeGPULaunchParams.value();
-        auto blockAttr = builder.getI64IntegerAttr(blockSize);
-        auto gridAttr = builder.getI64IntegerAttr(gridSize);
+        auto [numBlocks, numThreads] = maybeGPULaunchParams.value();
+        auto blockAttr = builder.getI64IntegerAttr(numBlocks);
+        auto threadAttr = builder.getI64IntegerAttr(numThreads);
         devCall = builder.create<cc::DeviceCallOp>(
-            loc, devFuncTy.getResults(), symbol, callArgs, blockAttr, gridAttr);
+            loc, devFuncTy.getResults(), symbol, callArgs, blockAttr, threadAttr);
       } else {
         devCall = builder.create<cc::DeviceCallOp>(loc, devFuncTy.getResults(),
                                                    symbol, callArgs);

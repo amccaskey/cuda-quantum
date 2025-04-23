@@ -1671,12 +1671,12 @@ def cc_DeviceCallOp :
   let arguments = (ins
     FlatSymbolRefAttr:$callee,
     Variadic<AnyType>:$args,
-    OptionalAttr<I64Attr>:$blockSize,
-    OptionalAttr<I64Attr>:$gridSize
+    OptionalAttr<I64Attr>:$numBlocks,
+    OptionalAttr<I64Attr>:$numThreadsPerBlock
   );
   let results = (outs Variadic<AnyType>);
   let assemblyFormat = [{
-    $callee (`<` $blockSize^ `,` $gridSize `>`)? `(` $args `)` `:` functional-type(operands, results) attr-dict
+    $callee (`<` $numBlocks^ `,` $numThreadsPerBlock `>`)? `(` $args `)` `:` functional-type(operands, results) attr-dict
   }];
 
   let builders = [

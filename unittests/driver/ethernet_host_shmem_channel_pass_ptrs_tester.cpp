@@ -101,12 +101,12 @@ TEST(DriverTester, checkLaunchKernel) {
 
   const std::string quake = R"#(
   module {
-  func.func @__nvqpp__mlirgen__function_test.test(%arg0: !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
-    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>
-    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+  func.func @__nvqpp__mlirgen__function_test.test(%arg0: !cc.struct<"device_ptr" {i64, i64, i64}>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
+    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64}>
+    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
     %1 = quake.alloca !quake.ref
     quake.h %1 : (!quake.ref) -> ()
-    %2 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>
+    %2 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>) -> !cc.ptr<i8>
     %3 = cc.cast %2 : (!cc.ptr<i8>) -> !cc.ptr<i32>
     %4 = cc.alloca !cc.ptr<i32>
     cc.store %3, %4 : !cc.ptr<!cc.ptr<i32>>
@@ -124,9 +124,9 @@ TEST(DriverTester, checkLaunchKernel) {
     return %3 : !cc.struct<{!cc.ptr<i8>, i64}>
   }
   func.func @function_test.test.thunk(%arg0: !cc.ptr<i8>, %arg1: i1) -> !cc.struct<{!cc.ptr<i8>, i64}> {
-    %0 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %1 = cc.load %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    call @__nvqpp__mlirgen__function_test.test(%1) : (!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) -> ()
+    %0 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %1 = cc.load %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    call @__nvqpp__mlirgen__function_test.test(%1) : (!cc.struct<"device_ptr" {i64, i64, i64}>) -> ()
     %2 = call @__nvqpp_zeroDynamicResult() : () -> !cc.struct<{!cc.ptr<i8>, i64}>
     return %2 : !cc.struct<{!cc.ptr<i8>, i64}>
   }

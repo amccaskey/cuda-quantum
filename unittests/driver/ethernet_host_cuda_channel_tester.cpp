@@ -56,12 +56,12 @@ TEST(DriverTester, checkLaunchKernel) {
 
   const std::string quake = R"#(
   module {
-  func.func @__nvqpp__mlirgen__function_callGpu.callGpu(%arg0: !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
-    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64} [192,8]>
-    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
+  func.func @__nvqpp__mlirgen__function_callGpu.callGpu(%arg0: !cc.struct<"device_ptr" {i64, i64, i64}>) attributes {"cudaq-entrypoint", "cudaq-kernel", no_this} {
+    %0 = cc.alloca !cc.struct<"device_ptr" {i64, i64, i64}>
+    cc.store %arg0, %0 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
     %1 = quake.alloca !quake.ref
     quake.h %1 : (!quake.ref) -> ()
-    %2 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>) -> !cc.ptr<i8>
+    %2 = cc.extract_ptr %0 : (!cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>) -> !cc.ptr<i8>
     %3 = cc.cast %2 : (!cc.ptr<i8>) -> !cc.ptr<i32>
     cc.device_call @incrementInt<1, 1> (%3) : (!cc.ptr<i32>) -> ()
     return
@@ -81,9 +81,9 @@ TEST(DriverTester, checkLaunchKernel) {
     %2 = cc.cast %arg0 : (!cc.ptr<i8>) -> !cc.ptr<!cc.array<i8 x ?>>
     %3 = cc.compute_ptr %2[%1] : (!cc.ptr<!cc.array<i8 x ?>>, i64) -> !cc.ptr<i8>
     %4 = cc.compute_ptr %0[0] : (!cc.ptr<!cc.struct<{!cc.struct<{i64, i64, i64}>}>>) -> !cc.ptr<!cc.struct<{i64, i64, i64}>>
-    %5 = cc.cast %4 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    %6 = cc.load %5 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>>
-    call @__nvqpp__mlirgen__function_callGpu.callGpu(%6) : (!cc.struct<"device_ptr" {i64, i64, i64} [192,8]>) -> ()
+    %5 = cc.cast %4 : (!cc.ptr<!cc.struct<{i64, i64, i64}>>) -> !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    %6 = cc.load %5 : !cc.ptr<!cc.struct<"device_ptr" {i64, i64, i64}>>
+    call @__nvqpp__mlirgen__function_callGpu.callGpu(%6) : (!cc.struct<"device_ptr" {i64, i64, i64}>) -> ()
     %7 = call @__nvqpp_zeroDynamicResult() : () -> !cc.struct<{!cc.ptr<i8>, i64}>
     return %7 : !cc.struct<{!cc.ptr<i8>, i64}>
   }
