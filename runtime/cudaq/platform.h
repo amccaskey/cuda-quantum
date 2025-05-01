@@ -9,18 +9,5 @@
 #pragma once
 
 #include "cudaq/builder/kernel_builder.h"
-#include "cudaq/platform/quantum_platform.h"
 
-namespace cudaq {
-quantum_platform *getQuantumPlatformInternal();
-
-/// @brief Return the quantum platform provided by the linked platform library
-/// @return
-inline quantum_platform &get_platform() {
-  return *getQuantumPlatformInternal();
-}
-
-// Declare this function, implemented elsewhere
-std::string getQIR(const std::string &);
-
-} // namespace cudaq
+namespace cudaq {} // namespace cudaq

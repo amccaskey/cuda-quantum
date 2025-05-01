@@ -55,13 +55,13 @@ int main() {
     return 2;
   }
 
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
 
   // If you run this on quantinuum hardware (i.e. H1-1E), the following parity
   // check will check that the results look reasonable. Skip the parity check on
   // `--emulate` runs because the unnamed measurement is not saved and therefore
   // cannot be compared in a parity check.
-  if (!platform.is_emulated()) {
+  if (!platform.is_emulator()) {
 
     // Populate binaryQ0results[iteration][shot]
     std::vector<std::vector<int>> binaryQ0results;

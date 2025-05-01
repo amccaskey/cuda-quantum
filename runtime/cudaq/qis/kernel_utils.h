@@ -9,6 +9,7 @@
 #pragma once
 
 #include "common/ExecutionContext.h"
+#include "cudaq/builder/kernel_builder.h"
 #include "cudaq/concepts.h"
 #include "cudaq/utils/registry.h"
 #include "qkernel.h"

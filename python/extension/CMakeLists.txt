@@ -13,9 +13,33 @@ endif()
 include(HandleLLVMOptions)
 include(AddMLIRPython)
 
+set(CUDAQ_TOPLEVEL_PYTHON_DIR ${CMAKE_SOURCE_DIR}/python)
+file(GLOB_RECURSE PY_RT_CPP_SOURCES "${CUDAQ_TOPLEVEL_PYTHON_DIR}/runtime/*.cpp")
+list(APPEND PY_RT_CPP_SOURCES ${CUDAQ_TOPLEVEL_PYTHON_DIR}/extension/CUDAQuantumExtension.cpp)
+list(APPEND PY_RT_CPP_SOURCES ${CUDAQ_TOPLEVEL_PYTHON_DIR}/utils/LinkedLibraryHolder.cpp) 
+
 # Specifies that all MLIR packages are co-located under the cudaq
 # top level package (the API has been embedded in a relocatable way).
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=cudaq.mlir.")
+
+################################################################################
+# For any plugin that uses MLIR (cudaq-mlir-runtime) 
+# we must "sanitize" that plugin for use with Python. 
+# Specifically, we have to manually remove the dynamic link 
+# to cudaq-mlir-runtime, and rely on those symbols being present 
+# in the holistic Python module / shared library setup here.
+# These libraries then need to be dynamically loaded by the 
+# LinkedLibraryHolder, along with CUDAQuantumPythonCAPI
+################################################################################
+cudaq_sanitize_plugin_for_python(cudaq-rest-qpu)
+cudaq_sanitize_plugin_for_python(cudaq-quera-qpu)
+cudaq_sanitize_plugin_for_python(cudaq-pasqal-qpu)
+cudaq_sanitize_plugin_for_python(cudaq-fermioniq-qpu)
+cudaq_sanitize_plugin_for_python(rest-remote-platform-client)
+cudaq_sanitize_plugin_for_python(cudaq-remote-simulator-qpu 
+  REMOVE_DEPENDENCIES 
+    librest-remote-platform-client.so 
+    libcudaq-mlir-runtime.so)
 
 ################################################################################
 # Sources
@@ -43,6 +67,7 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
   MODULE_NAME _quakeDialects
   ADD_TO_PARENT CUDAQuantumPythonSources
   SOURCES
+    # FIXME Figure out how to glob
     CUDAQuantumExtension.cpp
     ../runtime/common/py_ExecutionContext.cpp
     ../runtime/common/py_NoiseModel.cpp
@@ -64,7 +89,6 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
     ../runtime/cudaq/algorithms/py_vqe.cpp
     ../runtime/cudaq/platform/JITExecutionCache.cpp
     ../runtime/cudaq/platform/py_alt_launch_kernel.cpp
-    ../runtime/cudaq/qis/py_execution_manager.cpp
     ../runtime/cudaq/qis/py_qubit_qis.cpp
     ../runtime/cudaq/operators/py_helpers.cpp  
     ../runtime/cudaq/operators/py_matrix.cpp
@@ -78,23 +102,7 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
     ../runtime/cudaq/target/py_runtime_target.cpp
     ../runtime/cudaq/target/py_testing_utils.cpp
     ../runtime/mlir/py_register_dialects.cpp
-    ../runtime/utils/PyRemoteRESTQPU.cpp
-    ../runtime/utils/PyFermioniqRESTQPU.cpp
-    ../runtime/utils/PyRemoteSimulatorQPU.cpp
-    ../runtime/utils/PyRestRemoteClient.cpp
     ../utils/LinkedLibraryHolder.cpp
-    ../../runtime/common/ArgumentConversion.cpp
-    ../../runtime/common/RunTheKernel.cpp
-    ../../runtime/cudaq/platform/common/QuantumExecutionQueue.cpp
-    ../../runtime/cudaq/platform/default/rest_server/RemoteRuntimeClient.cpp
-    ../../runtime/cudaq/platform/orca/OrcaExecutor.cpp
-    ../../runtime/cudaq/platform/orca/OrcaQPU.cpp
-    ../../runtime/cudaq/platform/orca/OrcaRemoteRESTQPU.cpp
-    ../../runtime/cudaq/platform/orca/OrcaServerHelper.cpp
-    ../../runtime/cudaq/platform/pasqal/PasqalRemoteRESTQPU.cpp
-    ../../runtime/cudaq/platform/pasqal/PasqalServerHelper.cpp
-    ../../runtime/cudaq/platform/quera/QuEraRemoteRESTQPU.cpp
-
   EMBED_CAPI_LINK_LIBS
    CUDAQuantumMLIRCAPI
    MLIRCAPIExecutionEngine
@@ -112,10 +120,8 @@ target_include_directories(CUDAQuantumPythonSources.Extension INTERFACE
     ${CMAKE_SOURCE_DIR}/runtime
 )
 target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE 
-    cudaq 
+    cudaq nvqir
     cudaq-common 
-    cudaq-em-default
-    cudaq-em-photonics
     fmt::fmt-header-only
     unzip_util
 )
@@ -136,6 +142,57 @@ add_mlir_python_common_capi_library(CUDAQuantumPythonCAPI
     MLIRPythonExtension.RegisterEverything
     MLIRPythonSources.Core
 )
+
+target_sources(CUDAQuantumPythonCAPI PRIVATE  
+  ${CMAKE_SOURCE_DIR}/runtime/common/RuntimeMLIR.cpp     
+  ${CMAKE_SOURCE_DIR}/runtime/common/ArgumentConversion.cpp
+  ${CMAKE_SOURCE_DIR}/runtime/common/RunTheKernel.cpp
+  )
+
+# That code needs exceptions 
+target_compile_options(CUDAQuantumPythonCAPI PRIVATE -fexceptions )
+
+# Need RTTI for ArgumentConversion.cpp
+target_compile_options(CUDAQuantumPythonCAPI PRIVATE -frtti)
+
+# NEED THIS SO THAT THE PLUGINS LOAD (I THINK THIS IS GCC only)
+target_link_options(CUDAQuantumPythonCAPI PRIVATE -Wl,--no-as-needed)
+
+# Add our required (those we needed in cudaq-mlir-runtime) libs here
+target_link_libraries(CUDAQuantumPythonCAPI 
+  PRIVATE 
+    # Utils 
+    fmt::fmt-header-only 
+    
+    # MLIR
+    OptCodeGen 
+    OptTransforms 
+    MLIRTranslateLib
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRTranslateLib
+    MLIRSupport
+    MLIROptLib
+    MLIRExecutionEngine
+    MLIRTransforms
+    MLIRTargetLLVMIRExport
+    MLIRLLVMCommonConversion
+    MLIRLLVMToLLVMIRTranslation
+    
+    # CUDAQ
+    cudaq-common 
+    cudaq 
+    
+    # Plugins (No MLIR)
+    cudaq-orca-qpu
+    cudaq-qpu-photonics
+    cudaq-qpu-simulated
+
+    # Plugins (Requires MLIR)
+    # Must be dynamically loaded in LinkedLibraryHolder.cpp
+    # fermioniq, quera, pasqal, remote-sim, remote-rest
+    )
 
 ################################################################################
 # Instantiation of Python module
@@ -164,6 +221,8 @@ endif()
 
 if (NOT SKBUILD)
   SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:$ORIGIN/../../lib:$ORIGIN/../../lib/plugins")
+  set_property(TARGET CUDAQuantumPythonCAPI
+    APPEND PROPERTY INSTALL_RPATH "${_origin_prefix}/../../../lib:${_origin_prefix}/../../../lib/plugins")
   set_property(TARGET CUDAQuantumPythonModules.extension._quakeDialects.dso 
     APPEND PROPERTY INSTALL_RPATH "${_origin_prefix}/../../../lib:${_origin_prefix}/../../../lib/plugins")
 else()

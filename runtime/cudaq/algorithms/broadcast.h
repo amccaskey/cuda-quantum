@@ -9,7 +9,10 @@
 #pragma once
 
 #include "cudaq/host_config.h"
-#include "cudaq/platform.h"
+#include "cudaq/platformv2/platform.h"
+#include "cudaq/utils/cudaq_utils.h"
+
+#include <vector>
 
 namespace cudaq {
 
@@ -40,7 +43,7 @@ using BroadcastFunctorType = const std::function<ReturnType(
 /// number of QPUs.
 template <typename ResType, typename... Args>
 std::vector<ResType>
-broadcastFunctionOverArguments(std::size_t numQpus, quantum_platform &platform,
+broadcastFunctionOverArguments(std::size_t numQpus, v2::qpu_handle &platform,
                                BroadcastFunctorType<ResType, Args...> &apply,
                                ArgumentSet<Args...> &params) {
   using FutureCollection = std::vector<std::future<std::vector<ResType>>>;
@@ -63,67 +66,63 @@ broadcastFunctionOverArguments(std::size_t numQpus, quantum_platform &platform,
   for (std::size_t qpuId = 0; qpuId < numQpus; qpuId++) {
     std::promise<std::vector<ResType>> _promise;
     futures.emplace_back(_promise.get_future());
-    std::function<void()> functor = detail::make_copyable_function(
-        [&params, &apply, qpuId, nExecsPerQpu, seed,
-         promise = std::move(_promise)]() mutable {
-          // Compute the lower and upper bounds of the
-          // argument set that should be computed on the current QPU
-          auto lowerBound = qpuId * nExecsPerQpu;
-          auto upperBound = lowerBound + nExecsPerQpu;
+    platform.enqueue_task([&params, &apply, qpuId, nExecsPerQpu, seed,
+                           promise = std::move(_promise)]() mutable {
+      // Compute the lower and upper bounds of the
+      // argument set that should be computed on the current QPU
+      auto lowerBound = qpuId * nExecsPerQpu;
+      auto upperBound = lowerBound + nExecsPerQpu;
 
-          // Store the results
-          std::vector<ResType> results;
+      // Store the results
+      std::vector<ResType> results;
 
-          // Loop over all sets of arguments, the ith element of each vector
-          // in the ArgumentSet tuple
-          for (std::size_t i = lowerBound, counter = 0; i < upperBound; i++) {
-            // Construct the current set of arguments as a new tuple
-            // We want a tuple so we can use std::apply with the
-            // existing sample()/observe() functions.
-            std::tuple<std::size_t, std::size_t, std::size_t, Args...>
-                currentArgs;
+      // Loop over all sets of arguments, the ith element of each vector
+      // in the ArgumentSet tuple
+      for (std::size_t i = lowerBound, counter = 0; i < upperBound; i++) {
+        // Construct the current set of arguments as a new tuple
+        // We want a tuple so we can use std::apply with the
+        // existing sample()/observe() functions.
+        std::tuple<std::size_t, std::size_t, std::size_t, Args...> currentArgs;
 
-            // Fill the argument tuple with the QPU id, current argument
-            // iteration, and the total number of arguments that will be applied
-            // on this QPU.
-            std::get<0>(currentArgs) = qpuId;
-            std::get<1>(currentArgs) = counter;
-            std::get<2>(currentArgs) = nExecsPerQpu;
-            counter++;
+        // Fill the argument tuple with the QPU id, current argument
+        // iteration, and the total number of arguments that will be applied
+        // on this QPU.
+        std::get<0>(currentArgs) = qpuId;
+        std::get<1>(currentArgs) = counter;
+        std::get<2>(currentArgs) = nExecsPerQpu;
+        counter++;
 
-            // If seed is 0, then it has not been set.
-            if (seed > 0)
-              cudaq::set_random_seed(seed);
+        // If seed is 0, then it has not been set.
+        if (seed > 0)
+          cudaq::set_random_seed(seed);
 
-            // Fill the argument tuple with the actual arguments.
-            cudaq::tuple_for_each_with_idx(
-                params,
+        // Fill the argument tuple with the actual arguments.
+        cudaq::tuple_for_each_with_idx(
+            params,
 #if CUDAQ_USE_STD20
-                [&]<typename IDX_TYPE>(auto &&element, IDX_TYPE &&idx) {
-                  std::get<IDX_TYPE::value + 3>(currentArgs) = element[i];
-                }
+            [&]<typename IDX_TYPE>(auto &&element, IDX_TYPE &&idx) {
+              std::get<IDX_TYPE::value + 3>(currentArgs) = element[i];
+            }
 #else
-                [&](auto &&element, auto &&idx) {
-                  std::get<std::remove_cv_t<
-                               std::remove_reference_t<decltype(idx)>>::value +
-                           3>(currentArgs) = element[i];
-                }
+            [&](auto &&element, auto &&idx) {
+              std::get<std::remove_cv_t<
+                           std::remove_reference_t<decltype(idx)>>::value +
+                       3>(currentArgs) = element[i];
+            }
 #endif
-            );
+        );
 
-            // Call observe/sample with the current set of arguments
-            // (provided as a tuple)
-            auto result = std::apply(apply, currentArgs);
+        // Call observe/sample with the current set of arguments
+        // (provided as a tuple)
+        auto result = std::apply(apply, currentArgs);
 
-            // Store the result.
-            results.push_back(result);
-          }
+        // Store the result.
+        results.push_back(result);
+      }
 
-          // Set the promised results.
-          promise.set_value(results);
-        });
-
-    platform.enqueueAsyncTask(qpuId, functor);
+      // Set the promised results.
+      promise.set_value(results);
+    });
   }
 
   // Get all the async-generated results and return.

@@ -17,49 +17,40 @@ add_library(${LIBRARY_NAME}
                 algorithms/draw.cpp
                 algorithms/evolve.cpp
                 algorithms/schedule.cpp
-                platform/qpu_state.cpp
-                platform/quantum_platform.cpp
-                qis/execution_manager_c_api.cpp
-                qis/execution_manager.cpp
-                qis/remote_state.cpp
                 qis/state.cpp
                 utils/cudaq_utils.cpp
                 utils/matrix.cpp
-                distributed/mpi_plugin.cpp)
+                distributed/mpi_plugin.cpp
+                platformv2/platform.cpp 
+                platformv2/qpus/qpu_state.cpp
+                platformv2/qpus/remote_state.cpp
+                )
 
 set_property(GLOBAL APPEND PROPERTY CUDAQ_RUNTIME_LIBS ${LIBRARY_NAME})
+
+target_include_directories(${LIBRARY_NAME}
+  PUBLIC $<INSTALL_INTERFACE:include>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
+  PRIVATE .)
+
+target_link_libraries(${LIBRARY_NAME}
+  PUBLIC dl cudaq-operator cudaq-common cudaq-nlopt cudaq-ensmallen
+  PRIVATE fmt::fmt-header-only CUDAQTargetConfigUtil)
 
 if (CUDA_FOUND)
   enable_language(CUDA)
   find_package(CUDAToolkit REQUIRED)
-
   target_include_directories(${LIBRARY_NAME}
-    PUBLIC $<INSTALL_INTERFACE:include>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
-            $<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>
-    PRIVATE .)
-
+    PRIVATE $<BUILD_INTERFACE:${CUDAToolkit_INCLUDE_DIRS}>
+  )
   target_link_libraries(${LIBRARY_NAME}
-    PUBLIC dl cudaq-operator cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only CUDA::cudart_static)
-
+    PRIVATE CUDA::cudart_static)
   target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
-else()
-  target_include_directories(${LIBRARY_NAME}
-    PUBLIC $<INSTALL_INTERFACE:include>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/runtime>
-            $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/tpls/eigen>
-    PRIVATE .)
-
-  target_link_libraries(${LIBRARY_NAME}
-    PUBLIC dl cudaq-operator cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only)
 endif()
 
-add_subdirectory(qis/managers)
+add_subdirectory(platformv2)
 add_subdirectory(algorithms)
-add_subdirectory(platform)
 add_subdirectory(builder)
 add_subdirectory(domains)
 add_subdirectory(operators)

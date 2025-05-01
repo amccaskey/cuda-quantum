@@ -9,7 +9,11 @@
 #include "common/Logger.h"
 #include "cudaq.h"
 #include "cudaq/Support/Version.h"
-#include "cudaq/platform/orca/orca_qpu.h"
+
+#include "cudaq/platformv2/qpus/orca/orca_qpu.h"
+#include "cudaq/platformv2/qpus/photonics/photonics_qis.h"
+
+#include "cudaq/platformv2/platform.h"
 #include "runtime/common/py_AnalogHamiltonian.h"
 #include "runtime/common/py_CustomOpRegistry.h"
 #include "runtime/common/py_EvolveResult.h"
@@ -113,7 +117,6 @@ PYBIND11_MODULE(_quakeDialects, m) {
   cudaq::bindOptimizerWrapper(cudaqRuntime);
   cudaq::bindNoise(cudaqRuntime);
   cudaq::bindExecutionContext(cudaqRuntime);
-  cudaq::bindExecutionManager(cudaqRuntime);
   cudaq::bindPyState(cudaqRuntime, *holder.get());
   cudaq::bindPyDataClassRegistry(cudaqRuntime);
   cudaq::bindPyEvolve(cudaqRuntime);
@@ -238,7 +241,9 @@ PYBIND11_MODULE(_quakeDialects, m) {
   photonicsSubmodule.def(
       "allocate_qudit",
       [](std::size_t &level) {
-        return cudaq::getExecutionManager()->allocateQudit(level);
+        return cudaq::v2::get_qpu()
+            .as<cudaq::v2::simulation_trait>()
+            ->allocateQudit(level);
       },
       "Allocate a qudit of given level.", py::arg("level"));
   photonicsSubmodule.def(
@@ -251,23 +256,77 @@ PYBIND11_MODULE(_quakeDialects, m) {
             throw std::runtime_error("Invalid qudit target");
           targetInfo.emplace_back(t[0], t[1]);
         }
-        cudaq::getExecutionManager()->apply(name, params, {}, targetInfo, false,
-                                            cudaq::spin_op::identity());
+        int Levels = targetInfo[0].levels;
+        std::vector<std::size_t> ids(targetInfo.size());
+        std::transform(targetInfo.begin(), targetInfo.end(), ids.begin(),
+                       [](const auto &ii) { return ii.id; });
+
+        auto mat_gen =
+            llvm::StringSwitch<
+                std::function<std::vector<std::complex<double>>()>>(name)
+                .Case("create",
+                      [&]() {
+                        std::vector<std::complex<double>> mat(Levels * Levels);
+                        cudaq::details::element(mat, Levels, Levels - 1,
+                                                Levels - 1) = 1;
+                        for (int i = 1; i < Levels; i++)
+                          cudaq::details::element(mat, Levels, i, i - 1) = 1;
+                        return mat;
+                      })
+                .Case("annihilate",
+                      [&]() {
+                        std::vector<std::complex<double>> mat(Levels * Levels);
+                        cudaq::details::element(mat, Levels, 0, 0) = 1;
+                        for (int i = 0; i < Levels - 1; i++)
+                          cudaq::details::element(mat, Levels, i, i + 1) = 1;
+                        return mat;
+                      })
+                .Case("plus",
+                      [&]() {
+                        std::vector<std::complex<double>> mat(Levels * Levels);
+                        cudaq::details::element(mat, Levels, 0, Levels - 1) = 1;
+                        for (int i = 1; i < Levels; i++)
+                          cudaq::details::element(mat, Levels, i, i - 1) = 1;
+                        return mat;
+                      })
+                .Case("phase_shift",
+                      [&]() {
+                        std::vector<std::complex<double>> mat(Levels * Levels);
+                        for (int i = 0; i < Levels; i++)
+                          cudaq::details::element(mat, Levels, i, i) = std::exp(
+                              i * params[0] * std::complex<double>(0, 1.));
+                        return mat;
+                      })
+                .Case("beam_splitter",
+                      [&]() {
+                        std::vector<std::complex<double>> mat(Levels * Levels *
+                                                              Levels * Levels);
+                        cudaq::details::beam_splitter(params[0], Levels, mat);
+                        return mat;
+                      })
+                .Default([&]() -> std::vector<std::complex<double>> {
+                  throw std::runtime_error("photonics operation " + name +
+                                           " not supported.");
+                  return {};
+                });
+
+        cudaq::v2::get_qpu().as<cudaq::v2::simulation_trait>()->apply(
+            mat_gen(), {}, ids, {name, params});
       },
       "Apply the input photonics operation on the target qudits.",
       py::arg("name"), py::arg("params"), py::arg("targets"));
   photonicsSubmodule.def(
       "measure",
       [](std::size_t level, std::size_t id, const std::string &regName) {
-        return cudaq::getExecutionManager()->measure(
-            cudaq::QuditInfo(level, id), regName);
+        return cudaq::v2::get_qpu().as<cudaq::v2::simulation_trait>()->mz(
+            id, regName);
       },
       "Measure the input qudit(s).", py::arg("level"), py::arg("qudit"),
       py::arg("register_name") = "");
   photonicsSubmodule.def(
       "release_qudit",
       [](std::size_t level, std::size_t id) {
-        cudaq::getExecutionManager()->returnQudit(cudaq::QuditInfo(level, id));
+        cudaq::v2::get_qpu().as<cudaq::v2::simulation_trait>()->deallocate(id);
       },
       "Release a qudit of given id.", py::arg("level"), py::arg("id"));
   cudaqRuntime.def("cloneModule",

@@ -11,8 +11,7 @@
 #include <gtest/gtest.h>
 
 TEST(DynamicsAsyncTester, checkSimple) {
-  auto &platform = cudaq::get_platform();
-  printf("Num QPUs %lu\n", platform.num_qpus());
+  printf("Num QPUs %lu\n", cudaq::v2::get_num_qpus());
   auto jobHandle1 = []() {
     const cudaq::dimension_map dims = {{0, 2}};
     auto ham = 2.0 * M_PI * 0.1 * cudaq::spin_op::x(0);
@@ -110,8 +109,7 @@ TEST(DynamicsAsyncTester, checkSimple) {
 }
 
 TEST(DynamicsAsyncTester, checkInitializerArgs) {
-  auto &platform = cudaq::get_platform();
-  printf("Num QPUs %lu\n", platform.num_qpus());
+  printf("Num QPUs %lu\n", cudaq::v2::get_num_qpus());
   auto jobHandle1 = []() {
     const cudaq::dimension_map dims = {{0, 2}};
     auto ham = 2.0 * M_PI * 0.1 * cudaq::spin_op::x(0);

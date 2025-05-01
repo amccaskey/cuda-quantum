@@ -10,6 +10,6 @@ from .anyon import *
 from .braket import *
 from .infleqtion import *
 from .ionq import *
-from .iqm import *
+# from .iqm import *
 from .quantinuum import *
 from .quantum_machines import *

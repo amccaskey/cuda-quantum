@@ -132,10 +132,9 @@ def test_custom_single_qubit_gate():
         custom_gate(q)
 
     # currently, unsupported
-    with pytest.raises(RuntimeError,
-                       match='Invalid gate name provided: custom_gate'):
+    with pytest.raises(ValueError,
+                       match='Unknown gate name: custom_gate'):
         U = cudaq.get_unitary(k)
-    # np.testing.assert_allclose(U, M, atol=1e-12)
 
 
 def test_swap_two_qubits():

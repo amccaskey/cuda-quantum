@@ -59,7 +59,7 @@ getKernelLaunchParameters(py::object &kernel, py::args args) {
 RunResultSpan pyRunTheKernel(const std::string &name, MlirModule module,
                              func::FuncOp funcOp,
                              cudaq::OpaqueArguments &runtimeArgs,
-                             cudaq::quantum_platform &platform,
+                             cudaq::v2::qpu_handle &platform,
                              std::size_t shots_count) {
 
   auto returnTypes = funcOp.getResultTypes();
@@ -115,13 +115,14 @@ std::vector<py::object> pyRun(py::object &kernel, py::args args,
   auto mod = unwrap(module);
   mod->setAttr(runtime::enableCudaqRun, mlir::UnitAttr::get(mod->getContext()));
 
-  auto &platform = get_platform();
+  auto &platform = v2::get_qpu();
   if (noise_model.has_value()) {
     if (platform.is_remote())
       throw std::runtime_error(
           "Noise model is not supported on remote platforms.");
     // Launch the kernel in the appropriate context.
-    platform.set_noise(&noise_model.value());
+    if (auto *supportsNoise = platform.as<v2::noise_trait>())
+      supportsNoise->set_noise(noise_model.value());
   }
 
   auto span = details::pyRunTheKernel(name, module, func, *argData, platform,
@@ -130,7 +131,8 @@ std::vector<py::object> pyRun(py::object &kernel, py::args args,
   auto results = details::pyReadResults(span, module, func, shots_count);
 
   if (noise_model.has_value())
-    platform.reset_noise();
+    if (auto *supportsNoise = platform.as<v2::noise_trait>())
+      supportsNoise->reset_noise();
 
   return results;
 }
@@ -149,8 +151,8 @@ async_run_result pyRunAsync(py::object &kernel, py::args args,
                             std::optional<noise_model> noise_model,
                             std::size_t qpu_id) {
   kernel.inc_ref();
-  auto &platform = get_platform();
-  auto numQPUs = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQPUs = v2::get_num_qpus();
   if (qpu_id >= numQPUs)
     throw std::runtime_error("qpu_id (" + std::to_string(qpu_id) +
                              ") exceeds the number of available QPUs (" +
@@ -188,30 +190,32 @@ async_run_result pyRunAsync(py::object &kernel, py::args args,
     // Release GIL to allow c++ threads, all code inside the scope is c++, so
     // there is no need to re-acquire the GIL inside the thread.
     py::gil_scoped_release gil_release{};
-    QuantumTask wrapped = detail::make_copyable_function(
-        [sp = std::move(spanPromise), ep = std::move(errorPromise), shots_count,
-         argData, name, module, func,
-         noise_model = std::move(noise_model)]() mutable {
-          auto &platform = get_platform();
+    // QuantumTask wrapped = detail::make_copyable_function(
+    platform.enqueue_task([sp = std::move(spanPromise),
+                           ep = std::move(errorPromise), shots_count, argData,
+                           name, module, func,
+                           noise_model = std::move(noise_model)]() mutable {
+      auto &platform = v2::get_qpu();
 
-          // Launch the kernel in the appropriate context.
-          if (noise_model.has_value())
-            platform.set_noise(&noise_model.value());
+      // Launch the kernel in the appropriate context.
+      if (noise_model.has_value())
+        if (auto *supportsNoise = platform.as<v2::noise_trait>())
+          supportsNoise->set_noise(noise_model.value());
 
-          try {
-            auto span = details::pyRunTheKernel(name, module, func, *argData,
-                                                platform, shots_count);
-            delete argData;
-            sp.set_value(span);
-            ep.set_value("");
-          } catch (std::runtime_error &e) {
-            auto message = std::string(e.what());
-            sp.set_value({});
-            ep.set_value(message);
-          }
-          platform.reset_noise();
-        });
-    platform.enqueueAsyncTask(qpu_id, wrapped);
+      try {
+        auto span = details::pyRunTheKernel(name, module, func, *argData,
+                                            platform, shots_count);
+        delete argData;
+        sp.set_value(span);
+        ep.set_value("");
+      } catch (std::runtime_error &e) {
+        auto message = std::string(e.what());
+        sp.set_value({});
+        ep.set_value(message);
+      }
+      if (auto *supportsNoise = platform.as<v2::noise_trait>())
+        supportsNoise->reset_noise();
+    });
   }
 
   // Convert results after the span is computed.

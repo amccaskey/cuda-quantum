@@ -34,10 +34,8 @@ int main() {
   return 0;
 }
 
-// CHECK-QPP: [info] [NVQIR.cpp:{{[0-9]+}}] Creating the qpp backend.
-// CHECK-QPP: [info] [DefaultExecutionManager.cpp:{{[0-9]+}}] [DefaultExecutionManager] Creating the qpp backend.
+// CHECK-QPP: [info] [simulator_qpu.cpp:{{[0-9]+}}] instantiating the qpp simulator
 
-// CHECK-DM: [info] [NVQIR.cpp:{{[0-9]+}}] Creating the dm backend.
-// CHECK-DM: [info] [DefaultExecutionManager.cpp:{{[0-9]+}}] [DefaultExecutionManager] Creating the dm backend.
+// CHECK-DM: [info] [simulator_qpu.cpp:{{[0-9]+}}] instantiating the dm simulator
 
 // CHECK-NOT: foo

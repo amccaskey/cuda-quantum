@@ -31,8 +31,7 @@
 #include "cudaq/Support/Plugin.h"
 #include "cudaq/Support/TargetConfig.h"
 #include "cudaq/operators.h"
-#include "cudaq/platform/qpu.h"
-#include "cudaq/platform/quantum_platform.h"
+#include "cudaq/platformv2/qpu.h"
 #include "nvqpp_config.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -57,15 +56,13 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-namespace nvqir {
-// QIR helper to retrieve the output log.
-std::string_view getQirOutputLog();
-} // namespace nvqir
-
 namespace cudaq {
 
-class BaseRemoteRESTQPU : public cudaq::QPU {
+class BaseRemoteRESTQPU
+    : public cudaq::v2::qpu<v2::mlir_launch_trait, v2::noise_trait> {
 protected:
+  ExecutionContext *executionContext = nullptr;
+
   /// The number of shots
   std::optional<int> nShots;
 
@@ -96,7 +93,10 @@ protected:
   /// @brief Mapping of general key-values for backend configuration.
   std::map<std::string, std::string> backendConfig;
 
-  /// @brief Flag indicating whether we should emulate execution locally.
+  std::unique_ptr<v2::qpu_handle> emulatorQPU;
+
+  /// @brief Flag indicating whether we should emulate
+  /// execution locally.
   bool emulate = false;
 
   /// @brief Flag indicating the backend support QIR integer computation
@@ -153,7 +153,7 @@ protected:
 
 public:
   /// @brief The constructor
-  BaseRemoteRESTQPU() : QPU() {
+  BaseRemoteRESTQPU(const cudaq::v2::platform_metadata &m) : qpu(m) {
     std::filesystem::path cudaqLibPath{cudaq::getCUDAQLibraryPath()};
     platformPath = cudaqLibPath.parent_path().parent_path() / "targets";
   }
@@ -161,47 +161,60 @@ public:
   BaseRemoteRESTQPU(BaseRemoteRESTQPU &&) = delete;
   virtual ~BaseRemoteRESTQPU() = default;
 
-  void enqueue(cudaq::QuantumTask &task) override {
-    execution_queue->enqueue(task);
+  void set_random_seed(std::size_t seed) override {
+    if (emulatorQPU)
+      emulatorQPU->set_random_seed(seed);
   }
 
   /// @brief Return true if the current backend is a simulator
   /// @return
-  bool isSimulator() override { return emulate; }
+  bool is_simulator() const override { return emulate; }
 
   /// @brief Return true if the current backend supports conditional feedback
-  bool supportsConditionalFeedback() override {
+  bool supports_conditional_feedback() const override {
     return codegenTranslation == "qir-adaptive";
   }
 
   /// @brief Return true if the current backend supports explicit measurements
-  bool supportsExplicitMeasurements() override { return false; }
-
-  /// Provide the number of shots
-  void setShots(int _nShots) override {
-    nShots = _nShots;
-    executor->setShots(static_cast<std::size_t>(_nShots));
-  }
+  bool supports_explicit_measurements() const override { return false; }
 
   /// Clear the number of shots
-  void clearShots() override { nShots = std::nullopt; }
-  virtual bool isRemote() override { return !emulate; }
+  // void clearShots() override { nShots = std::nullopt; }
+  bool is_remote() const override { return !emulate; }
 
   /// @brief Return true if locally emulating a remote QPU
-  virtual bool isEmulated() override { return emulate; }
+  bool is_emulator() const override { return emulate; }
 
   /// @brief Set the noise model, only allow this for
   /// emulation.
-  void setNoiseModel(const cudaq::noise_model *model) override {
-    if (!emulate && model)
+  void set_noise(const cudaq::noise_model &model) override {
+    if (!emulate)
       throw std::runtime_error(
           "Noise modeling is not allowed on remote physical quantum backends.");
 
-    noiseModel = model;
+    if (auto *asNoise = emulatorQPU->as<v2::noise_trait>())
+      asNoise->set_noise(model);
+  }
+
+  void reset_noise() override {
+    if (auto *asNoise = emulatorQPU->as<v2::noise_trait>())
+      asNoise->reset_noise();
+  }
+
+  void apply_noise(const kraus_channel &channel,
+                   const std::vector<std::size_t> &targets) override {
+    if (auto *asNoise = emulatorQPU->as<v2::noise_trait>())
+      asNoise->apply_noise(channel, targets);
+  }
+
+  const noise_model *get_noise() override {
+    if (auto *asNoise = emulatorQPU->as<v2::noise_trait>())
+      return asNoise->get_noise();
+    return nullptr;
   }
 
   /// Store the execution context for launchKernel
-  void setExecutionContext(cudaq::ExecutionContext *context) override {
+  void set_execution_context(cudaq::ExecutionContext *context) override {
     if (!context)
       return;
 
@@ -213,7 +226,7 @@ public:
   }
 
   /// Reset the execution context
-  void resetExecutionContext() override {
+  void reset_execution_context() override {
     // do nothing here
     executionContext = nullptr;
   }
@@ -222,7 +235,7 @@ public:
   /// specific target backend configuration file (bundled as part of this
   /// CUDA-Q installation) and extract MLIR lowering pipelines and
   /// specific code generation output required by this backend (QIR/QASM2).
-  void setTargetBackend(const std::string &backend) override {
+  void setTargetBackend(const std::string &backend) {
     cudaq::info("Remote REST platform is targeting {}.", backend);
 
     // First we see if the given backend has extra config params
@@ -684,8 +697,8 @@ public:
     return codes;
   }
 
-  void launchKernel(const std::string &kernelName,
-                    const std::vector<void *> &rawArgs) override {
+  void launch_kernel(const std::string &kernelName,
+                     const std::vector<void *> &rawArgs) override {
     cudaq::info("launching remote rest kernel ({})", kernelName);
 
     // TODO future iterations of this should support non-void return types.
@@ -704,10 +717,10 @@ public:
   /// modifications for the execution context as well as asynchronous or
   /// synchronous invocation.
   KernelThunkResultType
-  launchKernel(const std::string &kernelName, KernelThunkType kernelFunc,
-               void *args, std::uint64_t voidStarSize,
-               std::uint64_t resultOffset,
-               const std::vector<void *> &rawArgs) override {
+  launch_kernel(const std::string &kernelName, KernelThunkType kernelFunc,
+                void *args, std::uint64_t voidStarSize,
+                std::uint64_t resultOffset,
+                const std::vector<void *> &rawArgs) override {
     cudaq::info("launching remote rest kernel ({})", kernelName);
 
     // TODO future iterations of this should support non-void return types.
@@ -734,9 +747,13 @@ public:
     // After performing lowerQuakeCode, check to see if we are simply drawing
     // the circuit. If so, perform the trace here and then return.
     if (executionContext->name == "tracer" && jitEngines.size() == 1) {
-      cudaq::getExecutionManager()->setExecutionContext(executionContext);
-      invokeJITKernelAndRelease(jitEngines[0], kernelName);
-      cudaq::getExecutionManager()->resetExecutionContext();
+      {
+        v2::override_current_qpu(emulatorQPU.get());
+        v2::get_qpu().set_execution_context(executionContext);
+        invokeJITKernelAndRelease(jitEngines[0], kernelName);
+        v2::get_qpu().reset_execution_context();
+        v2::reset_override_qpu();
+      }
       jitEngines.clear();
       return;
     }
@@ -768,6 +785,8 @@ public:
            localJIT = std::move(jitEngines)]() mutable -> cudaq::sample_result {
             std::vector<cudaq::ExecutionResult> results;
 
+            v2::override_current_qpu(emulatorQPU.get());
+
             // If seed is 0, then it has not been set.
             if (seed > 0)
               cudaq::set_random_seed(seed);
@@ -795,11 +814,11 @@ public:
                 cudaq::ExecutionContext context("sample", 1);
                 context.hasConditionalsOnMeasureResults = true;
                 if (!isRun)
-                  cudaq::getExecutionManager()->setExecutionContext(&context);
+                  v2::get_qpu().set_execution_context(&context);
 
                 invokeJITKernel(localJIT[0], kernelName);
                 if (!isRun) {
-                  cudaq::getExecutionManager()->resetExecutionContext();
+                  v2::get_qpu().reset_execution_context();
                   counts += context.result;
                 }
               }
@@ -812,7 +831,8 @@ public:
                 }
               } else {
                 // Get QIR output log
-                const auto qirOutputLog = nvqir::getQirOutputLog();
+                const auto qirOutputLog =
+                    v2::get_qpu().as<v2::simulation_trait>()->outputLog;
                 executionContext->invocationResultBuffer.assign(
                     qirOutputLog.begin(), qirOutputLog.end());
               }
@@ -823,10 +843,9 @@ public:
               for (std::size_t i = 0; i < codes.size(); i++) {
                 cudaq::ExecutionContext context("sample", localShots);
                 context.reorderIdx = reorderIdx;
-                cudaq::getExecutionManager()->setExecutionContext(&context);
+                v2::get_qpu().set_execution_context(&context);
                 invokeJITKernel(localJIT[i], kernelName);
-                cudaq::getExecutionManager()->resetExecutionContext();
-
+                v2::get_qpu().reset_execution_context();
                 if (isObserve) {
                   // Use the code name instead of the global register.
                   results.emplace_back(context.result.to_map(), codes[i].name);
@@ -843,6 +862,7 @@ public:
                 }
               }
             }
+            v2::reset_override_qpu();
 
             // Clean up the JIT engines. This functor owns these engine
             // instances.

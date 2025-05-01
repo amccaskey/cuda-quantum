@@ -23,12 +23,6 @@ bool isValidExpVal(double value) {
 }
 
 CUDAQ_TEST(IonQTester, checkSampleSync) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
-
   auto kernel = cudaq::make_kernel();
   auto qubit = kernel.qalloc(2);
   kernel.h(qubit[0]);
@@ -40,12 +34,6 @@ CUDAQ_TEST(IonQTester, checkSampleSync) {
 }
 
 CUDAQ_TEST(IonQTester, checkSampleAsync) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
-
   auto kernel = cudaq::make_kernel();
   auto qubit = kernel.qalloc(2);
   kernel.h(qubit[0]);
@@ -57,11 +45,6 @@ CUDAQ_TEST(IonQTester, checkSampleAsync) {
 }
 
 CUDAQ_TEST(IonQTester, checkSampleAsyncLoadFromFile) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
 
   auto kernel = cudaq::make_kernel();
   auto qubit = kernel.qalloc(2);
@@ -90,11 +73,6 @@ CUDAQ_TEST(IonQTester, checkSampleAsyncLoadFromFile) {
 }
 
 CUDAQ_TEST(IonQTester, checkObserveSync) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
 
   auto [kernel, theta] = cudaq::make_kernel<double>();
   auto qubit = kernel.qalloc(2);
@@ -114,11 +92,6 @@ CUDAQ_TEST(IonQTester, checkObserveSync) {
 }
 
 CUDAQ_TEST(IonQTester, checkObserveAsync) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
 
   auto [kernel, theta] = cudaq::make_kernel<double>();
   auto qubit = kernel.qalloc(2);
@@ -140,11 +113,6 @@ CUDAQ_TEST(IonQTester, checkObserveAsync) {
 }
 
 CUDAQ_TEST(IonQTester, checkObserveAsyncLoadFromFile) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
 
   auto [kernel, theta] = cudaq::make_kernel<double>();
   auto qubit = kernel.qalloc(2);

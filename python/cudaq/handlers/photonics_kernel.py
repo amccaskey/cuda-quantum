@@ -184,7 +184,7 @@ def phase_shift(qudit: PyQudit, phi: float):
         Exception: If input argument is not instance of `PyQudit` class.
     """
     _check_args(qudit)
-    cudaq_runtime.photonics.apply_operation("phase_shift", [phi],
+    cudaq_runtime.photonics.apply_operation("phase_shift", phi if isinstance(phi,list) else [phi],
                                             [[qudit.level, qudit.id]])
 
 

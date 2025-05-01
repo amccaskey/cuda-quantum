@@ -83,6 +83,8 @@ struct BackendEndConfigEntry {
   std::string LibraryModeExecutionManager;
   /// Name of the platform QPU implementation
   std::string PlatformQpu;
+  /// Name of the platform config implementation
+  std::string PlatformConfig;
   /// Preprocessor defines for this target
   std::vector<std::string> PreprocessorDefines;
   /// Compiler flags for this target

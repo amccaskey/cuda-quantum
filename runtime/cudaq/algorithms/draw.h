@@ -11,7 +11,7 @@
 #include <concepts>
 
 #include "common/ExecutionContext.h"
-#include "cudaq/platform.h"
+#include "cudaq/platformv2/platform.h"
 
 namespace cudaq {
 
@@ -30,7 +30,7 @@ namespace details {
 template <typename KernelFunctor, typename... Args>
 cudaq::Trace traceFromKernel(KernelFunctor &&kernel, Args &&...args) {
   // Get the platform.
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu(); // cudaq::get_platform();
 
   // This can only be done in simulation
   if (!platform.is_simulator())
@@ -41,9 +41,9 @@ cudaq::Trace traceFromKernel(KernelFunctor &&kernel, Args &&...args) {
   ExecutionContext context("tracer");
 
   // set the context, execute and then reset
-  platform.set_exec_ctx(&context);
+  platform.set_execution_context(&context);
   kernel(args...);
-  platform.reset_exec_ctx();
+  platform.reset_execution_context();
 
   return context.kernelTrace;
 }

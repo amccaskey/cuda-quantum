@@ -604,6 +604,7 @@ CUDAQ_TEST(NoiseTest, checkPhaseFlipType) {
 
 CUDAQ_TEST(NoiseTest, checkPauli1) {
   cudaq::set_random_seed(13);
+  cudaq::noise_model noise;
 
   auto kernel = []() __qpu__ {
     cudaq::qubit q, r;
@@ -613,7 +614,7 @@ CUDAQ_TEST(NoiseTest, checkPauli1) {
     mz(r);
   };
 
-  auto counts = cudaq::sample(cudaq::sample_options{}, kernel);
+  auto counts = cudaq::sample(cudaq::sample_options{.noise = noise}, kernel);
   counts.dump();
   EXPECT_EQ(4, counts.size());
 }
@@ -624,6 +625,7 @@ CUDAQ_TEST(NoiseTest, checkPauli1) {
 
 CUDAQ_TEST(NoiseTest, checkPauli2) {
   cudaq::set_random_seed(13);
+  cudaq::noise_model noise;
 
   auto kernel = [](std::vector<double> parms) __qpu__ {
     cudaq::qubit q, r;
@@ -633,7 +635,8 @@ CUDAQ_TEST(NoiseTest, checkPauli2) {
   };
 
   std::vector<double> probs(15, 0.9375 / 15);
-  auto counts = cudaq::sample(cudaq::sample_options{}, kernel, probs);
+  auto counts =
+      cudaq::sample(cudaq::sample_options{.noise = noise}, kernel, probs);
   counts.dump();
   EXPECT_EQ(4, counts.size());
 }

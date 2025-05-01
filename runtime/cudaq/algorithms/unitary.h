@@ -10,8 +10,8 @@
 
 #include "common/Trace.h"
 #include "cudaq/algorithms/draw.h"
+#include "cudaq/platformv2/gates.h"
 #include "cudaq/utils/matrix.h"
-#include "nvqir/Gates.h"
 #include <iostream>
 
 namespace cudaq::details {
@@ -111,8 +111,8 @@ inline complex_matrix unitary_from_trace(const Trace &trace) {
   complex_matrix U = complex_matrix::identity(dim);
 
   for (const auto &inst : trace) {
-    auto gate_name = nvqir::getGateNameFromString(inst.name);
-    auto gate_vec = nvqir::getGateByName<double>(gate_name, inst.params);
+    auto gate_name = gates::getGateNameFromString(inst.name);
+    auto gate_vec = gates::getGateByName<double>(gate_name, inst.params);
     std::size_t gate_dim = static_cast<std::size_t>(std::sqrt(gate_vec.size()));
     complex_matrix gate(gate_vec, {gate_dim, gate_dim});
 

@@ -93,4 +93,24 @@ std::unique_ptr<MLIRContext> initializeMLIR() {
   return context;
 }
 
+std::unique_ptr<MLIRContext> initializeMLIRPython() {
+  // One-time initialization of LLVM/MLIR components
+  static bool initOnce = [&] {
+    registerToQIRTranslation();
+    registerToOpenQASMTranslation();
+    registerToIQMJsonTranslation();
+    return true;
+  }();
+  (void)initOnce;
+
+  // Per-context initialization
+  DialectRegistry registry;
+  cudaq::opt::registerCodeGenDialect(registry);
+  cudaq::registerAllDialects(registry);
+  auto context = std::make_unique<MLIRContext>(registry);
+  context->loadAllAvailableDialects();
+  registerLLVMDialectTranslation(*context);
+  return context;
+}
+
 } // namespace cudaq

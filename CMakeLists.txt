@@ -396,6 +396,7 @@ set(CUDAQ_TOOLS_DIR ${CMAKE_BINARY_DIR}/bin)
 list(APPEND CMAKE_MODULE_PATH "${CUDAQ_CMAKE_DIR}")
 
 include(AddCUDAQ)
+include(CUDAQTests)
 include(BuildHelpers)
 
 # Add CUDA Quantum files to the include path
@@ -571,23 +572,25 @@ if(CUDAQ_BUILD_TESTS)
   enable_testing()
 endif()
 
-if (CUDAQ_ENABLE_PYTHON)
+find_program(HAS_PATCHELF_EXECUTABLE patchelf)
+
+if (CUDAQ_ENABLE_PYTHON AND HAS_PATCHELF_EXECUTABLE)
   find_package(Python 3 COMPONENTS Interpreter Development)
-  
+
   # Apply specific patch to pybind11 for our documentation.
   # Only apply the patch if not already applied.
-  execute_process(COMMAND ${GIT_EXECUTABLE} -C tpls/pybind11/ apply ../customizations/pybind11/pybind.h.diff --ignore-whitespace --reverse --check
-                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                  RESULT_VARIABLE GIT_PATCH_RESULT
-                  ERROR_QUIET)
-  if (NOT GIT_PATCH_RESULT EQUAL "0")
-    execute_process(COMMAND ${GIT_EXECUTABLE} -C tpls/pybind11/ apply ../customizations/pybind11/pybind.h.diff --ignore-whitespace
-                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                    RESULT_VARIABLE GIT_PATCH_RESULT)
-  endif()
-  if (NOT GIT_PATCH_RESULT EQUAL "0")
-    message(FATAL_ERROR "Applying patch to submodule failed with ${GIT_PATCH_RESULT}, please update patch")
-  endif()
+  # execute_process(COMMAND ${GIT_EXECUTABLE} -C tpls/pybind11/ apply ../customizations/pybind11/pybind.h.diff --ignore-whitespace --reverse --check
+  #                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  #                 RESULT_VARIABLE GIT_PATCH_RESULT
+  #                 ERROR_QUIET)
+  # if (NOT GIT_PATCH_RESULT EQUAL "0")
+  #   execute_process(COMMAND ${GIT_EXECUTABLE} -C tpls/pybind11/ apply ../customizations/pybind11/pybind.h.diff --ignore-whitespace
+  #                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  #                   RESULT_VARIABLE GIT_PATCH_RESULT)
+  # endif()
+  # if (NOT GIT_PATCH_RESULT EQUAL "0")
+  #   message(FATAL_ERROR "Applying patch to submodule failed with ${GIT_PATCH_RESULT}, please update patch")
+  # endif()
   
   # Regarding the use of PyBind, we need to be careful that the same STL is used for any 
   # Python bindings generated as part of the CUDA-Q build and bindings generated for 

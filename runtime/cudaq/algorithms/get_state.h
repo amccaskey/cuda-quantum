@@ -7,16 +7,15 @@
  ******************************************************************************/
 
 #pragma once
+#include <iostream>
 
 #include "common/ExecutionContext.h"
 #include "cudaq/concepts.h"
 #include "cudaq/host_config.h"
-#include "cudaq/platform.h"
-#include "cudaq/platform/QuantumExecutionQueue.h"
-#include "cudaq/platform/qpu_state.h"
+#include "cudaq/platformv2/qpus/qpu_state.h"
+#include "cudaq/platformv2/qpus/remote_state.h"
 #include "cudaq/qis/kernel_utils.h"
 #include "cudaq/qis/qkernel.h"
-#include "cudaq/qis/remote_state.h"
 #include "cudaq/qis/state.h"
 #include "cudaq/utils/registry.h"
 #include <complex>
@@ -39,7 +38,7 @@ namespace details {
 template <typename KernelFunctor>
 state extractState(KernelFunctor &&kernel) {
   // Get the platform.
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
 
   // This can only be done in simulation
   if (!platform.is_simulator())
@@ -50,9 +49,9 @@ state extractState(KernelFunctor &&kernel) {
 
   // Perform the usual pattern set the context,
   // execute and then reset
-  platform.set_exec_ctx(&context);
+  platform.set_execution_context(&context);
   kernel();
-  platform.reset_exec_ctx();
+  platform.reset_execution_context();
 
   // Return the state data. Since the ExecutionContext
   // is done being used, we'll move the simulation state
@@ -64,36 +63,33 @@ state extractState(KernelFunctor &&kernel) {
 
 template <typename KernelFunctor>
 auto runGetStateAsync(KernelFunctor &&wrappedKernel,
-                      cudaq::quantum_platform &platform, std::size_t qpu_id) {
+                      cudaq::v2::qpu_handle &platform, std::size_t qpu_id) {
   // This can only be done in simulation
   if (!platform.is_simulator())
     throw std::runtime_error("Cannot use get_state_async on a physical QPU.");
 
-  if (qpu_id >= platform.num_qpus())
+  if (qpu_id >= v2::get_num_qpus())
     throw std::invalid_argument("Provided qpu_id " + std::to_string(qpu_id) +
                                 " is invalid (must be < " +
-                                std::to_string(platform.num_qpus()) +
+                                std::to_string(v2::get_num_qpus()) +
                                 " i.e. platform.num_qpus())");
 
   std::promise<state> promise;
   auto f = promise.get_future();
-  // Wrapped it as a generic (returning void) function
-  QuantumTask wrapped = detail::make_copyable_function(
-      [p = std::move(promise), qpu_id, &platform,
+  platform.enqueue_task(
+      [p = std::move(promise), qpu_id,
        func = std::forward<KernelFunctor>(wrappedKernel)]() mutable {
+        auto &qpu = v2::get_qpu(qpu_id);
         ExecutionContext context("extract-state");
         // Indicate that this is an async exec
         context.asyncExec = true;
         // Set the platform and the qpu id.
-        platform.set_exec_ctx(&context, qpu_id);
-        platform.set_current_qpu(qpu_id);
+        qpu.set_execution_context(&context);
         func();
-        platform.reset_exec_ctx(qpu_id);
+        qpu.reset_execution_context();
         // Extract state data
         p.set_value(state(context.simulationState.release()));
       });
-
-  platform.enqueueAsyncTask(qpu_id, wrapped);
   return f;
 }
 
@@ -164,7 +160,7 @@ template <typename QuantumKernel, typename... Args,
 #endif
 async_state_result get_state_async(std::size_t qpu_id, QuantumKernel &&kernel,
                                    Args &&...args) {
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu(qpu_id);
 #if CUDAQ_USE_STD20
   return details::runGetStateAsync(
       [&kernel, ... args = std::forward<Args>(args)]() mutable {

@@ -13,10 +13,10 @@
 #ifdef CUDAQ_HAS_CUDA
 #include "cuda_runtime_api.h"
 #endif
-#include "cudaq/platform.h"
 #include "cudaq/qis/qkernel.h"
 #include "cudaq/utils/registry.h"
 #include "distributed/mpi_plugin.h"
+#include <cxxabi.h>
 #include <dlfcn.h>
 #include <filesystem>
 #include <map>
@@ -25,10 +25,6 @@
 #include <signal.h>
 #include <string>
 #include <vector>
-namespace nvqir {
-void tearDownBeforeMPIFinalize();
-void setRandomSeed(std::size_t);
-} // namespace nvqir
 
 namespace cudaq::mpi {
 cudaq::MPIPlugin *getMpiPlugin(bool unsafe) {
@@ -188,7 +184,7 @@ void finalize() {
 
   // Inform the simulator that we are
   // about to run MPI Finalize
-  nvqir::tearDownBeforeMPIFinalize();
+  v2::get_qpu().tear_down();
   auto *commPlugin = getMpiPlugin();
   if (!commPlugin->is_finalized())
     commPlugin->finalize();
@@ -197,10 +193,15 @@ void finalize() {
 } // namespace cudaq::mpi
 
 namespace cudaq::__internal__ {
-std::map<std::string, std::string> runtime_registered_mlir;
-std::string demangle_kernel(const char *name) {
-  return quantum_platform::demangle(name);
+
+static std::string demangle(char const *mangled) {
+  auto ptr = std::unique_ptr<char, decltype(&std::free)>{
+      abi::__cxa_demangle(mangled, nullptr, nullptr, nullptr), std::free};
+  return {ptr.get()};
 }
+
+std::map<std::string, std::string> runtime_registered_mlir;
+std::string demangle_kernel(const char *name) { return demangle(name); }
 bool globalFalse = false;
 } // namespace cudaq::__internal__
 
@@ -314,15 +315,10 @@ bool cudaq::__internal__::isLibraryMode(const std::string &kernelname) {
 
 //===----------------------------------------------------------------------===//
 
-namespace nvqir {
-void setRandomSeed(std::size_t);
-}
-
 namespace cudaq {
 
-void set_target_backend(const char *backend) {
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(std::string(backend));
+void set_target_backend(const char *backend, const char *options) {
+  v2::initialize(backend, options);
 }
 
 KernelArgsCreator getArgsCreator(const std::string &kernelName) {
@@ -388,34 +384,18 @@ bool kernelHasConditionalFeedback(const std::string &kernelName) {
          quakeCode.find("qubitMeasurementFeedback = true") != std::string::npos;
 }
 
-// Ignore warnings about deprecations in platform.set_shots and
-// platform.clear_shots because the functions that are using them here
-// (cudaq::set_shots and cudaq::clear_shots are also deprecated and will be
-// removed at the same time.)
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-void set_shots(const std::size_t nShots) {
-  auto &platform = cudaq::get_platform();
-  platform.set_shots(nShots);
-}
-void clear_shots(const std::size_t nShots) {
-  auto &platform = cudaq::get_platform();
-  platform.clear_shots();
-}
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-
 void set_noise(const cudaq::noise_model &model) {
-  auto &platform = cudaq::get_platform();
-  platform.set_noise(&model);
+  if (auto *supportsNoise = v2::get_qpu().as<v2::noise_trait>()) {
+    supportsNoise->set_noise(model);
+    return;
+  }
+  // FIXME may want to throw a warning
+  cudaq::warn("user set noise, but current qpu does not support noise.");
 }
 
 void unset_noise() {
-  auto &platform = cudaq::get_platform();
-  platform.set_noise(nullptr);
+  if (auto *supportsNoise = v2::get_qpu().as<v2::noise_trait>())
+    supportsNoise->reset_noise();
 }
 
 thread_local static std::size_t cudaq_random_seed = 0;
@@ -425,10 +405,7 @@ thread_local static std::size_t cudaq_random_seed = 0;
 /// will not be repeatable for those operations.
 void set_random_seed(std::size_t seed) {
   cudaq_random_seed = seed;
-  nvqir::setRandomSeed(seed);
-  auto &platform = cudaq::get_platform();
-  // Notify the platform that a new random seed value is set.
-  platform.onRandomSeedSet(seed);
+  v2::get_qpu().set_random_seed(seed);
 }
 
 std::size_t get_random_seed() { return cudaq_random_seed; }

@@ -32,12 +32,13 @@ public:
   qvector(std::size_t size) : qudits(size) {}
 
   /// @brief Construct a `qvector` from an input state vector.
-  /// The number of qubits is determined by the size of the input vector.
+  /// The number of qubits is determined by thpe size of the input vector.
   /// If `validate` is set, it will check the norm of input state vector.
   explicit qvector(const std::vector<complex> &vector, bool validate)
-      : qudits(std::log2(vector.size())) {
+      : qudits(std::log2(vector.size()),
+               /*Create Qudit, but do not allocate yet with QPU*/ false) {
+    auto numElements = std::log2(vector.size());
     if (Levels == 2) {
-      auto numElements = std::log2(vector.size());
       if (std::floor(numElements) != numElements)
         throw std::runtime_error(
             "Invalid state vector passed to qvector initialization - number of "
@@ -52,14 +53,15 @@ public:
       if (std::fabs(1.0 - norm) > 1e-4)
         throw std::runtime_error("Invalid vector norm for qudit allocation.");
     }
-    std::vector<QuditInfo> targets;
-    for (auto &q : qudits)
-      targets.emplace_back(QuditInfo{Levels, q.id()});
-
     auto precision = std::is_same_v<complex::value_type, float>
                          ? simulation_precision::fp32
                          : simulation_precision::fp64;
-    getExecutionManager()->initializeState(targets, vector.data(), precision);
+    auto uids = v2::get_qpu().as<v2::simulation_trait>()->allocateQudits(
+        numElements, Levels, vector.data(), precision);
+    std::size_t i = 0;
+    for (auto u : uids) {
+      qudits[i++].idx = u;
+    }
   }
   qvector(const std::vector<complex> &vector)
       : qvector(vector, /*validate=*/false){};
@@ -91,12 +93,13 @@ public:
   /// @brief Construct a `qvector` from a pre-existing `state`.
   /// This `state` could be constructed with `state::from_data` or retrieved
   /// from an cudaq::get_state.
-  explicit qvector(const state &state) : qudits(state.get_num_qubits()) {
-    std::vector<QuditInfo> targets;
-    for (auto &q : qudits)
-      targets.emplace_back(QuditInfo{Levels, q.id()});
+  explicit qvector(const state &state) : qudits(state.get_num_qubits(), false) {
     // Note: the internal state data will be cloned by the simulator backend.
-    getExecutionManager()->initializeState(targets, state.internal.get());
+    auto uids = v2::get_qpu().as<v2::simulation_trait>()->allocateQudits(
+        size(), Levels, state.internal.get());
+    std::size_t i = 0;
+    for (auto u : uids)
+      qudits[i++].idx = u;
   }
   explicit qvector(const state *ptr) : qvector(*ptr){};
   explicit qvector(state *ptr) : qvector(*ptr){};

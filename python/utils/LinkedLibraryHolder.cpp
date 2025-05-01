@@ -10,9 +10,10 @@
 #include "common/FmtCore.h"
 #include "common/Logger.h"
 #include "common/PluginUtils.h"
-#include "cudaq/platform.h"
+#include "cudaq/platformv2/platform.h"
 #include "cudaq/target_control.h"
-#include "nvqir/CircuitSimulator.h"
+#include "cudaq/utils/cudaq_utils.h"
+// #include "nvqir/CircuitSimulator.h"
 #include <fstream>
 #include <regex>
 #include <sstream>
@@ -20,15 +21,15 @@
 #include <unistd.h>
 
 // Our hook into configuring the NVQIR backend.
-extern "C" {
-void __nvqir__setCircuitSimulator(nvqir::CircuitSimulator *);
-}
+// extern "C" {
+// void __nvqir__setCircuitSimulator(nvqir::CircuitSimulator *);
+// }
 
 namespace cudaq {
-void setQuantumPlatformInternal(quantum_platform *p);
+// void setQuantumPlatformInternal(quantum_platform *p);
 
-void setExecutionManagerInternal(ExecutionManager *em);
-void resetExecutionManagerInternal();
+// void setExecutionManagerInternal(ExecutionManager *em);
+// void resetExecutionManagerInternal();
 
 static constexpr const char PLATFORM_LIBRARY[] = "PLATFORM_LIBRARY=";
 static constexpr const char NVQIR_SIMULATION_BACKEND[] =
@@ -67,24 +68,21 @@ int countGPUs() {
   return std::stoi(buffer.str());
 }
 
-std::size_t RuntimeTarget::num_qpus() {
-  auto &platform = cudaq::get_platform();
-  return platform.num_qpus();
-}
+std::size_t RuntimeTarget::num_qpus() { return v2::get_num_qpus(); }
 
 bool RuntimeTarget::is_remote() {
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
   return platform.is_remote();
 }
 
 bool RuntimeTarget::is_remote_simulator() {
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
   return platform.get_remote_capabilities().isRemoteSimulator;
 }
 
 bool RuntimeTarget::is_emulated() {
-  auto &platform = cudaq::get_platform();
-  return platform.is_emulated();
+  auto &platform = cudaq::v2::get_qpu();
+  return platform.is_emulator();
 }
 
 simulation_precision RuntimeTarget::get_precision() { return precision; }
@@ -132,7 +130,6 @@ void parseRuntimeTarget(const std::filesystem::path &cudaqLibPath,
 #else
       const std::string libSuffix = "so";
 #endif
-      cudaq::info("CUDA-Q Library Path is {}.", cudaqLibPath.string());
       const auto libName =
           fmt::format("libnvqir-{}.{}", simulatorName, libSuffix);
 
@@ -142,8 +139,9 @@ void parseRuntimeTarget(const std::filesystem::path &cudaqLibPath,
         foundSimulatorName =
             std::regex_replace(simulatorName, std::regex("-"), "_");
       } else {
-        cudaq::info("Skip {} simulator for target {} since it is not available",
-                    simulatorName, target.name);
+        // cudaq::info("Skip {} simulator for target {} since it is not
+        // available",
+        //             simulatorName, target.name);
       }
     } else if (line.find(IS_FP64_SIMULATION) != std::string::npos) {
       precision = simulation_precision::fp64;
@@ -188,7 +186,8 @@ void findAvailableTargets(
       cudaq::config::TargetConfig config;
       llvm::yaml::Input Input(configFileContent.c_str());
       Input >> config;
-      cudaq::info("Found Target {} with config file {}", targetName, fileName);
+      // cudaq::info("Found Target {} with config file {}", targetName,
+      // fileName);
       const std::string defaultTargetConfigStr =
           cudaq::config::processRuntimeArgs(config, {});
       RuntimeTarget target;
@@ -196,9 +195,9 @@ void findAvailableTargets(
       target.name = targetName;
       target.description = config.Description;
       auto cudaqLibPath = targetPath.parent_path() / "lib";
-      parseRuntimeTarget(cudaqLibPath, target, defaultTargetConfigStr);
-      cudaq::info("Found Target: {} -> (sim={}, platform={})", targetName,
-                  target.simulatorName, target.platformName);
+      // parseRuntimeTarget(cudaqLibPath, target, defaultTargetConfigStr);
+      // cudaq::info("Found Target: {} -> (sim={}, platform={})", targetName,
+      //             target.simulatorName, target.platformName);
       // Add the target.
       targets.emplace(targetName, target);
 
@@ -236,9 +235,25 @@ LinkedLibraryHolder::LinkedLibraryHolder() {
   cudaq::info("Init: Library Path is {}.", cudaqLibPath.string());
 
   // We have to ensure that nvqir and cudaq are loaded
+  auto libCudaQPyCAPITopLevel = cudaqLibPath / ".." / "cudaq";
+  if (!std::filesystem::exists(libCudaQPyCAPITopLevel))
+    libCudaQPyCAPITopLevel = cudaqLibPath / ".." / "python" / "cudaq";
+
   std::vector<std::filesystem::path> libPaths{
       cudaqLibPath / fmt::format("libnvqir.{}", libSuffix),
-      cudaqLibPath / fmt::format("libcudaq.{}", libSuffix)};
+      cudaqLibPath / fmt::format("libcudaq.{}", libSuffix),
+      // Required for MLIR-based plugins
+      libCudaQPyCAPITopLevel / "mlir" / "_mlir_libs" /
+          fmt::format("libCUDAQuantumPythonCAPI.{}", libSuffix),
+      cudaqLibPath / fmt::format("libpy-cudaq-rest-qpu.{}", libSuffix),
+      cudaqLibPath / fmt::format("libpy-cudaq-quera-qpu.{}", libSuffix),
+      cudaqLibPath / fmt::format("libpy-cudaq-pasqal-qpu.{}", libSuffix),
+      cudaqLibPath / fmt::format("libpy-cudaq-fermioniq-qpu.{}", libSuffix),
+      cudaqLibPath /
+          fmt::format("libpy-rest-remote-platform-client.{}", libSuffix),
+      cudaqLibPath /
+          fmt::format("libpy-cudaq-remote-simulator-qpu.{}", libSuffix),
+  };
 
   const char *dynlibs_var = std::getenv("CUDAQ_DYNLIBS");
   if (dynlibs_var != nullptr) {
@@ -251,9 +266,15 @@ LinkedLibraryHolder::LinkedLibraryHolder() {
   }
 
   // Load all the defaults
-  for (auto &p : libPaths)
+  for (auto &p : libPaths) {
     libHandles.emplace(p.string(),
                        dlopen(p.string().c_str(), RTLD_GLOBAL | RTLD_NOW));
+    if (auto *maybeError = dlerror())
+      throw std::runtime_error(
+          fmt::format("CUDA-Q failed to open required library ({}) - {}",
+                      p.string(), maybeError)
+              .c_str());
+  }
 
   // directory_iterator ordering is unspecified, so sort it to make it
   // repeatable and consistent.
@@ -266,93 +287,14 @@ LinkedLibraryHolder::LinkedLibraryHolder() {
               return a.path().filename() < b.path().filename();
             });
 
-  // Search for all simulators and create / store them
-  for (const auto &library : entries) {
-    auto path = library.path();
-    auto fileName = path.filename().string();
-    if (fileName.find("nvqir-") != std::string::npos) {
-
-      // Extract and process the simulator name
-      auto simName = std::regex_replace(fileName, std::regex("libnvqir-"), "");
-      simName = std::regex_replace(simName, std::regex("-"), "_");
-      // Remove the suffix from the library
-      auto idx = simName.find_last_of(".");
-      simName = simName.substr(0, idx);
-
-      // Store the dlopen handles
-      auto iter = libHandles.find(path.string());
-      bool loadFailed = false;
-      if (iter == libHandles.end()) {
-        void *simLibHandle =
-            dlopen(path.string().c_str(), RTLD_GLOBAL | RTLD_NOW);
-        // Add simulator lib if successfully loaded.
-        // Note: there could be potential dlopen failures due to missing
-        // dependencies.
-        if (simLibHandle)
-          libHandles.emplace(path.string(), simLibHandle);
-        else {
-          loadFailed = true;
-          // Retrieve the error message
-          char *error_msg = dlerror();
-          cudaq::info("Failed to load NVQIR backend '{}' from {}. Error: {}",
-                      simName, path.string(),
-                      (error_msg ? std::string(error_msg) : "unknown."));
-        }
-      }
-
-      if (!loadFailed) {
-        // Load the plugin and get the CircuitSimulator.
-        // Skip adding simulator name to the availableSimulators list if failed
-        // to load.
-        cudaq::info("Found simulator plugin {}.", simName);
-        availableSimulators.push_back(simName);
-      }
-
-    } else if (fileName.find("cudaq-platform-") != std::string::npos) {
-      // store all available platforms.
-      // Extract and process the platform name
-      auto platformName =
-          std::regex_replace(fileName, std::regex("libcudaq-platform-"), "");
-      platformName = std::regex_replace(platformName, std::regex("-"), "_");
-      // Remove the suffix from the library
-      auto idx = platformName.find_last_of(".");
-      platformName = platformName.substr(0, idx);
-
-      auto iter = libHandles.find(path.string());
-      if (iter == libHandles.end())
-        libHandles.emplace(path.string(), dlopen(path.string().c_str(),
-                                                 RTLD_GLOBAL | RTLD_NOW));
-
-      // Load the plugin and get the CircuitSimulator.
-      availablePlatforms.push_back(platformName);
-      cudaq::info("Found platform plugin {}.", platformName);
-    }
-  }
-
   // Set the default target
   // If environment variable set with a valid value, use it
   // Otherwise, if GPU(s) available and other dependencies are satisfied, set
   // default to 'nvidia', else to 'qpp-cpu'
   defaultTarget = "qpp-cpu";
-  if (countGPUs() > 0) {
-    // Before setting the defaultTarget to nvidia, make sure the simulator is
-    // available.
-    const std::string nvidiaTarget = "nvidia";
-    auto iter = targets.find(nvidiaTarget);
-    if (iter != targets.end()) {
-      auto target = iter->second;
-      if (std::find(availableSimulators.begin(), availableSimulators.end(),
-                    target.simulatorName) != availableSimulators.end())
-        defaultTarget = nvidiaTarget;
-      else
-        cudaq::info(
-            "GPU(s) found but cannot select nvidia target because simulator "
-            "is not available. Are all dependencies installed?");
-    } else {
-      cudaq::info("GPU(s) found but cannot select nvidia target because nvidia "
-                  "target not found.");
-    }
-  }
+  if (countGPUs() > 0)
+    defaultTarget = "nvidia";
+
   auto env = std::getenv("CUDAQ_DEFAULT_SIMULATOR");
   if (env) {
     cudaq::info("'CUDAQ_DEFAULT_SIMULATOR' = {}", env);
@@ -376,28 +318,6 @@ LinkedLibraryHolder::~LinkedLibraryHolder() {
     if (handle)
       dlclose(handle);
   }
-}
-
-nvqir::CircuitSimulator *
-LinkedLibraryHolder::getSimulator(const std::string &simName) {
-  auto end = availableSimulators.end();
-  auto iter = std::find(availableSimulators.begin(), end, simName);
-  if (iter == end)
-    throw std::runtime_error("Invalid simulator requested: " + simName);
-
-  return getUniquePluginInstance<nvqir::CircuitSimulator>(
-      std::string("getCircuitSimulator_") + simName);
-}
-
-quantum_platform *
-LinkedLibraryHolder::getPlatform(const std::string &platformName) {
-  auto end = availablePlatforms.end();
-  auto iter = std::find(availablePlatforms.begin(), end, platformName);
-  if (iter == end)
-    throw std::runtime_error("Invalid platform requested: " + platformName);
-
-  return getUniquePluginInstance<quantum_platform>(
-      std::string("getQuantumPlatform_") + platformName);
 }
 
 void LinkedLibraryHolder::resetTarget() { setTarget(defaultTarget); }
@@ -438,7 +358,7 @@ void LinkedLibraryHolder::setTarget(
   if (iter == targets.end())
     throw std::runtime_error("Invalid target name (" + targetName + ").");
 
-  std::vector<std::string> argv;
+  std::vector<std::string> argv{"is_python", "true"};
   for (const auto &[k, v] : extraConfig) {
     argv.emplace_back(k);
     argv.emplace_back(v);
@@ -452,16 +372,39 @@ void LinkedLibraryHolder::setTarget(
         fmt::format(fmt::fg(fmt::color::red), "warning"),
         fmt::format(fmt::fg(fmt::color::blue), target.name),
         fmt::format(fmt::fg(fmt::color::blue), target.config.WarningMsg));
+    if (targetName.find("-fp64") != std::string::npos) {
+      // If the target is the deprecated SOMETHING-fp64, then add the option
+      if (auto iter = std::find(argv.begin(), argv.end(), "option");
+          iter != argv.end()) {
+        // but if we already have the option flag, we need to
+        // append to its next element
+        iter++;
+        (*iter) += ",fp64";
+      } else {
+        argv.push_back("option");
+        argv.push_back("fp64");
+      }
+    }
+    if (targetName.find("-mqpu") != std::string::npos) {
+      // If the target is the deprecated SOMETHING-mqpu, then add the option
+      if (auto iter = std::find(argv.begin(), argv.end(), "option");
+          iter != argv.end()) {
+        // but if we already have the option flag, we need to
+        // append to its next element
+        iter++;
+        (*iter) += ",mqpu";
+      } else {
+        argv.push_back("option");
+        argv.push_back("mqpu");
+      }
+    }
   }
+
+  // Required to update the RuntimeTarget
   const std::string targetConfigStr =
       cudaq::config::processRuntimeArgs(target.config, argv);
   parseRuntimeTarget(cudaqLibPath, target, targetConfigStr);
-
-  cudaq::info("Setting target={} (sim={}, platform={})", targetName,
-              target.simulatorName, target.platformName);
-
-  __nvqir__setCircuitSimulator(getSimulator(target.simulatorName));
-  auto *platform = getPlatform(target.platformName);
+  cudaq::info("Setting target={}", targetName);
 
   // Pack the config into the backend string name
   std::string backendConfigStr = targetName;
@@ -476,22 +419,13 @@ void LinkedLibraryHolder::setTarget(
       libHandles.emplace(potentialServerHelperPath.string(),
                          serverHelperHandle);
   }
-  for (auto &[key, value] : extraConfig)
-    backendConfigStr += fmt::format(";{};{}", key, value);
 
-  platform->setTargetBackend(backendConfigStr);
-  setQuantumPlatformInternal(platform);
+  for (auto &val : argv)
+    backendConfigStr += fmt::format(";{}", val);
+
+  cudaq::info("Resetting the platform with {}", backendConfigStr);
   currentTarget = targetName;
-
-  if ("orca-photonics" == targetName) {
-    std::filesystem::path libPath =
-        cudaqLibPath / fmt::format("libcudaq-em-photonics.{}", libSuffix);
-    auto *em = getUniquePluginInstance<ExecutionManager>(
-        "getRegisteredExecutionManager_photonics", libPath.c_str());
-    setExecutionManagerInternal(em);
-  } else {
-    resetExecutionManagerInternal();
-  }
+  v2::reset_platform(backendConfigStr);
 }
 
 std::vector<RuntimeTarget> LinkedLibraryHolder::getTargets() const {
