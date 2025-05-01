@@ -14,8 +14,8 @@
 #include "cudaq/host_config.h"
 #include "cudaq/operators.h"
 #include "cudaq/operators/operator_type.h"
-#include "cudaq/platform.h"
 #include "cudaq/platform/QuantumExecutionQueue.h"
+#include "cudaq/platformv2/platform.h"
 #include "cudaq/schedule.h"
 #include "evolve_internal.h"
 
@@ -702,7 +702,7 @@ evolve_async(const HamTy &hamiltonian, const cudaq::dimension_map &dimensions,
       [=, cOps = std::move(collapseOperators),
        obs = std::move(observableOperators)]() {
         ExecutionContext context("evolve");
-        cudaq::get_platform().set_exec_ctx(&context, qpu_id);
+        cudaq::v2::get_qpu(qpu_id).set_execution_context(&context);
         state localizedState = cudaq::__internal__::migrateState(initial_state);
         return evolve(hamiltonian, dimensions, schedule, localizedState,
                       *cloneIntegrator, cOps, obs, store_intermediate_results,
@@ -741,7 +741,7 @@ evolve_async(const HamTy &hamiltonian, const cudaq::dimension_map &dimensions,
   return __internal__::evolve_async(
       [=]() {
         ExecutionContext context("evolve");
-        cudaq::get_platform().set_exec_ctx(&context, qpu_id);
+        cudaq::v2::get_qpu(qpu_id).set_execution_context(&context);
         state localizedState = cudaq::__internal__::migrateState(initial_state);
         return evolve(hamiltonian, dimensions, schedule, localizedState,
                       *cloneIntegrator, collapse_operators, observables,
@@ -776,7 +776,7 @@ evolve_async(const super_op &super_op, const cudaq::dimension_map &dimensions,
   return __internal__::evolve_async(
       [=, obs = std::move(observableOperators)]() {
         ExecutionContext context("evolve");
-        cudaq::get_platform().set_exec_ctx(&context, qpu_id);
+        cudaq::v2::get_qpu(qpu_id).set_execution_context(&context);
         state localizedState = cudaq::__internal__::migrateState(initial_state);
         return evolve(super_op, dimensions, schedule, localizedState,
                       *cloneIntegrator, obs, store_intermediate_results,
@@ -805,7 +805,7 @@ evolve_async(const cudaq::rydberg_hamiltonian &hamiltonian,
   return cudaq::__internal__::evolve_async(
       [=]() {
         ExecutionContext context("evolve");
-        cudaq::get_platform().set_exec_ctx(&context, qpu_id);
+        cudaq::v2::get_qpu(qpu_id).set_execution_context(&context);
         return evolve(hamiltonian, schedule, shots_count);
       },
       qpu_id);

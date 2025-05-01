@@ -76,7 +76,7 @@ namespace details {
 template <typename KernelFunctor>
 std::optional<observe_result>
 runObservation(KernelFunctor &&k, const cudaq::spin_op &H,
-               quantum_platform &platform, int shots,
+               v2::qpu_handle &platform, int shots,
                const std::string &kernelName, std::size_t qpu_id = 0,
                details::future *futureResult = nullptr,
                std::size_t batchIteration = 0, std::size_t totalBatchIters = 0,
@@ -96,8 +96,7 @@ runObservation(KernelFunctor &&k, const cudaq::spin_op &H,
   // Indicate that this is an asynchronous execution
   ctx->asyncExec = futureResult != nullptr;
 
-  platform.set_current_qpu(qpu_id);
-  platform.set_exec_ctx(ctx.get(), qpu_id);
+  platform.set_execution_context(ctx.get());
 
   k();
 
@@ -108,7 +107,7 @@ runObservation(KernelFunctor &&k, const cudaq::spin_op &H,
     return std::nullopt;
   }
 
-  platform.reset_exec_ctx(qpu_id);
+  platform.reset_execution_context();
 
   // Extract the results
   sample_result data;
@@ -140,21 +139,21 @@ runObservation(KernelFunctor &&k, const cudaq::spin_op &H,
 /// observation process asynchronously
 template <typename KernelFunctor>
 auto runObservationAsync(KernelFunctor &&wrappedKernel, const spin_op &H,
-                         quantum_platform &platform, int shots,
+                         v2::qpu_handle &platform, int shots,
                          const std::string &kernelName,
                          std::size_t qpu_id = 0) {
 
-  if (qpu_id >= platform.num_qpus()) {
+  if (qpu_id >= v2::get_num_qpus()) {
     throw std::invalid_argument("Provided qpu_id " + std::to_string(qpu_id) +
                                 " is invalid (must be < " +
-                                std::to_string(platform.num_qpus()) +
+                                std::to_string(v2::get_num_qpus()) +
                                 " i.e. platform.num_qpus())");
   }
 
   // Could be that the platform we are running on is
   // remotely hosted, if so, we can't do asynchronous execution with a
   // separate thread, the separate thread is the remote server invocation
-  if (platform.is_remote(qpu_id)) {
+  if (platform.is_remote()) {
     // In this case, everything we need can be dumped into a details::future
     // type. Just return that wrapped in an async_result
     details::future futureResult;
@@ -165,7 +164,7 @@ auto runObservationAsync(KernelFunctor &&wrappedKernel, const spin_op &H,
 
   // If the platform is not remote, then we can handle asynchronous execution
   // via a new worker thread.
-  KernelExecutionTask task(
+  std::function<sample_result()> task(
       [&, H, qpu_id, shots, kernelName,
        kernel = std::forward<KernelFunctor>(wrappedKernel)]() mutable {
         return details::runObservation(kernel, H, platform, shots, kernelName,
@@ -174,8 +173,14 @@ auto runObservationAsync(KernelFunctor &&wrappedKernel, const spin_op &H,
             .raw_data();
       });
 
-  return async_observe_result(
-      details::future(platform.enqueueAsyncTask(qpu_id, task)), &H);
+  std::promise<sample_result> promise;
+  auto f = promise.get_future();
+  platform.enqueue_task([p = std::move(promise), t = task]() mutable {
+    auto counts = t();
+    p.set_value(counts);
+  });
+
+  return async_observe_result(details::future(f), &H);
 }
 
 /// @brief Distribute the expectation value computations among the
@@ -231,8 +236,8 @@ template <typename QuantumKernel, typename... Args,
 observe_result observe(QuantumKernel &&kernel, const spin_op &H,
                        Args &&...args) {
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(-1);
+  auto &platform = v2::get_qpu();
+  auto shots = -1;
   auto kernelName = cudaq::getKernelName(kernel);
   return details::runObservation(
              [&kernel, &args...]() mutable {
@@ -264,8 +269,8 @@ std::vector<observe_result> observe(QuantumKernel &&kernel,
                 "term list must be a container of spin_op_term");
 
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(-1);
+  auto &platform = v2::get_qpu();
+  auto shots = -1;
   auto kernelName = cudaq::getKernelName(kernel);
 
   // Convert all spin_ops to a single summed spin_op
@@ -309,14 +314,14 @@ template <typename DistributionType, typename QuantumKernel, typename... Args,
 observe_result observe(std::size_t shots, QuantumKernel &&kernel,
                        const spin_op &H, Args &&...args) {
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   // Does platform support parallelism? Need a check here
   if (!platform.supports_task_distribution())
     throw std::runtime_error(
-        "The current quantum_platform does not support parallel distribution "
+        "The current platform does not support parallel distribution"
         "of observe() expectation value computations.");
 
-  auto nQpus = platform.num_qpus();
+  auto nQpus = v2::get_num_qpus();
   if constexpr (std::is_same_v<DistributionType, parallel::thread>) {
     if (nQpus == 1)
       printf(
@@ -414,10 +419,8 @@ template <typename DistributionType, typename QuantumKernel, typename... Args,
 #endif
 observe_result observe(QuantumKernel &&kernel, const spin_op &H,
                        Args &&...args) {
-  auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(-1);
-  return observe<DistributionType>(shots, std::forward<QuantumKernel>(kernel),
-                                   H, std::forward<Args>(args)...);
+  return observe<DistributionType>(-1, std::forward<QuantumKernel>(kernel), H,
+                                   std::forward<Args>(args)...);
 }
 /// \endcond
 
@@ -435,12 +438,12 @@ template <typename QuantumKernel, typename... Args,
 observe_result observe(std::size_t shots, QuantumKernel &&kernel,
                        const spin_op &H, Args &&...args) {
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   auto kernelName = cudaq::getKernelName(kernel);
 
   // Does this platform expose more than 1 QPU
   // If so, let's distribute the work among the QPUs
-  if (auto nQpus = platform.num_qpus(); nQpus > 1)
+  if (auto nQpus = v2::get_num_qpus(); nQpus > 1)
     return details::distributeComputations(
 #if CUDAQ_USE_STD20
         [&kernel, shots, ... args = std::forward<Args>(args)](
@@ -482,12 +485,12 @@ template <typename QuantumKernel, typename... Args,
 #endif
 observe_result observe(const observe_options &options, QuantumKernel &&kernel,
                        const spin_op &H, Args &&...args) {
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu(); // cudaq::get_platform();
   auto kernelName = cudaq::getKernelName(kernel);
   auto shots = options.shots;
 
-  platform.set_noise(&options.noise);
-
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->set_noise(options.noise);
   auto ret = details::runObservation(
                  [&kernel, &args...]() mutable {
                    kernel(std::forward<Args>(args)...);
@@ -498,7 +501,8 @@ observe_result observe(const observe_options &options, QuantumKernel &&kernel,
                  /*totalBatchIters=*/0, options.num_trajectories)
                  .value();
 
-  platform.reset_noise();
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->reset_noise();
   return ret;
 }
 
@@ -515,8 +519,8 @@ template <typename QuantumKernel, typename... Args,
 auto observe_async(const std::size_t qpu_id, QuantumKernel &&kernel,
                    const spin_op &H, Args &&...args) {
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(-1);
+  auto &platform = v2::get_qpu(qpu_id);
+  auto shots = -1;
   auto kernelName = cudaq::getKernelName(kernel);
 
 #if CUDAQ_USE_STD20
@@ -553,7 +557,7 @@ template <typename QuantumKernel, typename... Args,
 auto observe_async(std::size_t shots, std::size_t qpu_id,
                    QuantumKernel &&kernel, const spin_op &H, Args &&...args) {
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu(qpu_id);
   auto kernelName = cudaq::getKernelName(kernel);
 
 #if CUDAQ_USE_STD20
@@ -609,15 +613,15 @@ template <typename QuantumKernel, typename... Args,
 std::vector<observe_result> observe(QuantumKernel &&kernel, const spin_op &H,
                                     ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of quantum computers
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
 
   // Create the functor that will broadcast the observations across
   // all requested argument sets provided.
   details::BroadcastFunctorType<observe_result, Args...> functor =
       [&](std::size_t qpuId, std::size_t counter, std::size_t N,
           Args &...singleIterParameters) -> observe_result {
-    auto shots = platform.get_shots().value_or(-1);
+    auto shots = -1;
     auto kernelName = cudaq::getKernelName(kernel);
     auto ret = details::runObservation(
                    [&kernel, &singleIterParameters...]() mutable {
@@ -654,8 +658,8 @@ std::vector<observe_result> observe(std::size_t shots, QuantumKernel &&kernel,
                                     const spin_op &H,
                                     ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of quantum computers
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
 
   // Create the functor that will broadcast the observations across
   // all requested argument sets provided.
@@ -697,12 +701,12 @@ std::vector<observe_result> observe(cudaq::observe_options &options,
                                     QuantumKernel &&kernel, const spin_op &H,
                                     ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of quantum computers
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
   auto shots = options.shots;
 
-  platform.set_noise(&options.noise);
-
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->set_noise(options.noise);
   // Create the functor that will broadcast the observations across
   // all requested argument sets provided.
   details::BroadcastFunctorType<observe_result, Args...> functor =
@@ -723,7 +727,8 @@ std::vector<observe_result> observe(cudaq::observe_options &options,
   auto ret = details::broadcastFunctionOverArguments<observe_result, Args...>(
       numQpus, platform, functor, params);
 
-  platform.reset_noise();
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->reset_noise();
   return ret;
 }
 } // namespace cudaq

@@ -35,7 +35,6 @@ int main() {
 }
 
 // CHECK-QPP: [info] [NVQIR.cpp:{{[0-9]+}}] Creating the qpp backend.
-// CHECK-QPP: [info] [DefaultExecutionManager.cpp:{{[0-9]+}}] [DefaultExecutionManager] Creating the qpp backend.
 
 // CHECK-DM: [info] [NVQIR.cpp:{{[0-9]+}}] Creating the dm backend.
 // CHECK-DM: [info] [DefaultExecutionManager.cpp:{{[0-9]+}}] [DefaultExecutionManager] Creating the dm backend.

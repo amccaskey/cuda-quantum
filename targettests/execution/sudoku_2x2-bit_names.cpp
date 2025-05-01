@@ -58,8 +58,8 @@ int main() {
   auto result = cudaq::sample(1000, grover);
   result.dump();
 
-  auto& platform = cudaq::get_platform();
-  if (platform.is_remote() || platform.is_emulated()) {
+  auto& platform = cudaq::v2::get_qpu(); 
+  if (platform.is_remote() || platform.is_emulator()) {
     // Make sure that the get_marginal() results for the individual register names
     // match the subset of the bits from the global register.
     // Note that this will fail if you only compile this in library mode.

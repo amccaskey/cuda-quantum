@@ -76,7 +76,7 @@ observe_result pyObserve(py::object &kernel, spin_op &spin_operator,
                          py::args args, const int shots,
                          bool argMapperProvided = false) {
   auto [kernelName, kernelMod] = getKernelNameAndModule(kernel);
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
   args = simplifiedValidateInputArguments(args);
   auto *argData = toOpaqueArgs(args, kernelMod, kernelName);
 
@@ -130,7 +130,7 @@ static bool firstArgIsCompatibleWithRemoteVQE(py::object &kernel) {
 /// function is used for many of the pyVQE variants below, so some of the
 /// parameters may be nullptr.
 static optimization_result
-pyVQE_remote_cpp(cudaq::quantum_platform &platform, py::object &kernel,
+pyVQE_remote_cpp(cudaq::v2::qpu_handle &platform, py::object &kernel,
                  spin_op &hamiltonian, cudaq::optimizer &optimizer,
                  cudaq::gradient *gradient, py::function *argumentMapper,
                  const int n_params, const int shots) {
@@ -138,7 +138,7 @@ pyVQE_remote_cpp(cudaq::quantum_platform &platform, py::object &kernel,
   auto ctx = std::make_unique<ExecutionContext>("observe", /*shots=*/0);
   ctx->kernelName = kernelName;
   ctx->spin = cudaq::spin_op::canonicalize(hamiltonian);
-  platform.set_exec_ctx(ctx.get());
+  platform.set_execution_context(ctx.get());
 
   constexpr std::size_t startingArgIdx = 1;
   cudaq::OpaqueArguments args;
@@ -164,9 +164,10 @@ pyVQE_remote_cpp(cudaq::quantum_platform &platform, py::object &kernel,
   std::vector<std::string> names;
   auto *wrapper = new cudaq::ArgWrapper{unwrap(kernelMod), names, kernelArgs};
 
-  platform.launchVQE(kernelName, wrapper, gradient, ctx->spin.value(),
-                     optimizer, n_params, shots);
-  platform.reset_exec_ctx();
+  // FIXME AJM - Make this a new trait
+  // platform.launchVQE(kernelName, wrapper, gradient, ctx->spin.value(),
+  //                    optimizer, n_params, shots);
+  platform.reset_execution_context();
   delete wrapper;
   if (kernelArgs)
     std::free(kernelArgs);
@@ -176,7 +177,7 @@ pyVQE_remote_cpp(cudaq::quantum_platform &platform, py::object &kernel,
 /// @brief Perform VQE on a remote platform. This function is used for many of
 /// the pyVQE variants below, so some of the parameters may be nullptr.
 static optimization_result
-pyVQE_remote(cudaq::quantum_platform &platform, py::object &kernel,
+pyVQE_remote(cudaq::v2::qpu_handle &platform, py::object &kernel,
              spin_op &hamiltonian, cudaq::optimizer &optimizer,
              cudaq::gradient *gradient, py::function *argumentMapper,
              const int n_params, const int shots) {
@@ -252,10 +253,11 @@ pyVQE_remote(cudaq::quantum_platform &platform, py::object &kernel,
   scCtx.source_code = std::move(function_call);
 
   auto ctx = std::make_unique<cudaq::ExecutionContext>("sample", 0);
-  platform.set_exec_ctx(ctx.get());
-  platform.launchSerializedCodeExecution(
-      kernel.attr("name").cast<std::string>(), scCtx);
-  platform.reset_exec_ctx();
+  platform.set_execution_context(ctx.get());
+  // FIXME AJM Make this a new trait
+  // platform.launchSerializedCodeExecution(
+  //     kernel.attr("name").cast<std::string>(), scCtx);
+  platform.reset_execution_context();
   auto result = cudaq::optimization_result{};
   if (ctx->optResult)
     result = std::move(*ctx->optResult);
@@ -276,7 +278,7 @@ static void throwPerformanceError() {
 optimization_result pyVQE(py::object &kernel, spin_op &hamiltonian,
                           cudaq::optimizer &optimizer, const int n_params,
                           const int shots = -1) {
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   if (platform.get_remote_capabilities().vqe) {
     if (firstArgIsCompatibleWithRemoteVQE(kernel))
       return pyVQE_remote_cpp(platform, kernel, hamiltonian, optimizer,
@@ -302,7 +304,7 @@ optimization_result pyVQE(py::object &kernel, spin_op &hamiltonian,
 optimization_result pyVQE(py::object &kernel, spin_op &hamiltonian,
                           cudaq::optimizer &optimizer, const int n_params,
                           py::function &argumentMapper, const int shots = -1) {
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   if (platform.get_remote_capabilities().vqe) {
     if (firstArgIsCompatibleWithRemoteVQE(kernel))
       return pyVQE_remote_cpp(platform, kernel, hamiltonian, optimizer,
@@ -335,7 +337,7 @@ optimization_result pyVQE(py::object &kernel, cudaq::gradient &gradient,
   // vector of parameters. This is passed to `cudaq::gradient::compute`
   // to allow for the calculation of the gradient vector with the
   // provided gradient strategy.
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   if (platform.get_remote_capabilities().vqe) {
     if (firstArgIsCompatibleWithRemoteVQE(kernel))
       return pyVQE_remote_cpp(platform, kernel, hamiltonian, optimizer,
@@ -374,7 +376,7 @@ optimization_result pyVQE(py::object &kernel, cudaq::gradient &gradient,
   // vector of parameters. This is passed to `cudaq::gradient::compute`
   // to allow for the calculation of the gradient vector with the
   // provided gradient strategy.
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   if (platform.get_remote_capabilities().vqe) {
     if (firstArgIsCompatibleWithRemoteVQE(kernel))
       return pyVQE_remote_cpp(platform, kernel, hamiltonian, optimizer,

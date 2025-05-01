@@ -13,7 +13,7 @@
 #include "common/Registry.h"
 #include "common/ThunkInterface.h"
 #include "common/Timing.h"
-#include "cudaq/qis/execution_manager.h"
+// #include "cudaq/qis/execution_manager.h"
 #include "cudaq/qis/qubit_qis.h"
 #include "cudaq/remote_capabilities.h"
 #include "cudaq/utils/cudaq_utils.h"
@@ -25,7 +25,7 @@ class optimizer;
 class SerializedCodeExecutionContext;
 
 /// Expose the function that will return the current ExecutionManager
-ExecutionManager *getExecutionManager();
+// ExecutionManager *getExecutionManager();
 
 /// A CUDA-Q QPU is an abstraction on the quantum processing
 /// unit which executes quantum kernel expressions. The QPU exposes
@@ -62,7 +62,7 @@ protected:
     if (execute) {
       ScopedTraceWithContext(cudaq::TIMING_OBSERVE,
                              "handleObservation flushGateQueue()");
-      getExecutionManager()->flushGateQueue();
+      // getExecutionManager()->flushGateQueue();
     }
     if (execute) {
       ScopedTraceWithContext(cudaq::TIMING_OBSERVE,
@@ -81,9 +81,9 @@ protected:
       // manually looping over terms, applying basis change ops,
       // and computing <ZZ..ZZZ>
       if (localContext->canHandleObserve) {
-        auto [exp, data] = cudaq::measure(H);
-        localContext->expectationValue = exp;
-        localContext->result = data;
+        // auto [exp, data] = cudaq::measure(H);
+        // localContext->expectationValue = exp;
+        // localContext->result = data;
       } else {
 
         // Loop over each term and compute coeff * <term>
@@ -93,9 +93,9 @@ protected:
           else {
             // This takes a longer time for the first iteration unless
             // flushGateQueue() is called above.
-            auto [exp, data] = cudaq::measure(term);
-            results.emplace_back(data.to_map(), term.get_term_id(), exp);
-            sum += term.evaluate_coefficient().real() * exp;
+            // auto [exp, data] = cudaq::measure(term);
+            // results.emplace_back(data.to_map(), term.get_term_id(), exp);
+            // sum += term.evaluate_coefficient().real() * exp;
           }
         };
 
@@ -117,6 +117,16 @@ public:
   QPU(QPU &&) = default;
   /// The destructor
   virtual ~QPU() = default;
+
+  virtual void apply(const std::string_view gateName,
+                     const std::vector<double> &params,
+                     const std::vector<QuditInfo> &controls,
+                     const std::vector<QuditInfo> &targets,
+                     bool isAdjoint = false,
+                     const spin_op_term op = cudaq::spin_op::identity()) {
+    throw std::runtime_error("Bad");
+  }
+
   /// Set the current QPU Id
   void setId(std::size_t _qpuId) { qpu_id = _qpuId; }
 
@@ -164,9 +174,9 @@ public:
   enqueue(QuantumTask &task) = 0; //{ execution_queue->enqueue(task); }
 
   /// Set the execution context, meant for subtype specification
-  virtual void setExecutionContext(ExecutionContext *context) = 0;
+  virtual void set_execution_context(ExecutionContext *context) = 0;
   /// Reset the execution context, meant for subtype specification
-  virtual void resetExecutionContext() = 0;
+  virtual void reset_execution_context() = 0;
   virtual void setTargetBackend(const std::string &backend) {}
 
   virtual void launchVQE(const std::string &name, const void *kernelArgs,

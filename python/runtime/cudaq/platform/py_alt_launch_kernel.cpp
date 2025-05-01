@@ -12,6 +12,8 @@
 #include "common/ArgumentConversion.h"
 #include "common/ArgumentWrapper.h"
 #include "common/Environment.h"
+#include "common/Logger.h"
+#include "common/Timing.h"
 #include "cudaq/Optimizer/Builder/Factory.h"
 #include "cudaq/Optimizer/Builder/Runtime.h"
 #include "cudaq/Optimizer/CAPI/Dialects.h"
@@ -23,9 +25,8 @@
 #include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
-#include "cudaq/platform.h"
-#include "cudaq/platform/qpu.h"
 #include "runtime/cudaq/algorithms/py_utils.h"
+#include "cudaq/platformv2/platform.h"
 #include "utils/OpaqueArguments.h"
 #include "utils/PyTypes.h"
 #include "llvm/MC/SubtargetFeature.h"
@@ -337,7 +338,7 @@ jitAndCreateArgs(const std::string &name, MlirModule module,
 ///
 /// Now we can use the setters to store captured data into the globals.
 void storeCapturedData(ExecutionEngine *jit, const std::string &kernelName) {
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
   // If we have any state vector data, we need to extract the function pointer
   // to set that data, and then set it.
   for (auto &[stateHash, stateData] : *stateStorage) {
@@ -351,7 +352,7 @@ void storeCapturedData(ExecutionEngine *jit, const std::string &kernelName) {
       continue;
     }
 
-    if (platform.is_remote() || platform.is_emulated())
+    if (platform.is_remote() || platform.is_emulator())
       throw std::runtime_error("captured vectors are not supported on quantum "
                                "hardware or remote simulators");
 
@@ -380,7 +381,7 @@ void storeCapturedData(ExecutionEngine *jit, const std::string &kernelName) {
       continue;
     }
 
-    if (platform.is_remote() || platform.is_emulated())
+    if (platform.is_remote() || platform.is_emulator())
       throw std::runtime_error("captured states are not supported on quantum "
                                "hardware or remote simulators");
 
@@ -394,10 +395,10 @@ void pyLaunchKernel(const std::string &name, KernelThunkType thunk,
                     mlir::ModuleOp mod, cudaq::OpaqueArguments &runtimeArgs,
                     void *rawArgs, std::size_t size, std::uint32_t returnOffset,
                     const std::vector<std::string> &names) {
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();//get_platform();
   auto isRemoteSimulator = platform.get_remote_capabilities().isRemoteSimulator;
   auto isQuantumDevice =
-      !isRemoteSimulator && (platform.is_remote() || platform.is_emulated());
+      !isRemoteSimulator && (platform.is_remote() || platform.is_emulator());
 
   if (isRemoteSimulator) {
     // Remote simulator - use altLaunchKernel to support returning values.
@@ -753,9 +754,9 @@ MlirModule synthesizeKernel(const std::string &name, MlirModule module,
   auto enablePrintMLIREachPass =
       getEnvBool("CUDAQ_MLIR_PRINT_EACH_PASS", false);
 
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
   auto isRemoteSimulator = platform.get_remote_capabilities().isRemoteSimulator;
-  auto isLocalSimulator = platform.is_simulator() && !platform.is_emulated();
+  auto isLocalSimulator = platform.is_simulator() && !platform.is_emulator();
   auto isSimulator = isLocalSimulator || isRemoteSimulator;
 
   cudaq::opt::ArgumentConverter argCon(name, unwrap(module));
@@ -1065,6 +1066,7 @@ void bindAltLaunchKernel(py::module &mod) {
         auto ctx = unwrap(modA).getContext();
         auto moduleB = parseSourceString<ModuleOp>(modBStr, ctx);
         auto moduleA = unwrap(modA).clone();
+        moduleA.dump();
         moduleB->walk([&moduleA](func::FuncOp op) {
           if (!moduleA.lookupSymbol<func::FuncOp>(op.getName()))
             moduleA.push_back(op.clone());

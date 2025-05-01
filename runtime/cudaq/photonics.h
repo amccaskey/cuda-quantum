@@ -8,4 +8,4 @@
 
 #pragma once
 
-#include "qis/managers/photonics/photonics_qis.h"
+#include "cudaq/platformv2/qpus/photonics/photonics_qis.h"

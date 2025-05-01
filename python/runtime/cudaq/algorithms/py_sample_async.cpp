@@ -76,7 +76,7 @@ for more information on this programming pattern.)#")
       "sample_async",
       [&](py::object kernel, py::args args, std::size_t shots,
           bool explicitMeasurements, std::size_t qpu_id) {
-        auto &platform = cudaq::get_platform();
+        auto &platform = cudaq::v2::get_qpu();
         if (py::hasattr(kernel, "compile"))
           kernel.attr("compile")();
         auto kernelName = kernel.attr("name").cast<std::string>();

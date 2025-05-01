@@ -10,6 +10,7 @@
 
 #include "common/ExecutionContext.h"
 #include "common/SampleResult.h"
+#include "cudaq/builder/kernel_builder.h"
 #include "cudaq/algorithms/broadcast.h"
 #include "cudaq/concepts.h"
 #include "cudaq/host_config.h"
@@ -37,7 +38,7 @@ namespace details {
 /// arguments and invokes the quantum kernel) and invoke the sampling process.
 template <typename KernelFunctor>
 std::optional<sample_result>
-runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
+runSampling(KernelFunctor &&wrappedKernel, v2::qpu_handle &qpu,
             const std::string &kernelName, int shots, bool explicitMeasurements,
             std::size_t qpu_id = 0, details::future *futureResult = nullptr,
             std::size_t batchIteration = 0, std::size_t totalBatchIters = 0) {
@@ -45,7 +46,7 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
   auto hasConditionalFeebdback =
       cudaq::kernelHasConditionalFeedback(kernelName);
   if (explicitMeasurements) {
-    if (!platform.supports_explicit_measurements())
+    if (!qpu.supports_explicit_measurements())
       throw std::runtime_error("The sampling option `explicit_measurements` is "
                                "not supported on this target.");
     if (hasConditionalFeebdback)
@@ -71,10 +72,10 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
   if (!isRegistered && !ctx->hasConditionalsOnMeasureResults) {
     // Trace the kernel function
     ExecutionContext context("tracer");
-    auto &platform = get_platform();
-    platform.set_exec_ctx(&context, qpu_id);
+    auto &platform = v2::get_qpu();
+    platform.set_execution_context(&context);
     wrappedKernel();
-    platform.reset_exec_ctx(qpu_id);
+    platform.reset_execution_context();
     // In trace mode, if we have a measure result
     // that is passed to an if statement, then
     // we'll have collected registernames
@@ -92,8 +93,7 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
   ctx->asyncExec = futureResult != nullptr;
 
   // Set the platform and the qpu id.
-  platform.set_exec_ctx(ctx.get(), qpu_id);
-  platform.set_current_qpu(qpu_id);
+  qpu.set_execution_context(ctx.get());
 
   // Loop until all shots are returned.
   cudaq::sample_result counts;
@@ -103,7 +103,8 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
       *futureResult = ctx->futureResult;
       return std::nullopt;
     }
-    platform.reset_exec_ctx(qpu_id);
+    qpu.reset_execution_context();
+    // platform.reset_exec_ctx(qpu_id);
     if (counts.get_total_shots() == 0)
       counts = std::move(ctx->result); // optimize for first iteration
     else
@@ -123,7 +124,7 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
     // Reset the context for the next round,
     // don't need to reset on the last exec
     if (counts.get_total_shots() < static_cast<std::size_t>(shots)) {
-      platform.set_exec_ctx(ctx.get(), qpu_id);
+      qpu.set_execution_context(ctx.get());
     }
   }
   return counts;
@@ -134,20 +135,20 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
 /// asynchronously. Return an `async_sample_result`, clients can retrieve the
 /// results at a later time via the `get()` call.
 template <typename KernelFunctor>
-auto runSamplingAsync(KernelFunctor &&wrappedKernel, quantum_platform &platform,
+auto runSamplingAsync(KernelFunctor &&wrappedKernel, v2::qpu_handle &platform,
                       const std::string &kernelName, int shots,
                       bool explicitMeasurements = false,
                       std::size_t qpu_id = 0) {
-  if (qpu_id >= platform.num_qpus()) {
+  if (qpu_id >= v2::get_num_qpus()) {
     throw std::invalid_argument("Provided qpu_id " + std::to_string(qpu_id) +
                                 " is invalid (must be < " +
-                                std::to_string(platform.num_qpus()) +
+                                std::to_string(v2::get_num_qpus()) +
                                 " i.e. platform.num_qpus())");
   }
 
   // If we are remote, then create the sampling executor with `cudaq::future`
   // provided
-  if (platform.is_remote(qpu_id)) {
+  if (platform.is_remote()) {
     details::future futureResult;
     details::runSampling(std::forward<KernelFunctor>(wrappedKernel), platform,
                          kernelName, shots, explicitMeasurements, qpu_id,
@@ -156,7 +157,7 @@ auto runSamplingAsync(KernelFunctor &&wrappedKernel, quantum_platform &platform,
   }
 
   // Otherwise we'll create our own future/promise and return it
-  KernelExecutionTask task(
+  std::function<sample_result()> task(
       [qpu_id, explicitMeasurements, shots, kernelName, &platform,
        kernel = std::forward<KernelFunctor>(wrappedKernel)]() mutable {
         return details::runSampling(kernel, platform, kernelName, shots,
@@ -164,8 +165,13 @@ auto runSamplingAsync(KernelFunctor &&wrappedKernel, quantum_platform &platform,
             .value();
       });
 
-  return async_sample_result(
-      details::future(platform.enqueueAsyncTask(qpu_id, task)));
+  std::promise<sample_result> promise;
+  auto f = promise.get_future();
+  platform.enqueue_task([p = std::move(promise), t = task]() mutable {
+    auto counts = t();
+    p.set_value(counts);
+  });
+  return async_sample_result(details::future(f));
 }
 } // namespace details
 
@@ -210,8 +216,8 @@ sample_result sample(QuantumKernel &&kernel, Args &&...args) {
   }
 
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(1000);
+  auto &platform = v2::get_qpu();
+  auto shots = 1000;
   auto kernelName = cudaq::getKernelName(kernel);
   return details::runSampling(
              [&]() mutable { kernel(std::forward<Args>(args)...); }, platform,
@@ -249,7 +255,7 @@ auto sample(std::size_t shots, QuantumKernel &&kernel, Args &&...args) {
   }
 
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   auto kernelName = cudaq::getKernelName(kernel);
   return details::runSampling(
              [&]() mutable { kernel(std::forward<Args>(args)...); }, platform,
@@ -287,15 +293,17 @@ sample_result sample(const sample_options &options, QuantumKernel &&kernel,
     static_cast<cudaq::details::kernel_builder_base &>(kernel).jitCode();
   }
 
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   auto shots = options.shots;
   auto kernelName = cudaq::getKernelName(kernel);
-  platform.set_noise(&options.noise);
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->set_noise(options.noise);
   auto ret = details::runSampling(
                  [&]() mutable { kernel(std::forward<Args>(args)...); },
                  platform, kernelName, shots, options.explicit_measurements)
                  .value();
-  platform.reset_noise();
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->reset_noise();
   return ret;
 }
 
@@ -330,8 +338,8 @@ async_sample_result sample_async(const std::size_t qpu_id,
   }
 
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(1000);
+  auto &platform = v2::get_qpu(qpu_id);
+  auto shots = 1000;
   auto kernelName = cudaq::getKernelName(kernel);
 
 #if CUDAQ_USE_STD20
@@ -385,7 +393,7 @@ async_sample_result sample_async(std::size_t shots, std::size_t qpu_id,
   }
 
   // Run this SHOTS times
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu(qpu_id);
   auto kernelName = cudaq::getKernelName(kernel);
 
 #if CUDAQ_USE_STD20
@@ -438,10 +446,10 @@ async_sample_result sample_async(const sample_options &options,
   if constexpr (has_name<QuantumKernel>::value) {
     static_cast<cudaq::details::kernel_builder_base &>(kernel).jitCode();
   }
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu(qpu_id);
   auto kernelName = cudaq::getKernelName(kernel);
-  platform.set_noise(&options.noise);
-
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->set_noise(options.noise);
 #if CUDAQ_USE_STD20
   auto ret = details::runSamplingAsync(
       [&kernel, ... args = std::forward<Args>(args)]() mutable {
@@ -461,7 +469,8 @@ async_sample_result sample_async(const sample_options &options,
       platform, kernelName, options.shots, options.explicit_measurements,
       qpu_id);
 #endif
-  platform.reset_noise();
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->reset_noise();
   return ret;
 }
 
@@ -509,15 +518,15 @@ template <typename QuantumKernel, typename... Args,
 std::vector<sample_result> sample(QuantumKernel &&kernel,
                                   ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of qpus
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
 
   // Create the functor that will broadcast the sampling tasks across
   // all requested argument sets provided.
   details::BroadcastFunctorType<sample_result, Args...> functor =
       [&](std::size_t qpuId, std::size_t counter, std::size_t N,
           Args &...singleIterParameters) -> sample_result {
-    auto shots = platform.get_shots().value_or(1000);
+    auto shots = 1000;
     auto kernelName = cudaq::getKernelName(kernel);
     auto ret = details::runSampling(
                    [&kernel, &singleIterParameters...]() mutable {
@@ -553,8 +562,8 @@ template <typename QuantumKernel, typename... Args,
 std::vector<sample_result> sample(std::size_t shots, QuantumKernel &&kernel,
                                   ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of QPUs
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
 
   // Create the functor that will broadcast the sampling tasks across
   // all requested argument sets provided.
@@ -597,12 +606,12 @@ std::vector<sample_result> sample(const sample_options &options,
                                   QuantumKernel &&kernel,
                                   ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of qpus
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
   auto shots = options.shots;
 
-  platform.set_noise(&options.noise);
-
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->set_noise(options.noise);
   // Create the functor that will broadcast the sampling tasks across
   // all requested argument sets provided.
   details::BroadcastFunctorType<sample_result, Args...> functor =
@@ -624,7 +633,8 @@ std::vector<sample_result> sample(const sample_options &options,
   auto ret = details::broadcastFunctionOverArguments<sample_result, Args...>(
       numQpus, platform, functor, params);
 
-  platform.reset_noise();
+  if (auto *supportsNoise = platform.as<v2::noise_trait>())
+    supportsNoise->reset_noise();
   return ret;
 }
 
@@ -646,15 +656,15 @@ template <typename QuantumKernel, typename... Args,
 [[deprecated("Use sample() overload instead")]] std::vector<sample_result>
 sample_n(QuantumKernel &&kernel, ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of qpus
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
 
   // Create the functor that will broadcast the sampling tasks across
   // all requested argument sets provided.
   details::BroadcastFunctorType<sample_result, Args...> functor =
       [&](std::size_t qpuId, std::size_t counter, std::size_t N,
           Args &...singleIterParameters) -> sample_result {
-    auto shots = platform.get_shots().value_or(1000);
+    auto shots = 1000;
     auto kernelName = cudaq::getKernelName(kernel);
     auto ret = details::runSampling(
                    [&kernel, &singleIterParameters...]() mutable {
@@ -691,8 +701,8 @@ template <typename QuantumKernel, typename... Args,
 sample_n(std::size_t shots, QuantumKernel &&kernel,
          ArgumentSet<Args...> &&params) {
   // Get the platform and query the number of qpus
-  auto &platform = cudaq::get_platform();
-  auto numQpus = platform.num_qpus();
+  auto &platform = v2::get_qpu();
+  auto numQpus = v2::get_num_qpus();
 
   // Create the functor that will broadcast the sampling tasks across
   // all requested argument sets provided.

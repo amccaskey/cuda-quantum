@@ -77,11 +77,11 @@ evolve_result evolveSingle(const cudaq::rydberg_hamiltonian &hamiltonian,
 
   auto programJson = nlohmann::json(program);
 
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu(); // cudaq::get_platform();
   auto ctx =
       std::make_unique<ExecutionContext>("sample", shots_count.value_or(100));
   ctx->asyncExec = false;
-  platform.set_exec_ctx(ctx.get());
+  platform.set_execution_context(ctx.get());
 
   auto programString = programJson.dump();
   cudaq::debug("Program JSON: {}", programString);
@@ -91,7 +91,7 @@ evolve_result evolveSingle(const cudaq::rydberg_hamiltonian &hamiltonian,
       (void *)(const_cast<char *>(programString.c_str())), 0, 0);
 
   auto sampleResults = ctx->result;
-  platform.reset_exec_ctx();
+  platform.reset_execution_context();
 
   return evolve_result(sampleResults);
 }

@@ -12,7 +12,7 @@ description:
 
 config:
   gen-target-backend: true
-  platform-library: mqpu
+  # platform-library: mqpu
   platform-qpu: RemoteSimulatorQPU
   preprocessor-defines: ["-D CUDAQ_REMOTE_SIM"]
   link-libs: ["-lcudaq-remote-simulator-qpu"]

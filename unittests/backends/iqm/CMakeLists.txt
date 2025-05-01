@@ -6,24 +6,19 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_executable(test_iqm IQMTester.cpp)
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
-  target_link_options(test_iqm PRIVATE -Wl,--no-as-needed)
-endif()
-target_compile_definitions(test_iqm PRIVATE -DNVQIR_BACKEND_NAME=iqm)
-target_include_directories(test_iqm PRIVATE ../..)
-target_link_libraries(test_iqm
-  PRIVATE fmt::fmt-header-only
-  cudaq-common
-  cudaq
-  cudaq-builder
-  cudaq-mlir-runtime
-  cudaq-rest-qpu
-  cudaq-operator
-  cudaq-platform-default
-  gmock_main
-  gtest_main)
-
+create_simulator_runtime_test(test_iqm
+  EXTRA_SOURCES IQMTester.cpp 
+  DISABLE_INTEGRATION TRUE 
+  QPU_LIB cudaq-rest-qpu 
+  EXTRA_LIBS 
+    cudaq-mlir-runtime 
+    cudaq-qpu-simulated 
+    gmock_main
+  HAS_MAIN_CPP TRUE
+  BACKEND_CONFIG "iqm,qpu-architecture,Apollo,url,http://localhost:62443"
+  TARGET_OPTIONS "--target-option qpu:remote_rest"
+  SKIP_GTEST_DISCOVER TRUE
+)
 
 configure_file("IQMStartServerAndTest.sh.in" "${CMAKE_BINARY_DIR}/unittests/backends/iqm/IQMStartServerAndTest.sh" @ONLY)
 add_test(NAME iqm-tests COMMAND bash IQMStartServerAndTest.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/unittests/backends/iqm/)

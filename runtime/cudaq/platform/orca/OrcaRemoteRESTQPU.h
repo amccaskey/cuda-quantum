@@ -24,7 +24,7 @@ namespace cudaq {
 /// to be general enough to support any remotely hosted service.
 /// Moreover, this QPU handles launching kernels under the Execution Context
 /// that includes sampling via synchronous client invocations.
-class OrcaRemoteRESTQPU : public cudaq::QPU {
+class OrcaRemoteRESTQPU : public cudaq::v2::qpu_handle<v2::mlir_launch_trait> {
 protected:
   /// @brief The number of shots
   std::optional<int> nShots;
@@ -101,16 +101,16 @@ public:
   virtual bool isRemote() override { return !emulate; }
 
   /// @brief Store the execution context for launching kernel
-  void setExecutionContext(cudaq::ExecutionContext *context) override {
-    cudaq::info("OrcaRemoteRESTQPU::setExecutionContext QPU {}", qpu_id);
+  void set_execution_context(cudaq::ExecutionContext *context) override {
+    cudaq::info("OrcaRemoteRESTQPU::set_execution_context QPU {}", qpu_id);
     auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
     contexts.emplace(tid, context);
-    cudaq::getExecutionManager()->setExecutionContext(contexts[tid]);
+    cudaq::getExecutionManager()->set_execution_context(contexts[tid]);
   }
 
-  /// @brief Overrides resetExecutionContext
-  void resetExecutionContext() override {
-    cudaq::info("OrcaRemoteRESTQPU::resetExecutionContext QPU {}", qpu_id);
+  /// @brief Overrides reset_execution_context
+  void reset_execution_context() override {
+    cudaq::info("OrcaRemoteRESTQPU::reset_execution_context QPU {}", qpu_id);
     auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
     contexts[tid] = nullptr;
     contexts.erase(tid);

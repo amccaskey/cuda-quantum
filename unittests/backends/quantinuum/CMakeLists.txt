@@ -6,24 +6,39 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_executable(test_quantinuum QuantinuumTester.cpp)
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
-  target_link_options(test_quantinuum PRIVATE -Wl,--no-as-needed)
-endif()
-target_compile_definitions(test_quantinuum PRIVATE -DNVQIR_BACKEND_NAME=quantinuum)
-target_include_directories(test_quantinuum PRIVATE ../..)
-target_link_libraries(test_quantinuum
-  PRIVATE fmt::fmt-header-only 
-  cudaq-common 
-  cudaq
-  cudaq-builder
-  cudaq-mlir-runtime
-  cudaq-rest-qpu
-  cudaq-operator
-  nvqir nvqir-qpp
-  cudaq-platform-default 
-  gtest_main)
+create_simulator_runtime_test(test_quantinuum_emulate
+  EXTRA_SOURCES QuantinuumLocalEmulationTester.cpp 
+  DISABLE_INTEGRATION TRUE 
+  QPU_LIB cudaq-rest-qpu 
+  EXTRA_LIBS 
+    cudaq-mlir-runtime 
+    cudaq-qpu-simulated
+  HAS_MAIN_CPP TRUE
+  # BACKEND CONFIG Requires commas since semicolons are special in CMake, 
+  # create_simulator_runtime_test will replace them before passing them along 
+  BACKEND_CONFIG "quantinuum,emulate,true,credentials,FakeCreds.txt"
+  TARGET_OPTIONS "--target-option qpu:remote_rest"
+)
 
+configure_file(
+  "QuantinuumStartServerAndTest.sh.in" 
+  "${CMAKE_BINARY_DIR}/unittests/backends/quantinuum/QuantinuumStartServerAndTest.sh" 
+  @ONLY
+)
 
-configure_file("QuantinuumStartServerAndTest.sh.in" "${CMAKE_BINARY_DIR}/unittests/backends/quantinuum/QuantinuumStartServerAndTest.sh" @ONLY)
-add_test(NAME quantinuum-tests COMMAND bash QuantinuumStartServerAndTest.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/unittests/backends/quantinuum/)
+create_simulator_runtime_test(test_quantinuum
+  EXTRA_SOURCES QuantinuumTester.cpp 
+  DISABLE_INTEGRATION TRUE 
+  QPU_LIB cudaq-rest-qpu 
+  EXTRA_LIBS 
+    cudaq-mlir-runtime 
+    cudaq-qpu-simulated
+  HAS_MAIN_CPP TRUE
+  BACKEND_CONFIG "quantinuum,credentials,$ENV{HOME}/FakeCppQuantinuum.config,url,http://localhost:62440"
+  TARGET_OPTIONS "--target-option qpu:remote_rest"
+)
+
+add_test(NAME quantinuum-tests 
+  COMMAND bash QuantinuumStartServerAndTest.sh 
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/unittests/backends/quantinuum
+)

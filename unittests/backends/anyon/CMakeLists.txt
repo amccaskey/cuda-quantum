@@ -6,24 +6,31 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_executable(test_anyon AnyonTester.cpp)
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
-  target_link_options(test_anyon PRIVATE -Wl,--no-as-needed)
-endif()
-target_compile_definitions(test_anyon PRIVATE -DNVQIR_BACKEND_NAME=anyon)
-target_include_directories(test_anyon PRIVATE ../..)
-target_link_libraries(test_anyon
-  PRIVATE fmt::fmt-header-only 
-  cudaq-common 
-  cudaq
-  cudaq-builder
-  cudaq-mlir-runtime
-  cudaq-rest-qpu
-  cudaq-operator
-  nvqir nvqir-qpp
-  cudaq-platform-default 
-  gtest_main)
+create_simulator_runtime_test(test_anyon_emulate
+  EXTRA_SOURCES AnyonLocalEmulationTester.cpp 
+  DISABLE_INTEGRATION TRUE 
+  QPU_LIB cudaq-rest-qpu 
+  EXTRA_LIBS 
+    cudaq-mlir-runtime 
+    cudaq-qpu-simulated
+  HAS_MAIN_CPP TRUE
+  # BACKEND CONFIG Requires commas since semicolons are special in CMake, 
+  # create_simulator_runtime_test will replace them before passing them along 
+  BACKEND_CONFIG "anyon,emulate,true,credentials,$ENV{HOME}/FakeCppAnyon.config,machine,telegraph-8q"
+  TARGET_OPTIONS "--target-option qpu:remote_rest"
+)
 
+create_simulator_runtime_test(test_anyon
+  EXTRA_SOURCES AnyonTester.cpp 
+  DISABLE_INTEGRATION TRUE 
+  QPU_LIB cudaq-rest-qpu 
+  EXTRA_LIBS 
+    cudaq-mlir-runtime 
+    cudaq-qpu-simulated
+  HAS_MAIN_CPP TRUE
+  BACKEND_CONFIG "anyon,credentials,$ENV{HOME}/FakeCppAnyon.config,machine,telegraph-8q,url,http://localhost:62446"
+  TARGET_OPTIONS "--target-option qpu:remote_rest"
+)
 
 configure_file("AnyonStartServerAndTest.sh.in" "${CMAKE_BINARY_DIR}/unittests/backends/anyon/AnyonStartServerAndTest.sh" @ONLY)
 add_test(NAME anyon-tests COMMAND bash AnyonStartServerAndTest.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/unittests/backends/anyon/)

@@ -11,6 +11,7 @@
 #include "common/ExecutionContext.h"
 #include "cudaq/concepts.h"
 #include "cudaq/utils/registry.h"
+#include "cudaq/builder.h"
 #include "qkernel.h"
 
 namespace cudaq::details {

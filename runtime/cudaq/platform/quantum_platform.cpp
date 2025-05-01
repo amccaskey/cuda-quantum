@@ -107,13 +107,13 @@ std::size_t quantum_platform::get_current_qpu() { return platformCurrentQPU; }
 void quantum_platform::set_exec_ctx(ExecutionContext *ctx, std::size_t qid) {
   executionContext = ctx;
   auto &platformQPU = platformQPUs[qid];
-  platformQPU->setExecutionContext(ctx);
+  platformQPU->set_execution_context(ctx);
 }
 
 /// Reset the execution context for this platform.
 void quantum_platform::reset_exec_ctx(std::size_t qid) {
   auto &platformQPU = platformQPUs[qid];
-  platformQPU->resetExecutionContext();
+  platformQPU->reset_execution_context();
   executionContext = nullptr;
 }
 
@@ -223,45 +223,48 @@ void quantum_platform::setLogStream(std::ostream &logStream) {
   platformLogStream = &logStream;
 }
 
-KernelThunkResultType altLaunchKernel(const char *kernelName,
-                                      KernelThunkType kernelFunc,
-                                      void *kernelArgs, std::uint64_t argsSize,
-                                      std::uint64_t resultOffset) {
-  ScopedTraceWithContext("altLaunchKernel", kernelName, argsSize);
-  auto &platform = *getQuantumPlatformInternal();
-  std::string kernName = kernelName;
-  return platform.launchKernel(kernName, kernelFunc, kernelArgs, argsSize,
-                               resultOffset, {});
-}
+// KernelThunkResultType altLaunchKernel(const char *kernelName,
+//                                       KernelThunkType kernelFunc,
+//                                       void *kernelArgs, std::uint64_t
+//                                       argsSize, std::uint64_t resultOffset) {
+//   ScopedTraceWithContext("altLaunchKernel", kernelName, argsSize);
+//   auto &platform = *getQuantumPlatformInternal();
+//   std::string kernName = kernelName;
+//   return platform.launchKernel(kernName, kernelFunc, kernelArgs, argsSize,
+//                                resultOffset, {});
+// }
 
-KernelThunkResultType
-streamlinedLaunchKernel(const char *kernelName,
-                        const std::vector<void *> &rawArgs) {
-  std::size_t argsSize = rawArgs.size();
-  ScopedTraceWithContext("streamlinedLaunchKernel", kernelName, argsSize);
-  auto &platform = *getQuantumPlatformInternal();
-  std::string kernName = kernelName;
-  platform.launchKernel(kernName, rawArgs);
-  // NB: The streamlined launch will never return results. Use alt or hybrid if
-  // the kernel returns results.
-  return {};
-}
+// KernelThunkResultType
+// streamlinedLaunchKernel(const char *kernelName,
+//                         const std::vector<void *> &rawArgs) {
+//   std::size_t argsSize = rawArgs.size();
+//   ScopedTraceWithContext("streamlinedLaunchKernel", kernelName, argsSize);
+//   auto &platform = *getQuantumPlatformInternal();
+//   std::string kernName = kernelName;
+//   platform.launchKernel(kernName, rawArgs);
+//   // NB: The streamlined launch will never return results. Use alt or hybrid
+//   if
+//   // the kernel returns results.
+//   return {};
+// }
 
-KernelThunkResultType hybridLaunchKernel(const char *kernelName,
-                                         KernelThunkType kernel, void *args,
-                                         std::uint64_t argsSize,
-                                         std::uint64_t resultOffset,
-                                         const std::vector<void *> &rawArgs) {
-  ScopedTraceWithContext("hybridLaunchKernel", kernelName);
-  auto &platform = *getQuantumPlatformInternal();
-  const std::string kernName = kernelName;
-  if (platform.is_remote(platform.get_current_qpu())) {
-    // This path should never call a kernel that returns results.
-    platform.launchKernel(kernName, rawArgs);
-    return {};
-  }
-  return platform.launchKernel(kernName, kernel, args, argsSize, resultOffset,
-                               rawArgs);
-}
+// KernelThunkResultType hybridLaunchKernel(const char *kernelName,
+//                                          KernelThunkType kernel, void *args,
+//                                          std::uint64_t argsSize,
+//                                          std::uint64_t resultOffset,
+//                                          const std::vector<void *> &rawArgs)
+//                                          {
+//   ScopedTraceWithContext("hybridLaunchKernel", kernelName);
+//   auto &platform = *getQuantumPlatformInternal();
+//   const std::string kernName = kernelName;
+//   if (platform.is_remote(platform.get_current_qpu())) {
+//     // This path should never call a kernel that returns results.
+//     platform.launchKernel(kernName, rawArgs);
+//     return {};
+//   }
+//   return platform.launchKernel(kernName, kernel, args, argsSize,
+//   resultOffset,
+//                                rawArgs);
+// }
 
 } // namespace cudaq

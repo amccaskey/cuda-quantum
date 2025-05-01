@@ -1192,7 +1192,7 @@ public:
             auto rightSize = (totalWidth - strLen) - leftSize;
             std::string leftSide(leftSize, '=');
             std::string rightSide(rightSize, '=');
-            auto &platform = cudaq::get_platform();
+            auto &platform = cudaq::v2::get_qpu();
             std::ostream &os =
                 platform.getLogStream() ? *platform.getLogStream() : std::cout;
             os << fmt::format("\n{} {} {}\n", leftSide, message, rightSide);

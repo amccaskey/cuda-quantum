@@ -42,8 +42,8 @@ struct simple_double_rotation {
 // CHECK:           cc.store %[[VAL_1]], %[[VAL_9]] : !cc.ptr<i32>
 // CHECK:           %[[VAL_10:.*]] = cc.stdvec_data %[[VAL_0]] : (!cc.stdvec<f64>) -> !cc.ptr<!cc.array<f64 x ?>>
 // CHECK:           %[[VAL_11:.*]] = cc.cast %[[VAL_10]] : (!cc.ptr<!cc.array<f64 x ?>>) -> !cc.ptr<f64>
-// CHECK:           %[[VAL_12:.*]] = cc.load %[[VAL_11]] : !cc.ptr<f64>
-// CHECK:           %[[VAL_13:.*]] = quake.extract_ref %[[VAL_8]][0] : (!quake.veq<1>) -> !quake.ref
+// CHECK-DAG:       %[[VAL_12:.*]] = cc.load %[[VAL_11]] : !cc.ptr<f64>
+// CHECK-DAG:       %[[VAL_13:.*]] = quake.extract_ref %[[VAL_8]][0] : (!quake.veq<1>) -> !quake.ref
 // CHECK:           quake.rx (%[[VAL_12]]) %[[VAL_13]] : (f64, !quake.ref) -> ()
 // CHECK:           %[[VAL_14:.*]] = quake.mz %[[VAL_8]] : (!quake.veq<1>) -> !cc.stdvec<!quake.measure>
 // CHECK:           return
@@ -62,24 +62,27 @@ struct simple_float_rotation {
 
 // clang-format off
 // CHECK-LABEL: func.func @__nvqpp__mlirgen__simple_float_rotation
-// CHECK-SAME: (%[[VAL_0:.*]]: !cc.stdvec<f32>{{.*}}) attributes
-// CHECK:           %[[VAL_1:.*]] = arith.constant 0 : i64
-// CHECK:           %[[VAL_2:.*]] = cc.stdvec_size %[[VAL_0]] : (!cc.stdvec<f32>) -> i64
-// CHECK:           %[[VAL_3:.*]] = cc.cast %[[VAL_2]] : (i64) -> i32
-// CHECK:           %[[VAL_4:.*]] = cc.alloca i32
-// CHECK:           cc.store %[[VAL_3]], %[[VAL_4]] : !cc.ptr<i32>
-// CHECK:           %[[VAL_5:.*]] = cc.stdvec_size %[[VAL_0]] : (!cc.stdvec<f32>) -> i64
-// CHECK:           %[[VAL_6:.*]] = arith.cmpi eq, %[[VAL_5]], %[[VAL_1]] : i64
-// CHECK:           %[[VAL_7:.*]] = cc.alloca i1
-// CHECK:           cc.store %[[VAL_6]], %[[VAL_7]] : !cc.ptr<i1>
-// CHECK:           %[[VAL_8:.*]] = quake.alloca !quake.veq<1>
-// CHECK:           %[[VAL_9:.*]] = cc.stdvec_data %[[VAL_0]] : (!cc.stdvec<f32>) -> !cc.ptr<!cc.array<f32 x ?>>
-// CHECK:           %[[VAL_10:.*]] = cc.cast %[[VAL_9]] : (!cc.ptr<!cc.array<f32 x ?>>) -> !cc.ptr<f32>
-// CHECK:           %[[VAL_11:.*]] = cc.load %[[VAL_10]] : !cc.ptr<f32>
-// CHECK:           %[[VAL_12:.*]] = math.absf %[[VAL_11]] : f32
-// CHECK:           %[[VAL_13:.*]] = quake.extract_ref %[[VAL_8]][0] : (!quake.veq<1>) -> !quake.ref
-// CHECK:           quake.rx (%[[VAL_12]]) %[[VAL_13]] : (f32, !quake.ref) -> ()
-// CHECK:           %[[VAL_14:.*]] = quake.mz %[[VAL_8]] : (!quake.veq<1>) -> !cc.stdvec<!quake.measure>
+// CHECK-SAME:      %[[ARG0:.*]]: !cc.stdvec<f32>) attributes {"cudaq-entrypoint", "cudaq-kernel"} {
+// CHECK:           %[[VAL_0:.*]] = arith.constant 0 : i64
+// CHECK:           %[[VAL_1:.*]] = cc.stdvec_size %[[ARG0]] : (!cc.stdvec<f32>) -> i64
+// CHECK:           %[[VAL_2:.*]] = cc.cast %[[VAL_1]] : (i64) -> i32
+// CHECK:           %[[VAL_3:.*]] = cc.alloca i32
+// CHECK:           cc.store %[[VAL_2]], %[[VAL_3]] : !cc.ptr<i32>
+// CHECK:           %[[VAL_4:.*]] = cc.stdvec_size %[[ARG0]] : (!cc.stdvec<f32>) -> i64
+// CHECK:           %[[VAL_5:.*]] = arith.cmpi eq, %[[VAL_4]], %[[VAL_0]] : i64
+// CHECK:           %[[VAL_6:.*]] = cc.alloca i1
+// CHECK:           cc.store %[[VAL_5]], %[[VAL_6]] : !cc.ptr<i1>
+// CHECK:           %[[VAL_7:.*]] = quake.alloca !quake.veq<1>
+// CHECK:           %[[VAL_8:.*]] = cc.stdvec_data %[[ARG0]] : (!cc.stdvec<f32>) -> !cc.ptr<!cc.array<f32 x ?>>
+// CHECK:           %[[VAL_9:.*]] = cc.cast %[[VAL_8]] : (!cc.ptr<!cc.array<f32 x ?>>) -> !cc.ptr<f32>
+// CHECK:           %[[VAL_10:.*]] = cc.load %[[VAL_9]] : !cc.ptr<f32>
+// CHECK:           %[[VAL_11:.*]] = math.absf %[[VAL_10]] : f32
+// CHECK:           %[[VAL_12:.*]] = cc.alloca f32
+// CHECK:           cc.store %[[VAL_11]], %[[VAL_12]] : !cc.ptr<f32>
+// CHECK:           %[[VAL_13:.*]] = quake.extract_ref %[[VAL_7]][0] : (!quake.veq<1>) -> !quake.ref
+// CHECK:           %[[VAL_14:.*]] = cc.load %[[VAL_12]] : !cc.ptr<f32>
+// CHECK:           quake.rx (%[[VAL_14]]) %[[VAL_13]] : (f32, !quake.ref) -> ()
+// CHECK:           %[[VAL_15:.*]] = quake.mz %[[VAL_7]] : (!quake.veq<1>) -> !cc.stdvec<!quake.measure>
 // CHECK:           return
 // CHECK:         }
 // clang-format on
@@ -95,17 +98,17 @@ struct difficult_symphony {
 
 // clang-format off
 // CHECK-LABEL:   func.func @__nvqpp__mlirgen__difficult_symphony(
-// CHECK-SAME:      %[[VAL_0:.*]]: !cc.stdvec<f32>{{.*}}) attributes {"cudaq-entrypoint", "cudaq-kernel"} {
-// CHECK:           %[[VAL_1:.*]] = cc.stdvec_data %[[VAL_0]] : (!cc.stdvec<f32>) -> !cc.ptr<!cc.array<f32 x ?>>
-// CHECK:           %[[VAL_2:.*]] = cc.alloca !cc.ptr<!cc.array<f32 x ?>>
-// CHECK:           cc.store %[[VAL_1]], %[[VAL_2]] : !cc.ptr<!cc.ptr<!cc.array<f32 x ?>>>
-// CHECK:           %[[VAL_3:.*]] = quake.alloca !quake.veq<1>
-// CHECK:           %[[VAL_4:.*]] = cc.load %[[VAL_2]] : !cc.ptr<!cc.ptr<!cc.array<f32 x ?>>>
-// CHECK:           %[[VAL_5:.*]] = cc.cast %[[VAL_4]] : (!cc.ptr<!cc.array<f32 x ?>>) -> !cc.ptr<f32>
-// CHECK:           %[[VAL_6:.*]] = cc.load %[[VAL_5]] : !cc.ptr<f32>
-// CHECK:           %[[VAL_7:.*]] = quake.extract_ref %[[VAL_3]][0] : (!quake.veq<1>) -> !quake.ref
-// CHECK:           quake.rx (%[[VAL_6]]) %[[VAL_7]] : (f32, !quake.ref) -> ()
-// CHECK:           %[[VAL_8:.*]] = quake.mz %[[VAL_3]] : (!quake.veq<1>) -> !cc.stdvec<!quake.measure>
+// CHECK-SAME:      %[[ARG0:.*]]: !cc.stdvec<f32>) attributes {"cudaq-entrypoint", "cudaq-kernel"} {
+// CHECK:           %[[VAL_0:.*]] = cc.stdvec_data %[[ARG0]] : (!cc.stdvec<f32>) -> !cc.ptr<!cc.array<f32 x ?>>
+// CHECK:           %[[VAL_1:.*]] = cc.alloca !cc.ptr<!cc.array<f32 x ?>>
+// CHECK:           cc.store %[[VAL_0]], %[[VAL_1]] : !cc.ptr<!cc.ptr<!cc.array<f32 x ?>>>
+// CHECK:           %[[VAL_2:.*]] = quake.alloca !quake.veq<1>
+// CHECK:           %[[VAL_3:.*]] = cc.load %[[VAL_1]] : !cc.ptr<!cc.ptr<!cc.array<f32 x ?>>>
+// CHECK:           %[[VAL_4:.*]] = cc.cast %[[VAL_3]] : (!cc.ptr<!cc.array<f32 x ?>>) -> !cc.ptr<f32>
+// CHECK:           %[[VAL_5:.*]] = quake.extract_ref %[[VAL_2]][0] : (!quake.veq<1>) -> !quake.ref
+// CHECK:           %[[VAL_6:.*]] = cc.load %[[VAL_4]] : !cc.ptr<f32>
+// CHECK:           quake.rx (%[[VAL_6]]) %[[VAL_5]] : (f32, !quake.ref) -> ()
+// CHECK:           %[[VAL_7:.*]] = quake.mz %[[VAL_2]] : (!quake.veq<1>) -> !cc.stdvec<!quake.measure>
 // CHECK:           return
 // CHECK:         }
 // clang-format on

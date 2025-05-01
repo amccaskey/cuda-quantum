@@ -8,7 +8,7 @@
 
 #include "common/ArgumentWrapper.h"
 #include "cudaq/Optimizer/InitAllDialects.h"
-#include "cudaq/platform/fermioniq/FermioniqBaseQPU.h"
+#include "cudaq/platformv2/qpus/fermioniq/FermioniqBaseQPU.h"
 
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 
@@ -107,7 +107,18 @@ protected:
   }
 
   void cleanupContext(MLIRContext *context) override { delete context; }
-};
-} // namespace cudaq
 
-CUDAQ_REGISTER_TYPE(cudaq::QPU, cudaq::PyFermioniqRESTQPU, fermioniq)
+public:
+  PyFermioniqRESTQPU(const cudaq::v2::platform_metadata &m)
+      : FermioniqBaseQPU(m) {}
+  CUDAQ_EXTENSION_CUSTOM_CREATOR_FUNCTION_WITH_NAME(
+      PyFermioniqRESTQPU, "fermioniq",
+      static std::unique_ptr<qpu> create(
+          const cudaq::v2::platform_metadata &m) {
+        return std::make_unique<PyFermioniqRESTQPU>(m);
+      })
+};
+
+CUDAQ_REGISTER_EXTENSION_TYPE(PyFermioniqRESTQPU)
+
+} // namespace cudaq

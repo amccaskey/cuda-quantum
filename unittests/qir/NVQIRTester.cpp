@@ -8,7 +8,6 @@
 
 #include "CUDAQTestUtils.h"
 #include "common/ExecutionContext.h"
-#include "nvqir/Gates.h"
 #include <cmath>
 
 extern "C" {
@@ -420,16 +419,16 @@ CUDAQ_TEST(NVQIRTester, checkGates) {
   double oneOverSqrt2 = 1. / std::sqrt(2.0);
   std::vector<double> expectedHadamard{oneOverSqrt2, oneOverSqrt2, oneOverSqrt2,
                                        -oneOverSqrt2};
-  const auto mat =
-      nvqir::getGateByName<double>(nvqir::GateName::U2, {0., M_PI});
+  const auto mat = cudaq::gates::getGateByName<double>(
+      cudaq::gates::GateName::U2, {0., M_PI});
   for (std::size_t i = 0; auto m : mat) {
     EXPECT_NEAR(expectedHadamard[i++], m.real(), 1e-12);
     EXPECT_NEAR(0.0, m.imag(), 1e-12);
     std::cout << m.real() << ", " << m.imag() << "\n";
   }
   std::vector<double> expectedX{0, 1, 1, 0};
-  const auto mat2 =
-      nvqir::getGateByName<double>(nvqir::GateName::U3, {M_PI, 0., M_PI});
+  const auto mat2 = cudaq::gates::getGateByName<double>(
+      cudaq::gates::GateName::U3, {M_PI, 0., M_PI});
 
   for (std::size_t i = 0; auto m : mat2) {
     EXPECT_NEAR(expectedX[i++], m.real(), 1e-12);

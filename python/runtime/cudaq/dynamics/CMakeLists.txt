@@ -28,7 +28,7 @@ get_filename_component(CUDENSITYMAT_INCLUDE_DIR ${CUDENSITYMAT_INC} DIRECTORY)
 target_include_directories(nvqir_dynamics_bindings 
     PRIVATE 
         ${CMAKE_SOURCE_DIR}/runtime
-        ${CMAKE_SOURCE_DIR}/runtime/nvqir/cudensitymat 
+        ${CMAKE_SOURCE_DIR}/runtime/cudaq/platformv2/qpus/simulated/cudensitymat 
         ${CUDENSITYMAT_INCLUDE_DIR}
         ${CUDAToolkit_INCLUDE_DIRS})
 target_link_libraries(nvqir_dynamics_bindings PRIVATE fmt::fmt-header-only)
