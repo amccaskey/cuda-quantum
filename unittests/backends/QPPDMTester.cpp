@@ -6,12 +6,14 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#include "QppDMCircuitSimulator.cpp"
+#include "cudaq/platformv2/qpus/simulated/qpp/QppDMCircuitSimulator.cpp"
 
 #include <gtest/gtest.h>
 #include <iostream>
 
 #include "CUDAQTestUtils.h"
+
+using namespace cudaq;
 
 void print_state(const qpp::cmat &densityMatrix) {
   std::cout << "state = [";
@@ -59,8 +61,8 @@ std::string getSampledBitString(QppNoiseCircuitSimulator &qppBackend,
   // Call `sample` and return the bitstring as the first element of the
   // measurement count map.
   cudaq::ExecutionContext ctx("sample", 1);
-  qppBackend.setExecutionContext(&ctx);
-  qppBackend.resetExecutionContext();
+  qppBackend.set_execution_context(&ctx);
+  qppBackend.reset_execution_context();
   auto sampleResults = ctx.result;
   return sampleResults.begin()->first;
 }

@@ -188,9 +188,9 @@ py::class_<OptimizerT> addPyOptimizer(py::module &mod, std::string &&name) {
       .def(
           "optimize",
           [](OptimizerT &opt, const int dim, py::function &func) {
-            auto &platform = cudaq::get_platform();
+            auto &platform = v2::get_qpu();
             if (platform.get_remote_capabilities().serializedCodeExec &&
-                platform.num_qpus() == 1) {
+                v2::get_num_qpus() == 1) {
               std::string optimizer_var_name =
                   cudaq::get_var_name_for_handle(py::cast(&opt));
               if (optimizer_var_name.empty())
@@ -199,7 +199,7 @@ py::class_<OptimizerT> addPyOptimizer(py::module &mod, std::string &&name) {
                     "namespace. Aborting.");
 
               auto ctx = std::make_unique<cudaq::ExecutionContext>("sample", 0);
-              platform.set_exec_ctx(ctx.get());
+              platform.set_execution_context(ctx.get());
 
               std::string combined_code =
                   get_required_raw_source_code(dim, func, optimizer_var_name);
@@ -207,11 +207,13 @@ py::class_<OptimizerT> addPyOptimizer(py::module &mod, std::string &&name) {
               SerializedCodeExecutionContext serialized_code_execution_object =
                   get_serialized_code(combined_code);
 
-              platform.launchSerializedCodeExecution(
-                  func.attr("__name__").cast<std::string>(),
-                  serialized_code_execution_object);
+              // FIXME AJM Make this a new trait
 
-              platform.reset_exec_ctx();
+              // platform.launchSerializedCodeExecution(
+              //     func.attr("__name__").cast<std::string>(),
+              //     serialized_code_execution_object);
+
+              platform.reset_execution_context();
               auto result = cudaq::optimization_result{};
               if (ctx->optResult)
                 result = std::move(*ctx->optResult);

@@ -9,18 +9,18 @@
 include(HandleLLVMOptions)
 add_subdirectory(default)
 if (OPENSSL_FOUND)
-  add_subdirectory(orca)
+  # add_subdirectory(orca)
 endif()
 if (CUDAQ_ENABLE_REST)
-  add_subdirectory(mqpu)
+  # add_subdirectory(mqpu)
 endif()
 
-add_subdirectory(fermioniq)
+# add_subdirectory(fermioniq)
 
 if (AWSSDK_ROOT)
-  add_subdirectory(quera)
+  # add_subdirectory(quera)
 endif()
 
 if (CUDAQ_ENABLE_PASQAL_BACKEND)
-  add_subdirectory(pasqal)
+  # add_subdirectory(pasqal)
 endif()

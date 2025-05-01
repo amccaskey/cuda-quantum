@@ -41,15 +41,12 @@ class PhotonicsTargetHandler(TargetHandler):
         # NOTE: Since this handler does not support MLIR mode (yet), just
         # invoke the kernel. If calling from a bound function, need to
         # unpack the arguments, for example, see `pyGetStateLibraryMode`
+
         try:
             context_name = cudaq_runtime.getExecutionContextName()
         except RuntimeError:
             context_name = None
 
-        callable_args = args
-        if "extract-state" == context_name and len(args) == 1:
-            callable_args = args[0]
-
-        PhotonicsHandler(kernel)(*callable_args)
+        PhotonicsHandler(kernel)(*args)
         # `True` indicates call was handled
         return True

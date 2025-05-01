@@ -102,7 +102,7 @@ cudaq::details::LayoutExtractor::extractLayout(const std::string &kernelName,
 }
 
 cudaq::details::RunResultSpan cudaq::details::runTheKernel(
-    std::function<void()> &&kernel, quantum_platform &platform,
+    std::function<void()> &&kernel, v2::qpu_handle &platform,
     const std::string &kernel_name, std::size_t shots) {
   ScopedTraceWithContext(cudaq::TIMING_RUN, "runTheKernel");
   // 1. Clear the outputLog.
@@ -112,15 +112,15 @@ cudaq::details::RunResultSpan cudaq::details::runTheKernel(
 
   // 2. Launch the kernel on the QPU.
   if (platform.get_remote_capabilities().isRemoteSimulator ||
-      platform.is_emulated() || platform.is_remote()) {
+      platform.is_emulator() || platform.is_remote()) {
     // In a remote simulator execution/hardware emulation environment, set the
     // `run` context name and number of iterations (shots)
     auto ctx = std::make_unique<cudaq::ExecutionContext>("run", shots);
-    platform.set_exec_ctx(ctx.get());
+    platform.set_execution_context(ctx.get());
     // Launch the kernel a single time to post the 'run' request to the remote
     // server or emulation executor.
     kernel();
-    platform.reset_exec_ctx();
+    platform.reset_execution_context();
     // Retrieve the result output log.
     // FIXME: this currently assumes all the shots are good.
     std::string remoteOutputLog(ctx->invocationResultBuffer.begin(),
@@ -131,10 +131,10 @@ cudaq::details::RunResultSpan cudaq::details::runTheKernel(
     for (std::size_t i = 0; i < shots; ++i) {
       // Set the execution context since as noise model is attached to this
       // context.
-      platform.set_exec_ctx(ctx.get());
+      platform.set_execution_context(ctx.get());
       kernel();
       // Reset the context to flush qubit deallocation.
-      platform.reset_exec_ctx();
+      platform.reset_execution_context();
     }
   }
 

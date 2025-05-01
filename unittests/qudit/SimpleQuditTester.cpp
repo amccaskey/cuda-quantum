@@ -15,15 +15,16 @@
 /// You could imagine these in their own header file, like we do
 /// for qubit_qis.h
 
+using namespace cudaq;
+
 // Plus Gate : U|0> -> |1>, U|1> -> |2>, and U|2> -> |0>
 void plusGate(cudaq::qudit<3> &q) {
-  auto em = cudaq::getExecutionManager();
-  em->apply("plusGate", {}, {}, {{q.n_levels(), q.id()}});
+  v2::get_qpu().as<v2::simulation_trait>()->apply({0, 0, 1, 1, 0, 0, 0, 1, 0},
+                                                  {}, {q.id()});
 }
 
 int mz(cudaq::qudit<3> &q) {
-  auto em = cudaq::getExecutionManager();
-  return em->measure({q.n_levels(), q.id()});
+  return v2::get_qpu().as<v2::simulation_trait>()->mz(q.id());
 }
 
 std::vector<int> mz(cudaq::qvector<3> &q) {

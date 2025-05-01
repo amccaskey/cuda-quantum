@@ -8,13 +8,19 @@
 
 #pragma once
 
-#include "cudaq/qis/execution_manager.h"
 #include <string>
 #include <vector>
 
 namespace cudaq {
 
-struct QuditInfo;
+struct QuditInfo {
+  std::size_t levels = 0;
+  std::size_t id = 0;
+  QuditInfo(std::size_t _levels, std::size_t _id) : levels(_levels), id(_id) {}
+  bool operator==(const QuditInfo &other) const {
+    return levels == other.levels && id == other.id;
+  }
+};
 
 /// @brief A trace is a circuit representation of the executed computation, as
 /// seen by the execution manager. (Here, a circuit is represented as a list

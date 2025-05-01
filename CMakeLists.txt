@@ -391,6 +391,7 @@ set(CUDAQ_TOOLS_DIR ${CMAKE_BINARY_DIR}/bin)
 list(APPEND CMAKE_MODULE_PATH "${CUDAQ_CMAKE_DIR}")
 
 include(AddCUDAQ)
+include(CUDAQTests)
 include(BuildHelpers)
 
 # Add CUDA Quantum files to the include path

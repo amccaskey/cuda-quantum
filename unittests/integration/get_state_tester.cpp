@@ -142,9 +142,9 @@ CUDAQ_TEST(GetStateTester, checkSimple) {
 
   cudaq::optimizers::cobyla optimizer;
   optimizer.max_eval = 100;
+  optimizer.initial_parameters = cudaq::random_vector(-M_PI_2, M_PI_2, 6);
   auto [opt_val, params] = optimizer.optimize(6, [&](std::vector<double> x) {
-    auto testState = cudaq::get_state(so4, x);
-    return 1.0 - state.overlap(testState).real();
+    return 1.0 - state.overlap(cudaq::get_state(so4, x)).real();
   });
 
   EXPECT_NEAR(opt_val, 0.0, 1e-3);

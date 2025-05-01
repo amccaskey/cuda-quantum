@@ -30,7 +30,7 @@ public:
   }
 
   /// Reset the execution context
-  virtual void resetExecutionContext() override {
+  virtual void reset_execution_context() override {
     // set the pre-computed expectation value.
     if (executionContext->name == "observe") {
       auto expectation =

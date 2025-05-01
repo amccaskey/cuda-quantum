@@ -14,7 +14,8 @@
 #include "cudaq/Support/Version.h"
 #include "cudaq/gradients.h"
 #include "cudaq/optimizers.h"
-#include "cudaq/simulators.h"
+#include "cudaq/platformv2/qpu.h"
+#include "cudaq/platformv2/qpus/simulated/CircuitSimulator.h"
 #include "nlohmann/json.hpp"
 /*! \file
     \brief Utility to support JSON serialization between the client and server.
@@ -107,6 +108,8 @@ inline void to_json(json &j, const ExecutionContext &context) {
 
   if (context.simulationState) {
     j["simulationData"] = json();
+    j["simulationData"]["isFp32"] = context.simulationState->getPrecision() ==
+                                    SimulationState::precision::fp32;
     if (context.simulationState->isArrayLike()) {
       j["simulationData"]["dim"] = context.simulationState->getTensor().extents;
     } else {
@@ -191,19 +194,23 @@ inline void from_json(const json &j, ExecutionContext &context) {
     // Note: before `SimulationState` was added, `simulationData` contains a
     // flat pair of dimensions and data, whereby an empty dimension array
     // represents no state data in the context.
+
+    // FIXME AJM May 23 2025 Revisit This. I'm just picking something 
+    // that I can get locally to create a simulation state.
     if (!stateDim.empty()) {
       // Create the simulation specific SimulationState
-      auto *simulator = cudaq::get_simulator();
-      if (simulator->isSinglePrecision()) {
+      if (j["simulationData"]["isFp32"].get<bool>()) {
         // If the host (local) simulator is single-precision, convert the type
         // before loading the state vector.
         std::vector<std::complex<float>> converted(stateData.begin(),
                                                    stateData.end());
-        context.simulationState = simulator->createStateFromData(
-            std::make_pair(converted.data(), stateDim[0]));
+        context.simulationState = CircuitSimulator::get("custatevec_fp32")
+                                      ->createStateFromData(std::make_pair(
+                                          converted.data(), stateDim[0]));
       } else {
-        context.simulationState = simulator->createStateFromData(
-            std::make_pair(stateData.data(), stateDim[0]));
+        context.simulationState =
+            CircuitSimulator::get("qpp")->createStateFromData(
+                std::make_pair(stateData.data(), stateDim[0]));
       }
     }
   }
@@ -224,8 +231,7 @@ inline void from_json(const json &j, ExecutionContext &context) {
 // Enum data to denote the payload format.
 enum class CodeFormat { MLIR, LLVM };
 
-#define JSON_ENUM(enum_class, val)                                             \
-  { enum_class::val, #val }
+#define JSON_ENUM(enum_class, val) {enum_class::val, #val}
 
 NLOHMANN_JSON_SERIALIZE_ENUM(CodeFormat, {JSON_ENUM(CodeFormat, MLIR),
                                           JSON_ENUM(CodeFormat, LLVM)});

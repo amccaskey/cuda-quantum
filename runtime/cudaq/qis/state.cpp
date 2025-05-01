@@ -7,10 +7,11 @@
  ******************************************************************************/
 
 #include "state.h"
+#include "cudaq/platformv2/platform.h"
+
 #include "common/EigenDense.h"
 #include "common/FmtCore.h"
 #include "common/Logger.h"
-#include "cudaq/simulators.h"
 #include <iostream>
 
 namespace cudaq {
@@ -18,12 +19,18 @@ namespace cudaq {
 std::mutex deleteStateMutex;
 
 state state::from_data(const state_data &data) {
-  auto *simulator = cudaq::get_simulator();
-  if (!simulator)
-    throw std::runtime_error(
-        "[state::from_data] Could not find valid simulator backend.");
+  auto &qpu = v2::get_qpu();
+  if (auto asSim = qpu.as<v2::simulation_trait>())
+    return asSim->get_state(data);
 
-  return state(simulator->createStateFromData(data).release());
+  if (auto asMLIR = qpu.as<v2::mlir_launch_trait>()) {
+    auto maybeState = asMLIR->local_state_from_data(data);
+    if (maybeState)
+      return maybeState.value();
+  }
+
+  throw std::runtime_error("Cannot get a cudaq::state from data on a QPU that "
+                           "does not implement the simulation_trait.");
 }
 
 SimulationState::precision state::get_precision() const {
@@ -133,8 +140,9 @@ state *__nvqpp_cudaq_state_createFromData_fp64(void *data, std::size_t size) {
 
   // Convert the data to the current simulation precision
   // if different from the data's precision.
-  auto *simulator = cudaq::get_simulator();
-  if (simulator->isSinglePrecision()) {
+  auto &qpu = v2::get_qpu();
+  auto *asSim = qpu.as<v2::simulation_trait>();
+  if (asSim->get_precision() == simulation_precision::fp32) {
     std::vector<std::complex<float>> converted(d, d + size);
     return new state(state::from_data(converted));
   }
@@ -148,8 +156,9 @@ state *__nvqpp_cudaq_state_createFromData_fp32(void *data, std::size_t size) {
 
   // Convert the data to the current simulation precision
   // if different from the data's precision.
-  auto *simulator = cudaq::get_simulator();
-  if (simulator->isDoublePrecision()) {
+  auto &qpu = v2::get_qpu();
+  auto *asSim = qpu.as<v2::simulation_trait>();
+  if (asSim->get_precision() == simulation_precision::fp64) {
     std::vector<std::complex<double>> converted(d, d + size);
     return new state(state::from_data(converted));
   }

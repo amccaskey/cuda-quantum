@@ -196,8 +196,12 @@ def test_quantinuum_state_synthesis_from_simulator():
     def kernel(state: cudaq.State):
         qubits = cudaq.qvector(state)
 
-    state = cudaq.State.from_data(
-        np.array([1. / np.sqrt(2.), 1. / np.sqrt(2.), 0., 0.], dtype=complex))
+    @cudaq.kernel 
+    def gen00_01():
+        q = cudaq.qvector(2)
+        h(q[0])
+    
+    state = cudaq.get_state(gen00_01) 
 
     counts = cudaq.sample(kernel, state)
     assert "00" in counts

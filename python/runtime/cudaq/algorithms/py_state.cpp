@@ -78,21 +78,27 @@ public:
 
   void execute() const override {
     if (!state) {
-      auto &platform = cudaq::get_platform();
+      auto &platform = cudaq::v2::get_qpu();
+      auto *mlirLauncher = platform.as<v2::mlir_launch_trait>();
+      if (!mlirLauncher)
+        throw std::runtime_error(
+            "PyRemoteSimulationState cannot launch kernel on QPU that does not "
+            "implement the mlir_launch_trait.");
+
       // Create an execution context, indicate this is for
       // extracting the state representation
       ExecutionContext context("extract-state");
       // Perform the usual pattern set the context,
       // execute and then reset
-      platform.set_exec_ctx(&context);
+      platform.set_execution_context(&context);
       // Note: in Python, the platform QPU (`PyRemoteSimulatorQPU`) expects an
       // ModuleOp pointer as the first element in the args array in StreamLined
       // mode.
       auto args = argsData->getArgs();
       args.insert(args.begin(),
                   const_cast<void *>(static_cast<const void *>(&kernelMod)));
-      platform.launchKernel(kernelName, args);
-      platform.reset_exec_ctx();
+      mlirLauncher->launch_kernel(kernelName, args);
+      platform.reset_execution_context();
       state = std::move(context.simulationState);
     }
   }
@@ -100,17 +106,22 @@ public:
   std::complex<double> overlap(const cudaq::SimulationState &other) override {
     const auto &otherState =
         dynamic_cast<const PyRemoteSimulationState &>(other);
-    auto &platform = cudaq::get_platform();
+    auto &platform = cudaq::v2::get_qpu();
+    auto *mlirLauncher = platform.as<v2::mlir_launch_trait>();
+    if (!mlirLauncher)
+      throw std::runtime_error(
+          "PyRemoteSimulationState cannot compute overlap on QPU that does not "
+          "implement the mlir_launch_trait.");
     ExecutionContext context("state-overlap");
     context.overlapComputeStates = std::make_pair(
         static_cast<const cudaq::SimulationState *>(this),
         static_cast<const cudaq::SimulationState *>(&otherState));
-    platform.set_exec_ctx(&context);
+    platform.set_execution_context(&context);
     auto args = argsData->getArgs();
     args.insert(args.begin(),
                 const_cast<void *>(static_cast<const void *>(&kernelMod)));
-    platform.launchKernel(kernelName, args);
-    platform.reset_exec_ctx();
+    mlirLauncher->launch_kernel(kernelName, args);
+    platform.reset_execution_context();
     assert(context.overlapResult.has_value());
     return context.overlapResult.value();
   }
@@ -169,16 +180,7 @@ state pyGetStateQPU(py::object kernel, py::args args) {
 
 state pyGetStateLibraryMode(py::object kernel, py::args args) {
   return details::extractState([&]() mutable {
-    if (0 == args.size())
-      kernel();
-    else {
-      std::vector<py::object> argsData;
-      for (size_t i = 0; i < args.size(); i++) {
-        py::object arg = args[i];
-        argsData.emplace_back(std::forward<py::object>(arg));
-      }
-      kernel(std::move(argsData));
-    }
+    kernel(*args);
   });
 }
 
@@ -757,7 +759,7 @@ for more information on this programming pattern.)#")
         auto *argData = toOpaqueArgs(args, kernelMod, kernelName);
 
         // Launch the asynchronous execution.
-        auto &platform = cudaq::get_platform();
+        auto &platform = cudaq::v2::get_qpu();
         py::gil_scoped_release release;
         return details::runGetStateAsync(
             [kernelMod, argData, kernelName]() mutable {

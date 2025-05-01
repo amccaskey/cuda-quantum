@@ -47,7 +47,6 @@ int main() {
 
   // Lower the number of shots
   int nShots = 100;
-  auto &platform = cudaq::get_platform();
 
   // Sample
   auto counts = cudaq::sample(nShots, kernel{});

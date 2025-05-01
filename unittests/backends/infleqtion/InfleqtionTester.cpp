@@ -23,12 +23,6 @@ bool isValidExpVal(double value) {
 }
 
 CUDAQ_TEST(InfleqtionTester, checkSampleSync) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
-
   auto kernel = cudaq::make_kernel();
   auto qubit = kernel.qalloc(2);
   kernel.h(qubit[0]);
@@ -40,12 +34,6 @@ CUDAQ_TEST(InfleqtionTester, checkSampleSync) {
 }
 
 CUDAQ_TEST(InfleqtionTester, checkSampleAsync) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
-
   auto kernel = cudaq::make_kernel();
   auto qubit = kernel.qalloc(2);
   kernel.h(qubit[0]);
@@ -57,11 +45,6 @@ CUDAQ_TEST(InfleqtionTester, checkSampleAsync) {
 }
 
 CUDAQ_TEST(InfleqtionTester, checkSampleAsyncLoadFromFile) {
-  auto backendString =
-      fmt::format(fmt::runtime(backendStringTemplate), mockPort);
-
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(backendString);
 
   auto kernel = cudaq::make_kernel();
   auto qubit = kernel.qalloc(2);

@@ -24,8 +24,7 @@ struct simpleX {
 };
 
 int main() {
-  auto &platform = cudaq::get_platform();
-  auto num_qpus = platform.num_qpus();
+  auto num_qpus = cudaq::v2::get_num_qpus();
   printf("Number of QPUs: %zu\n", num_qpus);
   REMOTE_TEST_ASSERT(num_qpus == 4);
   std::vector<cudaq::async_sample_result> countFutures;

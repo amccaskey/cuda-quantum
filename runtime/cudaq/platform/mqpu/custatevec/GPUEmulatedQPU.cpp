@@ -46,27 +46,27 @@ public:
     return kernelFunc(args, /*differentMemorySpace=*/false);
   }
 
-  /// Overrides setExecutionContext to forward it to the ExecutionManager
-  void setExecutionContext(cudaq::ExecutionContext *context) override {
+  /// Overrides set_execution_context to forward it to the ExecutionManager
+  void set_execution_context(cudaq::ExecutionContext *context) override {
     cudaSetDevice(qpu_id);
 
-    cudaq::info("MultiQPUPlatform::setExecutionContext QPU {}", qpu_id);
+    cudaq::info("MultiQPUPlatform::set_execution_context QPU {}", qpu_id);
     auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
     contexts.emplace(tid, context);
     if (noiseModel)
       contexts[tid]->noiseModel = noiseModel;
 
-    cudaq::getExecutionManager()->setExecutionContext(contexts[tid]);
+    cudaq::getExecutionManager()->set_execution_context(contexts[tid]);
   }
 
-  /// Overrides resetExecutionContext to forward to
+  /// Overrides reset_execution_context to forward to
   /// the ExecutionManager. Also handles observe post-processing
-  void resetExecutionContext() override {
-    cudaq::info("MultiQPUPlatform::resetExecutionContext QPU {}", qpu_id);
+  void reset_execution_context() override {
+    cudaq::info("MultiQPUPlatform::reset_execution_context QPU {}", qpu_id);
     auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
     auto ctx = contexts[tid];
     handleObservation(ctx);
-    cudaq::getExecutionManager()->resetExecutionContext();
+    cudaq::getExecutionManager()->reset_execution_context();
     contexts[tid] = nullptr;
     contexts.erase(tid);
   }

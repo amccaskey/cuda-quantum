@@ -64,7 +64,6 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
     ../runtime/cudaq/algorithms/py_vqe.cpp
     ../runtime/cudaq/platform/JITExecutionCache.cpp
     ../runtime/cudaq/platform/py_alt_launch_kernel.cpp
-    ../runtime/cudaq/qis/py_execution_manager.cpp
     ../runtime/cudaq/qis/py_qubit_qis.cpp
     ../runtime/cudaq/operators/py_helpers.cpp  
     ../runtime/cudaq/operators/py_matrix.cpp
@@ -93,6 +92,19 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
     ../../runtime/cudaq/platform/pasqal/PasqalRemoteRESTQPU.cpp
     ../../runtime/cudaq/platform/pasqal/PasqalServerHelper.cpp
     ../../runtime/cudaq/platform/quera/QuEraRemoteRESTQPU.cpp
+    # REFACTOR
+    # ../runtime/utils/PyQuEraRemoteRESTQPU.cpp
+    # # ../runtime/utils/PyRemoteSimulatorQPU.cpp
+    # # ../runtime/utils/PyRestRemoteClient.cpp
+    # ../utils/LinkedLibraryHolder.cpp
+    # ../../runtime/common/ArgumentConversion.cpp
+    # # ../../runtime/cudaq/platform/default/rest_server/RemoteRuntimeClient.cpp
+    # # ../../runtime/cudaq/platform/orca/OrcaExecutor.cpp
+    # # ../../runtime/cudaq/platform/orca/OrcaQPU.cpp
+    # # ../../runtime/cudaq/platform/orca/OrcaRemoteRESTQPU.cpp
+    # # ../../runtime/cudaq/platform/orca/OrcaServerHelper.cpp
+    # # ../../runtime/cudaq/platform/pasqal/PasqalRemoteRESTQPU.cpp
+    # # ../../runtime/cudaq/platform/pasqal/PasqalServerHelper.cpp
 
   EMBED_CAPI_LINK_LIBS
    CUDAQuantumMLIRCAPI
@@ -111,12 +123,11 @@ target_include_directories(CUDAQuantumPythonSources.Extension INTERFACE
     ${CMAKE_SOURCE_DIR}/runtime
 )
 target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE 
-    cudaq 
+    cudaq nvqir
     cudaq-common 
-    cudaq-em-default
-    cudaq-em-photonics
     fmt::fmt-header-only
-    unzip_util
+    cudaq-orca-qpu
+    # unzip_util
 )
 
 ################################################################################

@@ -78,7 +78,7 @@ async_observe_result pyObserveAsync(py::object &kernel,
     throw std::runtime_error(
         "Invalid number of arguments passed to observe_async.");
 
-  auto &platform = cudaq::get_platform();
+  auto &platform = cudaq::v2::get_qpu();
   auto kernelName = kernel.attr("name").cast<std::string>();
   auto kernelMod = kernel.attr("module").cast<MlirModule>();
   args = simplifiedValidateInputArguments(args);
@@ -119,7 +119,7 @@ observe_result pyObservePar(const PyParType &type, py::object &kernel,
     kernel.attr("compile")();
 
   // Ensure the user input is correct.
-  auto &platform = cudaq::get_platform();
+  auto &platform = v2::get_qpu();
   if (!platform.supports_task_distribution())
     throw std::runtime_error(
         "The current quantum_platform does not support parallel distribution "
@@ -130,7 +130,7 @@ observe_result pyObservePar(const PyParType &type, py::object &kernel,
     TODO("Handle Noise Models with python parallel distribution.");
 
   auto name = kernel.attr("name").cast<std::string>();
-  auto nQpus = platform.num_qpus();
+  auto nQpus = v2::get_num_qpus();
   if (type == PyParType::thread) {
     // Does this platform expose more than 1 QPU
     // If so, let's distribute the work amongst the QPUs

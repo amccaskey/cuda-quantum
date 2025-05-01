@@ -36,6 +36,7 @@ protected:
 
   class ScopedApi {
     Aws::SDKOptions &options;
+    bool emulate = false;
 
   public:
     ScopedApi(Aws::SDKOptions &options) : options(options) {
@@ -44,7 +45,12 @@ protected:
       // options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Debug;
       Aws::InitAPI(options);
     }
-    ~ScopedApi() { Aws::ShutdownAPI(options); }
+    void toggleEmulate() { emulate = !emulate; }
+    ~ScopedApi() {
+      if (emulate)
+        return;
+      Aws::ShutdownAPI(options);
+    }
   };
 
   ScopedApi api;

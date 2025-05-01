@@ -138,6 +138,12 @@ bool buildOp(OpBuilder &builder, Location loc, ValueRange operands,
   if constexpr (std::is_same_v<P, Param>) {
     assert(operands.size() >= 2 && "must be at least 2 operands");
     auto params = operands.take_front(paramCount);
+    SmallVector<Value> processedParams;
+    for (auto p : params)
+      if (isa<cudaq::cc::PointerType>(p.getType()))
+        processedParams.push_back(builder.create<cudaq::cc::LoadOp>(loc, p));
+      else
+        processedParams.push_back(p);
     auto [target, ctrls] = maybeUnpackOperands(
         builder, loc, operands.drop_front(paramCount), isControl);
     for (auto v : target)
@@ -147,11 +153,11 @@ bool buildOp(OpBuilder &builder, Location loc, ValueRange operands,
         negatedControlsAttribute(builder.getContext(), ctrls, negations);
     if (ctrls.empty())
       for (auto t : target)
-        builder.create<A>(loc, isAdjoint, params, ctrls, t, negs);
+        builder.create<A>(loc, isAdjoint, processedParams, ctrls, t, negs);
     else {
       assert(target.size() == 1 &&
              "can only have a single target with control qubits.");
-      builder.create<A>(loc, isAdjoint, params, ctrls, target, negs);
+      builder.create<A>(loc, isAdjoint, processedParams, ctrls, target, negs);
     }
   } else {
     assert(operands.size() >= 1 && "must be at least 1 operand");

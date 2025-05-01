@@ -34,20 +34,29 @@ __qpu__ void testInt() {
 // CHECK:           cc.store %[[VAL_2]], %[[VAL_7]] : !cc.ptr<i32>
 // CHECK:           %[[VAL_8:.*]] = cc.compute_ptr %[[VAL_5]][2] : (!cc.ptr<!cc.array<i32 x 3>>) -> !cc.ptr<i32>
 // CHECK:           cc.store %[[VAL_1]], %[[VAL_8]] : !cc.ptr<i32>
+// CHECK:           %[[VAL_9:.*]] = cc.alloca f64
+// CHECK:           cc.store %[[VAL_0]], %[[VAL_9]] : !cc.ptr<f64>
 // CHECK:           %[[VAL_10:.*]] = cc.cast %[[VAL_5]] : (!cc.ptr<!cc.array<i32 x 3>>) -> !cc.ptr<i32>
 // CHECK:           %[[VAL_11:.*]] = cc.load %[[VAL_10]] : !cc.ptr<i32>
 // CHECK:           %[[VAL_12:.*]] = cc.cast signed %[[VAL_11]] : (i32) -> i64
-// CHECK:           %[[VAL_13:.*]] = quake.extract_ref %[[VAL_4]][%[[VAL_12]]] : (!quake.veq<3>, i64) -> !quake.ref
-// CHECK:           quake.ry (%[[VAL_0]]) %[[VAL_13]] : (f64, !quake.ref) -> ()
-// CHECK:           %[[VAL_15:.*]] = cc.compute_ptr %[[VAL_5]][1] : (!cc.ptr<!cc.array<i32 x 3>>) -> !cc.ptr<i32>
-// CHECK:           %[[VAL_16:.*]] = cc.load %[[VAL_15]] : !cc.ptr<i32>
-// CHECK:           %[[VAL_17:.*]] = cc.cast signed %[[VAL_16]] : (i32) -> i64
-// CHECK:           %[[VAL_18:.*]] = quake.extract_ref %[[VAL_4]][%[[VAL_17]]] : (!quake.veq<3>, i64) -> !quake.ref
-// CHECK:           quake.ry (%[[VAL_0]]) %[[VAL_18]] : (f64, !quake.ref) -> ()
-// CHECK:           %[[VAL_20:.*]] = cc.compute_ptr %[[VAL_5]][2] : (!cc.ptr<!cc.array<i32 x 3>>) -> !cc.ptr<i32>
-// CHECK:           %[[VAL_21:.*]] = cc.load %[[VAL_20]] : !cc.ptr<i32>
-// CHECK:           %[[VAL_22:.*]] = cc.cast signed %[[VAL_21]] : (i32) -> i64
-// CHECK:           %[[VAL_23:.*]] = quake.extract_ref %[[VAL_4]][%[[VAL_22]]] : (!quake.veq<3>, i64) -> !quake.ref
-// CHECK:           quake.ry (%[[VAL_0]]) %[[VAL_23]] : (f64, !quake.ref) -> ()
+// CHECK:           %[[VAL_13:.*]] = quake.extract_ref %[[VAL_4]]{{\[}}%[[VAL_12]]] : (!quake.veq<3>, i64) -> !quake.ref
+// CHECK:           %[[VAL_14:.*]] = cc.load %[[VAL_9]] : !cc.ptr<f64>
+// CHECK:           quake.ry (%[[VAL_14]]) %[[VAL_13]] : (f64, !quake.ref) -> ()
+// CHECK:           %[[VAL_15:.*]] = cc.alloca f64
+// CHECK:           cc.store %[[VAL_0]], %[[VAL_15]] : !cc.ptr<f64>
+// CHECK:           %[[VAL_16:.*]] = cc.compute_ptr %[[VAL_5]][1] : (!cc.ptr<!cc.array<i32 x 3>>) -> !cc.ptr<i32>
+// CHECK:           %[[VAL_17:.*]] = cc.load %[[VAL_16]] : !cc.ptr<i32>
+// CHECK:           %[[VAL_18:.*]] = cc.cast signed %[[VAL_17]] : (i32) -> i64
+// CHECK:           %[[VAL_19:.*]] = quake.extract_ref %[[VAL_4]]{{\[}}%[[VAL_18]]] : (!quake.veq<3>, i64) -> !quake.ref
+// CHECK:           %[[VAL_20:.*]] = cc.load %[[VAL_15]] : !cc.ptr<f64>
+// CHECK:           quake.ry (%[[VAL_20]]) %[[VAL_19]] : (f64, !quake.ref) -> ()
+// CHECK:           %[[VAL_21:.*]] = cc.alloca f64
+// CHECK:           cc.store %[[VAL_0]], %[[VAL_21]] : !cc.ptr<f64>
+// CHECK:           %[[VAL_22:.*]] = cc.compute_ptr %[[VAL_5]][2] : (!cc.ptr<!cc.array<i32 x 3>>) -> !cc.ptr<i32>
+// CHECK:           %[[VAL_23:.*]] = cc.load %[[VAL_22]] : !cc.ptr<i32>
+// CHECK:           %[[VAL_24:.*]] = cc.cast signed %[[VAL_23]] : (i32) -> i64
+// CHECK:           %[[VAL_25:.*]] = quake.extract_ref %[[VAL_4]]{{\[}}%[[VAL_24]]] : (!quake.veq<3>, i64) -> !quake.ref
+// CHECK:           %[[VAL_26:.*]] = cc.load %[[VAL_21]] : !cc.ptr<f64>
+// CHECK:           quake.ry (%[[VAL_26]]) %[[VAL_25]] : (f64, !quake.ref) -> ()
 // CHECK:           return
 // CHECK:         }

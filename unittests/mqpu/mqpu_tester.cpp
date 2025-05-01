@@ -7,6 +7,7 @@
  ******************************************************************************/
 #include <cudaq.h>
 #include <cudaq/algorithm.h>
+#include <cudaq/platformv2/platform.h>
 #include <gtest/gtest.h>
 #include <random>
 
@@ -32,8 +33,8 @@ TEST(MQPUTester, checkSimple) {
 TEST(MQPUTester, checkLarge) {
 
   // This will warm up the GPUs, we don't time this
-  auto &platform = cudaq::get_platform();
-  printf("Num QPUs %lu\n", platform.num_qpus());
+  // auto &platform = cudaq::get_platform();
+  printf("Num QPUs %lu\n", cudaq::v2::get_num_qpus());
   int nQubits = 12;
   int nTerms = 1000; /// Scale this on multiple gpus to see speed up
   auto H = cudaq::spin_op::random(nQubits, nTerms, std::mt19937::default_seed);
@@ -103,10 +104,10 @@ TEST(MQPUTester, checkAsyncWithKernelBuilder) {
     };
   };
   kernel.for_loop(0, numIters, rotateStep);
-  auto &platform = cudaq::get_platform();
+  // auto &platform = cudaq::get_platform();
   int numSteps = 1;
   // Query the number of QPUs in the system
-  auto num_qpus = platform.num_qpus();
+  auto num_qpus = cudaq::v2::get_num_qpus();
   printf("Number of QPUs: %zu\n", num_qpus);
   std::vector<cudaq::async_state_result> stateFutures;
   // QPU 0: 1 step, QPU 1: 2 steps, etc.

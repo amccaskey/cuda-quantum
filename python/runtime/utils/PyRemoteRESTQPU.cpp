@@ -70,6 +70,15 @@ private:
     return context;
   }
 
+public:
+  PyRemoteRESTQPU(const v2::platform_metadata &m) : BaseRemoteRESTQPU(m) {
+    setTargetBackend(m.initial_config_str);
+    if (is_emulator()) {
+      cudaq::info("RemoteRESTQPU is in emulation mode, setting the simulator.");
+      emulatorQPU = cudaq::v2::qpu_handle::get("circuit_simulator", m);
+    }
+  }
+
 protected:
   std::tuple<ModuleOp, MLIRContext *, void *>
   extractQuakeCodeAndContext(const std::string &kernelName,
@@ -133,7 +142,14 @@ protected:
   }
 
   void cleanupContext(MLIRContext *context) override { delete context; }
+
+  CUDAQ_EXTENSION_CUSTOM_CREATOR_FUNCTION_WITH_NAME(
+      PyRemoteRESTQPU, "remote_rest",
+      static std::unique_ptr<qpu> create(
+          const cudaq::v2::platform_metadata &m) {
+        return std::make_unique<PyRemoteRESTQPU>(m);
+      })
 };
 } // namespace cudaq
 
-CUDAQ_REGISTER_TYPE(cudaq::QPU, cudaq::PyRemoteRESTQPU, remote_rest)
+CUDAQ_REGISTER_EXTENSION_TYPE(cudaq::PyRemoteRESTQPU)

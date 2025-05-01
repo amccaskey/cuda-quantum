@@ -27,8 +27,9 @@ if (${CMAKE_EXE_LINKER_FLAGS} MATCHES "^.*static-libstdc\\+\\+.*")
         -Wl,--no-whole-archive
     )
 endif()
-target_link_libraries(${TOOL_NAME} PRIVATE cudaq rest-remote-platform-server cudaq-mlir-runtime)
+target_link_libraries(${TOOL_NAME} PRIVATE cudaq rest-remote-platform-server cudaq-qpu-simulated)
 target_compile_options(${TOOL_NAME} PRIVATE -fno-rtti)
+target_link_options(${TOOL_NAME} PRIVATE -Wl,--no-as-needed)
 export_executable_symbols_for_plugins(${TOOL_NAME})
 
 install(TARGETS ${TOOL_NAME} DESTINATION bin)

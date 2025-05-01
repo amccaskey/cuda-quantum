@@ -9,6 +9,7 @@
 find_package(Python COMPONENTS Interpreter)
 if (OPENSSL_FOUND AND CUDAQ_ENABLE_PYTHON AND CUDAQ_TEST_MOCK_SERVERS)
   add_subdirectory(anyon)
+  # AJM Refactor - I'm not sure the Braket tests were ever working
   add_subdirectory(braket)
   add_subdirectory(infleqtion)
   add_subdirectory(ionq)
@@ -17,5 +18,4 @@ if (OPENSSL_FOUND AND CUDAQ_ENABLE_PYTHON AND CUDAQ_TEST_MOCK_SERVERS)
   add_subdirectory(quantinuum)  
 endif()
 add_subdirectory(pasqal)
-add_subdirectory(qpp_observe)
 add_subdirectory(quera)

@@ -15,7 +15,7 @@
 // simply "did it run to completion?", but we will do additional timing tests
 // elsewhere.
 
-#include "nvqir/CircuitSimulator.h"
+#include "cudaq/platformv2/qpus/simulated/CircuitSimulator.h"
 #include <cudaq.h>
 #include <iostream>
 
@@ -34,8 +34,11 @@
 // #define DEBUG
 #endif
 
-namespace nvqir {
-CircuitSimulator *getCircuitSimulatorInternal();
+namespace cudaq {
+CircuitSimulator *getCircuitSimulatorInternal() {
+  static std::unique_ptr<cudaq::CircuitSimulator> sim = cudaq::CircuitSimulator::get("qpp");
+  return sim.get();
+}
 }
 
 // Global data for timing functions
@@ -56,13 +59,13 @@ std::chrono::system_clock::time_point g_time;
 
 void timer_start(int tag) {
   // Flush before starting the timer to get accurate timing
-  nvqir::getCircuitSimulatorInternal()->flushGateQueue();
+  cudaq::getCircuitSimulatorInternal()->flushGateQueue();
   g_time = std::chrono::high_resolution_clock::now();
 }
 
 void timer_stop(int tag, int count) {
   // Flush before stopping the timer to get accurate timing
-  nvqir::getCircuitSimulatorInternal()->flushGateQueue();
+  cudaq::getCircuitSimulatorInternal()->flushGateQueue();
   auto tStop = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double> diff = tStop - g_time;
   double avg_ms = diff.count() * 1000.0 / count;

@@ -41,25 +41,25 @@ public:
     return kernelFunc(args, /*isRemote=*/false);
   }
 
-  /// Overrides setExecutionContext to forward it to the ExecutionManager
-  void setExecutionContext(cudaq::ExecutionContext *context) override {
-    ScopedTraceWithContext("DefaultPlatform::setExecutionContext",
+  /// Overrides set_execution_context to forward it to the ExecutionManager
+  void set_execution_context(cudaq::ExecutionContext *context) override {
+    ScopedTraceWithContext("DefaultPlatform::set_execution_context",
                            context->name);
     executionContext = context;
     if (noiseModel)
       executionContext->noiseModel = noiseModel;
 
-    cudaq::getExecutionManager()->setExecutionContext(executionContext);
+    cudaq::getExecutionManager()->set_execution_context(executionContext);
   }
 
-  /// Overrides resetExecutionContext to forward to
+  /// Overrides reset_execution_context to forward to
   /// the ExecutionManager. Also handles observe post-processing
-  void resetExecutionContext() override {
+  void reset_execution_context() override {
     ScopedTraceWithContext(
         executionContext->name == "observe" ? cudaq::TIMING_OBSERVE : 0,
-        "DefaultPlatform::resetExecutionContext", executionContext->name);
+        "DefaultPlatform::reset_execution_context", executionContext->name);
     handleObservation(executionContext);
-    cudaq::getExecutionManager()->resetExecutionContext();
+    cudaq::getExecutionManager()->reset_execution_context();
     executionContext = nullptr;
   }
 };

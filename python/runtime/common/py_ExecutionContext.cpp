@@ -8,7 +8,7 @@
 
 #include "common/ExecutionContext.h"
 #include "common/RecordLogParser.h"
-#include "cudaq/platform.h"
+#include "cudaq/platformv2/platform.h"
 #include <fmt/core.h>
 #include <pybind11/complex.h>
 #include <pybind11/stl.h>
@@ -50,28 +50,28 @@ void bindExecutionContext(py::module &mod) {
   mod.def(
       "setExecutionContext",
       [](cudaq::ExecutionContext &ctx) {
-        auto &self = cudaq::get_platform();
-        self.set_exec_ctx(&ctx);
+        auto &self = cudaq::v2::get_qpu();
+        self.set_execution_context(&ctx);
       },
       "");
   mod.def(
       "resetExecutionContext",
       []() {
-        auto &self = cudaq::get_platform();
-        self.reset_exec_ctx();
+        auto &self = cudaq::v2::get_qpu();
+        self.reset_execution_context();
       },
       "");
   mod.def("supportsConditionalFeedback", []() {
-    auto &platform = cudaq::get_platform();
-    return platform.supports_conditional_feedback();
+    auto &self = cudaq::v2::get_qpu();
+    return self.supports_conditional_feedback();
   });
   mod.def("supportsExplicitMeasurements", []() {
-    auto &platform = cudaq::get_platform();
-    return platform.supports_explicit_measurements();
+    auto &self = cudaq::v2::get_qpu();
+    return self.supports_explicit_measurements();
   });
   mod.def("getExecutionContextName", []() {
-    auto &self = cudaq::get_platform();
-    return self.get_exec_ctx()->name;
+    auto &self = cudaq::v2::get_qpu();
+    return self.get_current_context_name();
   });
   mod.def("getQirOutputLog", []() { return nvqir::getQirOutputLog(); });
   mod.def("clearQirOutputLog", []() { nvqir::clearQirOutputLog(); });

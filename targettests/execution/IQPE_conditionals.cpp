@@ -75,7 +75,6 @@ struct iqpe {
 int main() {
 
   int nShots = 10;
-  auto &platform = cudaq::get_platform();
   auto counts = cudaq::sample(nShots, iqpe{});
   counts.dump();
 

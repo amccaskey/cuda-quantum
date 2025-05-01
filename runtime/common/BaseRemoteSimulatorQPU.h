@@ -16,15 +16,15 @@
 #include "cudaq.h"
 #include "cudaq/algorithms/gradient.h"
 #include "cudaq/algorithms/optimizer.h"
-#include "cudaq/platform/qpu.h"
-#include "cudaq/platform/quantum_platform.h"
+#include "cudaq/platformv2/qpu.h"
+#include "cudaq/platformv2/qpus/simulated/CircuitSimulator.h"
 #include <fstream>
 
 namespace cudaq {
 
 // Remote QPU: delegating the execution to a remotely-hosted server, which can
 // reinstate the execution context and JIT-invoke the kernel.
-class BaseRemoteSimulatorQPU : public cudaq::QPU {
+class BaseRemoteSimulatorQPU : public cudaq::v2::qpu<v2::mlir_launch_trait> {
 protected:
   std::string m_simName;
   std::unordered_map<std::thread::id, cudaq::ExecutionContext *> m_contexts;
@@ -43,27 +43,33 @@ protected:
   }
 
 public:
-  BaseRemoteSimulatorQPU()
-      : QPU(),
-        m_client(cudaq::registry::get<cudaq::RemoteRuntimeClient>("rest")) {}
+  BaseRemoteSimulatorQPU(const v2::platform_metadata &m)
+      : qpu(m),
+        m_client(cudaq::registry::get<cudaq::RemoteRuntimeClient>("rest")) {
+    setTargetBackend(m.initial_config_str);
+  }
 
   BaseRemoteSimulatorQPU(BaseRemoteSimulatorQPU &&) = delete;
   virtual ~BaseRemoteSimulatorQPU() = default;
 
-  std::thread::id getExecutionThreadId() const {
-    return execution_queue->getExecutionThreadId();
-  }
-
   // Conditional feedback is handled by the server side.
-  virtual bool supportsConditionalFeedback() override { return true; }
+  bool supports_conditional_feedback() const override { return true; }
 
   // Get the capabilities from the client.
-  virtual RemoteCapabilities getRemoteCapabilities() const override {
+  RemoteCapabilities get_remote_capabilities() const override {
     return m_client->getRemoteCapabilities();
   }
 
-  virtual void setTargetBackend(const std::string &backend) override {
+  std::optional<cudaq::state>
+  local_state_from_data(const state_data &data) override {
+    return state(
+        CircuitSimulator::get(m_simName)->createStateFromData(data).release());
+  }
+
+  void setTargetBackend(const std::string &backend) {
     auto parts = cudaq::split(backend, ';');
+    if (parts[0] == "remote-mqpu" || parts[0] == "nvqc")
+      parts.erase(parts.begin());
     if (parts.size() % 2 != 0)
       throw std::invalid_argument("Unexpected backend configuration string. "
                                   "Expecting a ';'-separated key-value pairs.");
@@ -75,15 +81,10 @@ public:
     }
   }
 
-  void enqueue(cudaq::QuantumTask &task) override {
-    cudaq::info("BaseRemoteSimulatorQPU: Enqueue Task on QPU {}", qpu_id);
-    execution_queue->enqueue(task);
-  }
-
-  void launchVQE(const std::string &name, const void *kernelArgs,
-                 cudaq::gradient *gradient, const cudaq::spin_op &H,
-                 cudaq::optimizer &optimizer, const int n_params,
-                 const std::size_t shots) override {
+  void launch_vqe(const std::string &name, const void *kernelArgs,
+                  cudaq::gradient *gradient, const cudaq::spin_op &H,
+                  cudaq::optimizer &optimizer, const int n_params,
+                  const std::size_t shots) override {
     cudaq::ExecutionContext *executionContextPtr =
         getExecutionContextForMyThread();
 
@@ -98,23 +99,24 @@ public:
 
     std::string errorMsg;
     const bool requestOkay = m_client->sendRequest(
-        *m_mlirContext, *executionContextPtr, /*serializedCodeContext=*/nullptr,
-        gradient, &optimizer, n_params, m_simName, name, /*kernelFunc=*/nullptr,
-        kernelArgs, /*argSize=*/0, &errorMsg);
+        *m_mlirContext, *executionContextPtr,
+        /*serializedCodeContext=*/nullptr, gradient, &optimizer, n_params,
+        m_simName, name, /*kernelFunc=*/nullptr, kernelArgs, /*argSize=*/0,
+        &errorMsg);
     if (!requestOkay)
       throw std::runtime_error("Failed to launch VQE. Error: " + errorMsg);
   }
 
-  void launchKernel(const std::string &name,
-                    const std::vector<void *> &rawArgs) override {
+  void launch_kernel(const std::string &name,
+                     const std::vector<void *> &rawArgs) override {
     [[maybe_unused]] auto dynamicResult =
         launchKernelImpl(name, nullptr, nullptr, 0, 0, &rawArgs);
   }
 
   KernelThunkResultType
-  launchKernel(const std::string &name, KernelThunkType kernelFunc, void *args,
-               std::uint64_t voidStarSize, std::uint64_t resultOffset,
-               const std::vector<void *> &rawArgs) override {
+  launch_kernel(const std::string &name, KernelThunkType kernelFunc, void *args,
+                std::uint64_t voidStarSize, std::uint64_t resultOffset,
+                const std::vector<void *> &rawArgs) override {
     // Remote simulation cannot deal with rawArgs. Drop them on the floor.
     return launchKernelImpl(name, kernelFunc, args, voidStarSize, resultOffset,
                             nullptr);
@@ -128,7 +130,7 @@ public:
     cudaq::info(
         "BaseRemoteSimulatorQPU: Launch kernel named '{}' remote QPU {} "
         "(simulator = {})",
-        name, qpu_id, m_simName);
+        name, qpu_uid, m_simName);
 
     cudaq::ExecutionContext *executionContextPtr =
         getExecutionContextForMyThread();
@@ -190,53 +192,59 @@ public:
     return {};
   }
 
-  void
-  launchSerializedCodeExecution(const std::string &name,
-                                cudaq::SerializedCodeExecutionContext
-                                    &serializeCodeExecutionObject) override {
-    cudaq::info(
-        "BaseRemoteSimulatorQPU: Launch remote code named '{}' remote QPU {} "
-        "(simulator = {})",
-        name, qpu_id, m_simName);
+  // void
+  // launchSerializedCodeExecution(const std::string &name,
+  //                               cudaq::SerializedCodeExecutionContext
+  //                                   &serializeCodeExecutionObject) override {
+  //   cudaq::info(
+  //       "BaseRemoteSimulatorQPU: Launch remote code named '{}' remote QPU {}
+  //       "
+  //       "(simulator = {})",
+  //       name, qpu_id, m_simName);
 
-    cudaq::ExecutionContext *executionContextPtr =
-        getExecutionContextForMyThread();
+  //   cudaq::ExecutionContext *executionContextPtr =
+  //       getExecutionContextForMyThread();
 
-    if (executionContextPtr && executionContextPtr->name == "tracer") {
-      return;
-    }
+  //   if (executionContextPtr && executionContextPtr->name == "tracer") {
+  //     return;
+  //   }
 
-    // Default context for a 'fire-and-ignore' kernel launch; i.e., no context
-    // was set before launching the kernel. Use a static variable per thread to
-    // set up a single-shot execution context for this case.
-    static thread_local cudaq::ExecutionContext defaultContext("sample",
-                                                               /*shots=*/1);
-    cudaq::ExecutionContext &executionContext =
-        executionContextPtr ? *executionContextPtr : defaultContext;
+  //   // Default context for a 'fire-and-ignore' kernel launch; i.e., no
+  //   context
+  //   // was set before launching the kernel. Use a static variable per thread
+  //   to
+  //   // set up a single-shot execution context for this case.
+  //   static thread_local cudaq::ExecutionContext defaultContext("sample",
+  //                                                              /*shots=*/1);
+  //   cudaq::ExecutionContext &executionContext =
+  //       executionContextPtr ? *executionContextPtr : defaultContext;
 
-    std::string errorMsg;
-    const bool requestOkay = m_client->sendRequest(
-        *m_mlirContext, executionContext, &serializeCodeExecutionObject,
-        /*vqe_gradient=*/nullptr, /*vqe_optimizer=*/nullptr, /*vqe_n_params=*/0,
-        m_simName, name, /*kernelFunc=*/nullptr, /*args=*/nullptr,
-        /*voidStarSize=*/0, &errorMsg);
-    if (!requestOkay)
-      throw std::runtime_error("Failed to launch kernel. Error: " + errorMsg);
-  }
+  //   std::string errorMsg;
+  //   const bool requestOkay = m_client->sendRequest(
+  //       *m_mlirContext, executionContext, &serializeCodeExecutionObject,
+  //       /*vqe_gradient=*/nullptr, /*vqe_optimizer=*/nullptr,
+  //       /*vqe_n_params=*/0, m_simName, name, /*kernelFunc=*/nullptr,
+  //       /*args=*/nullptr,
+  //       /*voidStarSize=*/0, &errorMsg);
+  //   if (!requestOkay)
+  //     throw std::runtime_error("Failed to launch kernel. Error: " +
+  //     errorMsg);
+  // }
 
-  void setExecutionContext(cudaq::ExecutionContext *context) override {
-    cudaq::info("BaseRemoteSimulatorQPU::setExecutionContext QPU {}", qpu_id);
+  void set_execution_context(cudaq::ExecutionContext *context) override {
+    cudaq::info("BaseRemoteSimulatorQPU::setExecutionContext QPU {}", qpu_uid);
     std::scoped_lock<std::mutex> lock(m_contextMutex);
     m_contexts[std::this_thread::get_id()] = context;
   }
 
-  void resetExecutionContext() override {
-    cudaq::info("BaseRemoteSimulatorQPU::resetExecutionContext QPU {}", qpu_id);
+  void reset_execution_context() override {
+    cudaq::info("BaseRemoteSimulatorQPU::resetExecutionContext QPU {}",
+                qpu_uid);
     std::scoped_lock<std::mutex> lock(m_contextMutex);
     m_contexts.erase(std::this_thread::get_id());
   }
 
-  void onRandomSeedSet(std::size_t seed) override {
+  void set_random_seed(std::size_t seed) override {
     m_client->resetRemoteRandomSeed(seed);
   }
 };
@@ -245,8 +253,10 @@ public:
 /// NVCF.
 class BaseNvcfSimulatorQPU : public cudaq::BaseRemoteSimulatorQPU {
 public:
-  BaseNvcfSimulatorQPU() : BaseRemoteSimulatorQPU() {
+  BaseNvcfSimulatorQPU(const v2::platform_metadata &m)
+      : BaseRemoteSimulatorQPU(m) {
     m_client = cudaq::registry::get<cudaq::RemoteRuntimeClient>("NVCF");
+    setTargetBackend(m.initial_config_str);
   }
 
   // Encapsulates Nvcf configurations that we need.
@@ -257,7 +267,7 @@ public:
     std::string versionId;
   };
 
-  virtual void setTargetBackend(const std::string &backend) override {
+  void setTargetBackend(const std::string &backend) {
     auto parts = cudaq::split(backend, ';');
     if (parts.size() % 2 != 0)
       throw std::invalid_argument("Unexpected backend configuration string. "
@@ -310,7 +320,7 @@ public:
 
   // The NVCF version of this function needs to dynamically fetch the remote
   // capabilities from the currently deployed servers.
-  virtual RemoteCapabilities getRemoteCapabilities() const override {
+  RemoteCapabilities get_remote_capabilities() const override {
     return m_client->getRemoteCapabilities();
   }
 

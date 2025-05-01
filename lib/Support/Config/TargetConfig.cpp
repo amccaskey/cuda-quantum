@@ -183,11 +183,13 @@ cudaq::config::processRuntimeArgs(const cudaq::config::TargetConfig &config,
         llvm::StringRef(featureFlags).split(flagStrs, ',', -1, false);
         for (const auto &flag : flagStrs) {
           const auto iter = stringToFeatureFlag.find(flag.str());
-          if (iter == stringToFeatureFlag.end()) {
-            llvm::errs() << "Unknown  feature flag '" << flag << "'\n";
-            abort();
+          if (!flag.contains("qpu:")) {
+            if (iter == stringToFeatureFlag.end()) {
+              llvm::errs() << "Unknown  feature flag '" << flag << "'\n";
+              abort();
+            }
+            featureFlag += iter->second;
           }
-          featureFlag += iter->second;
         }
       }
     }
@@ -315,6 +317,7 @@ void MappingTraits<cudaq::config::BackendEndConfigEntry>::mapping(
   io.mapOptional("library-mode-execution-manager",
                  info.LibraryModeExecutionManager);
   io.mapOptional("platform-qpu", info.PlatformQpu);
+  io.mapOptional("platform-config", info.PlatformConfig);
   io.mapOptional("preprocessor-defines", info.PreprocessorDefines);
   io.mapOptional("compiler-flags", info.CompilerFlags);
   io.mapOptional("link-libs", info.LinkLibs);

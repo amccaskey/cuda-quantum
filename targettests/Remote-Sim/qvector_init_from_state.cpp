@@ -11,7 +11,7 @@
 
 // clang-format off
 // TODO-FIX-KERNEL-EXEC
-// RUN: nvq++ %cpp_std --enable-mlir --target remote-mqpu -fkernel-exec-kind=2 %s -o %t && %t | FileCheck %s
+// RUN: nvq++ %cpp_std -DCUDAQ_SIMULATION_SCALAR_FP64 --enable-mlir --target remote-mqpu -fkernel-exec-kind=2 %s -o %t && %t | FileCheck %s
 // clang-format on
 
 #include <cudaq.h>

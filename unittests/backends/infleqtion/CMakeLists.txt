@@ -6,22 +6,18 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_executable(test_infleqtion InfleqtionTester.cpp)
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
-  target_link_options(test_infleqtion PRIVATE -Wl,--no-as-needed)
-endif()
-target_compile_definitions(test_infleqtion PRIVATE -DNVQIR_BACKEND_NAME=infleqtion)
-target_include_directories(test_infleqtion PRIVATE ../..)
-target_link_libraries(test_infleqtion
-  PRIVATE fmt::fmt-header-only 
-  cudaq-common 
-  cudaq
-  cudaq-builder
-  cudaq-mlir-runtime
-  cudaq-rest-qpu
-  cudaq-operator
-  cudaq-platform-default 
-  gtest_main)
+create_simulator_runtime_test(test_infleqtion
+  EXTRA_SOURCES InfleqtionTester.cpp 
+  DISABLE_INTEGRATION TRUE 
+  QPU_LIB cudaq-rest-qpu 
+  EXTRA_LIBS 
+    cudaq-mlir-runtime 
+    cudaq-qpu-simulated
+  HAS_MAIN_CPP TRUE
+  ENV_VARS "SUPERSTAQ_API_KEY=00000000000000000000000000000000"
+  BACKEND_CONFIG "infleqtion,url,http://localhost:62447,token,0"
+  TARGET_OPTIONS "--target-option qpu:remote_rest"
+)
 
 
 configure_file("InfleqtionStartServerAndTest.sh.in" "${CMAKE_BINARY_DIR}/unittests/backends/infleqtion/InfleqtionStartServerAndTest.sh" @ONLY)

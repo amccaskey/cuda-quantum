@@ -18,7 +18,7 @@ target_link_libraries(OptimizerUnitTests
 
 gtest_discover_tests(OptimizerUnitTests)
 
-add_executable(test_quake_synth QuakeSynthTester.cpp)
+add_executable(test_quake_synth QuakeSynthTester.cpp ${CUDAQ_BACKEND_CONFIG_GLUE})
 target_link_libraries(test_quake_synth
   PRIVATE 
   cudaq
@@ -26,10 +26,7 @@ target_link_libraries(test_quake_synth
   cudaq-mlir-runtime
   cudaq-builder
   cudaq-common
-  cudaq-platform-default
-  nvqir-qpp 
-  nvqir
-  cudaq-em-default
+  cudaq-qpu-simulated
   gtest_main)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
   target_link_options(test_quake_synth PRIVATE -Wl,--no-as-needed)

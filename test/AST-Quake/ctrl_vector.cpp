@@ -16,8 +16,8 @@ struct lower_ctrl_as_qreg {
     cudaq::qvector reg1(4); // group of controls
     cudaq::qvector reg2(2); // some targets
 
-    h(reg1, reg2[0]);
-    x(reg1, reg2[1]);
+    h<cudaq::ctrl>(reg1, reg2[0]);
+    x<cudaq::ctrl>(reg1, reg2[1]);
 
     mz(reg2);
   }

@@ -10,7 +10,7 @@
 
 #include "common/ExecutionContext.h"
 #include "common/Resources.h"
-#include "cudaq/platform.h"
+#include "cudaq/platformv2/platform.h"
 
 namespace cudaq {
 
@@ -22,10 +22,10 @@ namespace cudaq {
 template <typename QuantumKernel, typename... Args>
 auto estimate_resources(QuantumKernel &&kernel, Args &&...args) {
   ExecutionContext context("tracer");
-  auto &platform = get_platform();
-  platform.set_exec_ctx(&context);
+  auto &platform = v2::get_qpu();
+  platform.set_execution_context(&context);
   kernel(args...);
-  platform.reset_exec_ctx();
+  platform.reset_execution_context();
   return cudaq::Resources::compute(context.kernelTrace);
 }
 
