@@ -657,12 +657,8 @@ struct MappingFunc : public cudaq::opt::impl::MappingFuncBase<MappingFunc> {
     auto walkResult = func.walk([&](quake::BorrowWireOp borrowOp) {
       if (inputWireSet.empty()) {
         inputWireSet = borrowOp.getSetName();
-      } else if (borrowOp.getSetName() != inputWireSet) {
-        // Why is this here? It's entirely possible to have disjoint wire sets,
-        // where the sets are for fundamentally distinct purposes in the target
-        // model.
-        if (nonComposable)
-          func.emitOpError("function cannot use multiple WireSets");
+      else if (borrowOp.getSetName() != inputWireSet) {
+        func.emitOpError("function cannot use multiple WireSets");
         return WalkResult::interrupt();
       }
       highestIdentity = highestIdentity

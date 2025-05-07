@@ -53,12 +53,7 @@ public:
   matchAndRewrite(cudaq::cc::AllocaOp alloc, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto operands = adaptor.getOperands();
-    auto toTy = LLVM::LLVMPointerType::get([&]() -> Type {
-      if (auto arrTy = dyn_cast<cudaq::cc::ArrayType>(alloc.getElementType());
-          arrTy && arrTy.isUnknownSize())
-        return getTypeConverter()->convertType(arrTy.getElementType());
-      return getTypeConverter()->convertType(alloc.getElementType());
-    }());
+    auto toTy = LLVM::LLVMPointerType::get(rewriter.getContext());
     if (operands.empty()) {
       rewriter.replaceOpWithNewOp<LLVM::AllocaOp>(
           alloc, toTy,
@@ -161,8 +156,8 @@ public:
     auto *thenBlock = rewriter.createBlock(endBlock);
     auto *elseBlock = rewriter.createBlock(endBlock);
     SmallVector<Type> resultTy;
-    auto llvmFuncTy = cast<LLVM::LLVMFunctionType>(
-        cast<LLVM::LLVMPointerType>(funcPtrTy).getElementType());
+    LLVM::LLVMFunctionType llvmFuncTy;
+    assert(false);
     if (!isa<LLVM::LLVMVoidType>(llvmFuncTy.getReturnType())) {
       resultTy.push_back(llvmFuncTy.getReturnType());
       endBlock->addArgument(resultTy[0], loc);
@@ -203,9 +198,9 @@ public:
     auto funcPtrTy = getTypeConverter()->convertType(
         cast<cudaq::cc::IndirectCallableType>(call.getCallee().getType())
             .getSignature());
-    auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getI8Type());
-    auto funcTy = cast<LLVM::LLVMFunctionType>(
-        cast<LLVM::LLVMPointerType>(funcPtrTy).getElementType());
+    auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
+    LLVM::LLVMFunctionType funcTy;
+    assert(false);
     auto i64Ty = rewriter.getI64Type(); // intptr_t
     FlatSymbolRefAttr funSymbol = cudaq::opt::factory::createLLVMFunctionSymbol(
         cudaq::runtime::getLinkableKernelDeviceSide, ptrTy, {i64Ty},
@@ -483,7 +478,7 @@ public:
           cast<LLVM::LLVMFuncOp>(calledFuncOp).getFunctionType());
     }();
     auto tramp = rewriter.create<LLVM::AddressOfOp>(
-        loc, sigTy, callable.getCallee().cast<FlatSymbolRefAttr>());
+        loc, sigTy, cast<FlatSymbolRefAttr>(callable.getCallee()));
     auto trampoline =
         rewriter.create<LLVM::BitcastOp>(loc, tupleArgTy.getBody()[0], tramp);
     auto zeroA = DenseI64ArrayAttr::get(ctx, ArrayRef<std::int64_t>{0});

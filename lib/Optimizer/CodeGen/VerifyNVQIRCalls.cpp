@@ -36,7 +36,7 @@ struct VerifyNVQIRCallOpsPass
     bool passFailed = false;
     // Check that a function name is either QIR or NVQIR registered.
     const auto isKnownFunctionName = [&](llvm::StringRef functionName) -> bool {
-      if (functionName.startswith("__quantum_"))
+      if (functionName.starts_with("__quantum_"))
         return true;
       static const std::vector<llvm::StringRef> NVQIR_FUNCS = {
           cudaq::opt::NVQIRInvokeWithControlBits,           // obsolete

@@ -8,7 +8,7 @@
 
 #include "Logger.h"
 #include "Timing.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/ansicolor_sink.h"
 #include <filesystem>
 #include <set>
 #include <spdlog/cfg/env.h>

@@ -205,7 +205,7 @@ struct BranchRewrite : OpConversionPattern<cf::BranchOp> {
   matchAndRewrite(cf::BranchOp branchOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto qubitTy = cudaq::opt::getQubitType(rewriter.getContext());
-    rewriter.startRootUpdate(branchOp);
+    rewriter.startOpModification(branchOp);
     if (branchOp.getSuccessor())
       for (auto arg : branchOp.getSuccessor()->getArguments())
         if (isa<quake::WireType>(arg.getType()))
@@ -213,7 +213,7 @@ struct BranchRewrite : OpConversionPattern<cf::BranchOp> {
     for (auto operand : branchOp.getOperands())
       if (isa<quake::WireType>(operand.getType()))
         operand.setType(qubitTy);
-    rewriter.finalizeRootUpdate(branchOp);
+    rewriter.finalizeOpModification(branchOp);
     return success();
   }
 };
@@ -225,7 +225,7 @@ struct CondBranchRewrite : OpConversionPattern<cf::CondBranchOp> {
   matchAndRewrite(cf::CondBranchOp branchOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto qubitTy = cudaq::opt::getQubitType(rewriter.getContext());
-    rewriter.startRootUpdate(branchOp);
+    rewriter.startOpModification(branchOp);
     for (auto suc : branchOp.getSuccessors())
       for (auto arg : suc->getArguments())
         if (isa<quake::WireType>(arg.getType()))
@@ -233,7 +233,7 @@ struct CondBranchRewrite : OpConversionPattern<cf::CondBranchOp> {
     for (auto operand : branchOp.getOperands())
       if (isa<quake::WireType>(operand.getType()))
         operand.setType(qubitTy);
-    rewriter.finalizeRootUpdate(branchOp);
+    rewriter.finalizeOpModification(branchOp);
     return success();
   }
 };
@@ -607,8 +607,8 @@ struct WireSetToProfileQIRPostPass
                 callableRegion->getParentOfType<mlir::func::FuncOp>();
 
             if (auto reqQubits =
-                    parentFuncOp->getAttr(cudaq::opt::QIRRequiredQubitsAttrName)
-                        .dyn_cast_or_null<StringAttr>()) {
+                    dyn_cast_or_null<StringAttr>(parentFuncOp->getAttr(
+                        cudaq::opt::QIRRequiredQubitsAttrName))) {
               std::uint32_t thisFuncReqQubits = 0;
               if (!reqQubits.strref().getAsInteger(10, thisFuncReqQubits)) {
                 auto thisFuncHighestIdentity = thisFuncReqQubits - 1;
@@ -620,9 +620,8 @@ struct WireSetToProfileQIRPostPass
             }
 
             if (auto reqResults =
-                    parentFuncOp
-                        ->getAttr(cudaq::opt::QIRRequiredResultsAttrName)
-                        .dyn_cast_or_null<StringAttr>()) {
+                    dyn_cast_or_null<StringAttr>(parentFuncOp->getAttr(
+                        cudaq::opt::QIRRequiredResultsAttrName))) {
               std::uint32_t thisFuncReqResults = 0;
               if (!reqResults.strref().getAsInteger(10, thisFuncReqResults)) {
                 auto thisFuncHighestResult = thisFuncReqResults - 1;

@@ -287,6 +287,14 @@ ParseResult quake::ApplyOp::parse(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
+LogicalResult
+quake::ApplyOp::verifySymbolUses(mlir::SymbolTableCollection &symTab) {
+  if (auto calleeSym = getCallee())
+    if (!symTab.lookupNearestSymbolFrom<func::FuncOp>(*this, *calleeSym))
+      return failure();
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // ApplyNoiseOp
 //===----------------------------------------------------------------------===//
@@ -999,6 +1007,7 @@ using EffectsVectorImpl =
 [[maybe_unused]] inline static void
 getModelessEffectsImpl(EffectsVectorImpl &effects, ValueRange controls,
                        ValueRange targets) {
+#if 0
   for (auto v : controls)
     effects.emplace_back(MemoryEffects::Read::get(), v,
                          SideEffects::DefaultResource::get());
@@ -1008,6 +1017,7 @@ getModelessEffectsImpl(EffectsVectorImpl &effects, ValueRange controls,
     effects.emplace_back(MemoryEffects::Write::get(), v,
                          SideEffects::DefaultResource::get());
   }
+#endif
 }
 
 /// For an operation with moded effects, the operation conditionally has
@@ -1019,6 +1029,7 @@ getModelessEffectsImpl(EffectsVectorImpl &effects, ValueRange controls,
 inline static void getModedEffectsImpl(EffectsVectorImpl &effects,
                                        ValueRange controls,
                                        ValueRange targets) {
+#if 0
   for (auto v : controls)
     if (isa<quake::RefType, quake::VeqType>(v.getType()))
       effects.emplace_back(MemoryEffects::Read::get(), v,
@@ -1030,6 +1041,7 @@ inline static void getModedEffectsImpl(EffectsVectorImpl &effects,
       effects.emplace_back(MemoryEffects::Write::get(), v,
                            SideEffects::DefaultResource::get());
     }
+#endif
 }
 
 /// Quake reset has modeless effects.

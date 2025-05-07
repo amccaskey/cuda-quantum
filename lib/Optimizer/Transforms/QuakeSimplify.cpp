@@ -551,7 +551,7 @@ public:
         RotationCombine<quake::R1Op>, RotationCombine<quake::RxOp>,
         RotationCombine<quake::RyOp>, RotationCombine<quake::RzOp>,
         RotationCombine<quake::PhasedRxOp>>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns))))
+    if (failed(applyPatternsGreedily(op, std::move(patterns))))
       signalPassFailure();
   }
 };

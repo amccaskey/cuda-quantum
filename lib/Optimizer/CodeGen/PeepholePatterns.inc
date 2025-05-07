@@ -69,7 +69,7 @@ struct CalleeConv : public OpRewritePattern<LLVM::CallOp> {
     if (!callee)
       return failure();
     if (!needsToBeRenamed(*callee) ||
-        callee->startswith(cudaq::opt::QIRMeasure))
+        callee->starts_with(cudaq::opt::QIRMeasure))
       return failure();
     auto *ctx = rewriter.getContext();
     auto symbol = FlatSymbolRefAttr::get(ctx, callee->str() + "__body");

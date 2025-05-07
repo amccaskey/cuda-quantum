@@ -37,7 +37,7 @@ static std::size_t getStateSize(Operation *op) {
     while (defOp && !dyn_cast<arith::ConstantIntOp>(defOp))
       defOp = defOp->getOperand(0).getDefiningOp();
     if (auto constOp = dyn_cast<arith::ConstantIntOp>(defOp))
-      return constOp.getValue().cast<IntegerAttr>().getInt();
+      return cast<IntegerAttr>(constOp.getValue()).getInt();
   }
   op->emitError("Cannot compute number of qubits from createStateOp");
   return 0;
@@ -129,8 +129,8 @@ public:
 
       LLVM_DEBUG(llvm::dbgs() << "Before deleting states: " << func << '\n');
 
-      if (failed(applyPatternsAndFoldGreedily(func.getOperation(),
-                                              std::move(patterns))))
+      if (failed(
+              applyPatternsGreedily(func.getOperation(), std::move(patterns))))
         signalPassFailure();
 
       // Remove unused states.

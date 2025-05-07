@@ -16,9 +16,9 @@
 #include "mlir/Support/LLVM.h"
 
 inline bool needsToBeRenamed(mlir::StringRef name) {
-  return name.startswith(cudaq::opt::QIRQISPrefix) &&
-         !name.endswith("__body") && !name.endswith("__adj") &&
-         !name.endswith("__ctl");
+  return name.starts_with(cudaq::opt::QIRQISPrefix) &&
+         !name.ends_with("__body") && !name.ends_with("__adj") &&
+         !name.ends_with("__ctl");
 }
 
 inline bool callToInvokeWithXCtrlOneTarget(mlir::StringRef callee,
@@ -26,7 +26,7 @@ inline bool callToInvokeWithXCtrlOneTarget(mlir::StringRef callee,
   if ((args.size() == 4) && (callee == cudaq::opt::NVQIRInvokeWithControlBits))
     if (auto addrOf = dyn_cast_or_null<mlir::LLVM::AddressOfOp>(
             args[1].getDefiningOp())) {
-      return addrOf.getGlobalName().startswith(
+      return addrOf.getGlobalName().starts_with(
           std::string(cudaq::opt::QIRQISPrefix) + "x__ctl");
     }
   return false;

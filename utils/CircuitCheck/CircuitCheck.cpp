@@ -11,11 +11,11 @@
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
-
 #include <iostream>
 
 using namespace llvm;
@@ -57,8 +57,8 @@ int main(int argc, char **argv) {
   cl::ParseCommandLineOptions(argc, argv);
 
   MLIRContext context;
-  context.loadDialect<cudaq::cc::CCDialect, quake::QuakeDialect,
-                      func::FuncDialect>();
+  context.loadDialect<arith::ArithDialect, cudaq::cc::CCDialect,
+                      quake::QuakeDialect, func::FuncDialect>();
 
   ParserConfig config(&context);
   auto checkMod = parseSourceFile<mlir::ModuleOp>(checkFilename, config);

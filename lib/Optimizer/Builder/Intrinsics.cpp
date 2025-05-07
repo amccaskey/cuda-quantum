@@ -200,7 +200,7 @@ static constexpr IntrinsicCode intrinsicTable[] = {
     %false = arith.constant false
     %to0 = cc.cast %dest : (!cc.ptr<i64>) -> !cc.ptr<i8>
     %from0 = cc.cast %src : (!cc.ptr<!cc.array<i64 x ?>>) -> !cc.ptr<i8>
-    call @llvm.memcpy.p0i8.p0i8.i64(%to0, %from0, %len, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
+    call @llvm.memcpy.p0.p0.i64(%to0, %from0, %len, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
     return
   }
 )#"},
@@ -250,11 +250,11 @@ static constexpr IntrinsicCode intrinsicTable[] = {
     %3 = call @malloc(%2) : (i64) -> !cc.ptr<i8>
     %10 = cc.cast %3 : (!cc.ptr<i8>) -> !cc.ptr<!cc.array<i8 x ?>>
     %false = arith.constant false
-    call @llvm.memcpy.p0i8.p0i8.i64(%3, %arg0, %arg1, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
+    call @llvm.memcpy.p0.p0.i64(%3, %arg0, %arg1, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
     %4 = cc.compute_ptr %arg2[0] : (!cc.ptr<!cc.struct<{!cc.ptr<i8>, i64}>>) -> !cc.ptr<!cc.ptr<i8>>
     %5 = cc.load %4 : !cc.ptr<!cc.ptr<i8>>
     %6 = cc.compute_ptr %10[%arg1] : (!cc.ptr<!cc.array<i8 x ?>>, i64) -> !cc.ptr<i8>
-    call @llvm.memcpy.p0i8.p0i8.i64(%6, %5, %1, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
+    call @llvm.memcpy.p0.p0.i64(%6, %5, %1, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
     %7 = cc.undef !cc.struct<{!cc.ptr<i8>, i64}>
     %8 = cc.insert_value %7[0], %3 : (!cc.struct<{!cc.ptr<i8>, i64}>, !cc.ptr<i8>) -> !cc.struct<{!cc.ptr<i8>, i64}>
     %9 = cc.insert_value %8[1], %2 : (!cc.struct<{!cc.ptr<i8>, i64}>, i64) -> !cc.struct<{!cc.ptr<i8>, i64}>
@@ -369,7 +369,7 @@ static constexpr IntrinsicCode intrinsicTable[] = {
     %size = arith.muli %arg1, %arg2 : i64
     %0 = call @malloc(%size) : (i64) -> !cc.ptr<i8>
     %false = arith.constant false
-    call @llvm.memcpy.p0i8.p0i8.i64(%0, %arg0, %size, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
+    call @llvm.memcpy.p0.p0.i64(%0, %arg0, %size, %false) : (!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
     return %0 : !cc.ptr<i8>
   }
 )#"},
@@ -438,10 +438,10 @@ static constexpr IntrinsicCode intrinsicTable[] = {
   func.func private @hybridLaunchKernel(!cc.ptr<i8>, !cc.ptr<i8>, !cc.ptr<i8>, i64, i64, !cc.ptr<i8>) -> !cc.struct<{!cc.ptr<i8>, i64}>
 )#"},
 
-    // llvm.memcpy.p0i8.p0i8.i64
-    {cudaq::llvmMemCopyIntrinsic, {}, R"#(
-  func.func private @llvm.memcpy.p0i8.p0i8.i64(!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ()
-)#"},
+    {cudaq::llvmMemCopyIntrinsic, // llvm.memcpy.p0.p0.i64
+     {},
+     R"#(
+  func.func private @llvm.memcpy.p0.p0.i64(!cc.ptr<i8>, !cc.ptr<i8>, i64, i1) -> ())#"},
 
     {cudaq::llvmMemSetIntrinsic, // llvm.memset.p0i8.i64
      {},

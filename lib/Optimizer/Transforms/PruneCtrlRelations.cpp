@@ -134,7 +134,7 @@ public:
     auto func = getOperation();
     RewritePatternSet patterns(ctx);
     patterns.insert<WRAPPER_GATE_OPS, ForwardControl>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(func.getOperation(),
+    if (failed(applyPatternsGreedily(func.getOperation(),
                                             std::move(patterns)))) {
       signalPassFailure();
     }

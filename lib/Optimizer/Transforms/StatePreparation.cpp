@@ -380,7 +380,7 @@ public:
     RewritePatternSet patterns(ctx);
     patterns.insert<StatePrepPattern>(ctx, phaseThreshold);
 
-    if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
       func.emitOpError("State preparation failed");
       signalPassFailure();
     }

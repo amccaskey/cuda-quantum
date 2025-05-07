@@ -100,9 +100,11 @@ Value factory::packIsArrayAndLengthArray(Location loc,
   // operand is a veq<N>, and 0 otherwise.
   auto i64Type = rewriter.getI64Type();
   auto context = rewriter.getContext();
-  Value isArrayAndLengthArr = createLLVMTemporary(
-      loc, rewriter, LLVM::LLVMPointerType::get(i64Type), numOperands);
-  auto intPtrTy = LLVM::LLVMPointerType::get(i64Type);
+  auto alignment = IntegerAttr::get(i64Type, 8);
+  auto ptrTy = LLVM::LLVMPointerType::get(context);
+  Value numOpnds = rewriter.create<arith::ConstantIntOp>(loc, numOperands, 64);
+  Value isArrayAndLengthArr = rewriter.create<LLVM::AllocaOp>(
+      loc, ptrTy, numOpnds, alignment, TypeAttr::get(i64Type));
   Value zero = rewriter.create<arith::ConstantIntOp>(loc, 0, 64);
   auto getSizeSymbolRef = opt::factory::createLLVMFunctionSymbol(
       opt::QIRArrayGetSize, i64Type, {opt::getArrayType(context)},
@@ -111,18 +113,18 @@ Value factory::packIsArrayAndLengthArray(Location loc,
     auto operand = iter.value();
     auto i = iter.index();
     Value idx = rewriter.create<arith::ConstantIntOp>(loc, i, 64);
-    Value ptr = rewriter.create<LLVM::GEPOp>(loc, intPtrTy, isArrayAndLengthArr,
-                                             ValueRange{idx});
+    Value ptr = rewriter.create<LLVM::GEPOp>(
+        loc, ptrTy, i64Type, isArrayAndLengthArr, ValueRange{idx});
     Value element;
-    if (operand.getType() == opt::getQubitType(context))
+    if (operand.getType() == opt::getQubitType(context)) {
       element = zero;
-    else
+    } else {
       // get array size with the runtime function
       element = rewriter
-                    .create<LLVM::CallOp>(loc, rewriter.getI64Type(),
-                                          getSizeSymbolRef, ValueRange{operand})
+                    .create<LLVM::CallOp>(loc, i64Type, getSizeSymbolRef,
+                                          ValueRange{operand})
                     .getResult();
-
+    }
     rewriter.create<LLVM::StoreOp>(loc, element, ptr);
   }
   return isArrayAndLengthArr;
@@ -194,7 +196,7 @@ void factory::createGlobalCtorCall(ModuleOp mod, FlatSymbolRefAttr ctor) {
   auto i32Ty = builder.getI32Type();
   constexpr int prio = 17;
   auto prioAttr = ArrayAttr::get(ctx, {IntegerAttr::get(i32Ty, prio)});
-  builder.create<LLVM::GlobalCtorsOp>(loc, ctorAttr, prioAttr);
+  builder.create<LLVM::GlobalCtorsOp>(loc, ctorAttr, prioAttr, ArrayAttr{});
 }
 
 cc::LoopOp factory::createInvariantLoop(
@@ -481,7 +483,7 @@ static bool shouldExpand(SmallVectorImpl<Type> &packedTys,
     } else if (theSet.size() == 1) {
       packedTys[packIdx] = theSet[0];
     } else {
-      assert(theSet[0] == FloatType::getF32(ctx) && "must be float");
+      assert(theSet[0] == Float32Type::get(ctx) && "must be float");
       packedTys[packIdx] =
           VectorType::get(ArrayRef<std::int64_t>{2}, theSet[0]);
     }

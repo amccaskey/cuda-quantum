@@ -370,7 +370,8 @@ def quake_VeqSizeOp : QuakeOp<"veq_size", [Pure]> {
 //===----------------------------------------------------------------------===//
 
 def quake_ApplyOp : QuakeOp<"apply",
-    [AttrSizedOperandSegments, CallOpInterface]> {
+    [AttrSizedOperandSegments, CallOpInterface,
+     DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let summary = "Abstract application of a function in Quake.";
   let description = [{
     User-defined kernels define both predicated and unpredicated functions.
@@ -385,7 +386,9 @@ def quake_ApplyOp : QuakeOp<"apply",
     Variadic<cc_CallableType>:$indirect_callee, // must be 0 or 1 element
     UnitAttr:$is_adj,
     Variadic<AnyQType>:$controls,
-    Variadic<AnyType>:$args
+    Variadic<AnyType>:$args,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs Variadic<AnyType>);
 
@@ -397,7 +400,7 @@ def quake_ApplyOp : QuakeOp<"apply",
                    "mlir::ValueRange":$controls,
                    "mlir::ValueRange":$args), [{
       return build($_builder, $_state, retTy, callee, mlir::ValueRange{},
-                   is_adj, controls, args);
+                   is_adj, controls, args, {}, {});
     }]>,
     OpBuilder<(ins "mlir::TypeRange":$retTy,
                    "mlir::SymbolRefAttr":$callee,
@@ -405,7 +408,7 @@ def quake_ApplyOp : QuakeOp<"apply",
                    "mlir::ValueRange":$controls,
                    "mlir::ValueRange":$args), [{
       return build($_builder, $_state, retTy, callee, mlir::ValueRange{},
-                   is_adj, controls, args);
+                   is_adj, controls, args, {}, {});
     }]>,
     OpBuilder<(ins "mlir::TypeRange":$retTy,
                    "mlir::Value":$callable,
@@ -413,7 +416,7 @@ def quake_ApplyOp : QuakeOp<"apply",
                    "mlir::ValueRange":$controls,
                    "mlir::ValueRange":$args), [{
       return build($_builder, $_state, retTy, mlir::SymbolRefAttr{},
-                   mlir::ValueRange{callable}, is_adj, controls, args);
+                   mlir::ValueRange{callable}, is_adj, controls, args, {}, {});
     }]>,
     OpBuilder<(ins "mlir::TypeRange":$retTy,
                    "mlir::Value":$callable,
@@ -421,7 +424,7 @@ def quake_ApplyOp : QuakeOp<"apply",
                    "mlir::ValueRange":$controls,
                    "mlir::ValueRange":$args), [{
       return build($_builder, $_state, retTy, mlir::SymbolRefAttr{},
-                   mlir::ValueRange{callable}, is_adj, controls, args);
+                   mlir::ValueRange{callable}, is_adj, controls, args, {}, {});
     }]>
   ];
 
@@ -437,6 +440,14 @@ def quake_ApplyOp : QuakeOp<"apply",
       return {getArgs().begin(), getArgs().end()};
     }
 
+    mlir::MutableOperandRange getArgOperandsMutable() {
+      auto range0 = getODSOperandIndexAndLength(0);
+      auto range2 = getODSOperandIndexAndLength(2);
+      auto mutableRange = ::mlir::MutableOperandRange(getOperation(),
+        range0.first, range2.second);
+      return mutableRange;
+    }
+
     bool applyToVariant() {
       return getIsAdj() || !getControls().empty();
     }
@@ -444,6 +455,12 @@ def quake_ApplyOp : QuakeOp<"apply",
     /// Return the callee of this operation.
     mlir::CallInterfaceCallable getCallableForCallee() {
       return (*this)->getAttrOfType<mlir::SymbolRefAttr>(getCalleeAttrName());
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
+      (*this)->setAttr(getCalleeAttrName(),
+                       llvm::cast<mlir::SymbolRefAttr>(callee));
     }
   }];
 }
@@ -583,6 +600,12 @@ def quake_WrapOp : QuakeOp<"wrap"> {
   }];
 
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    // RefValue may be a nullptr in the degenerate case.
+    // TODO: make ref_value an optional operand.
+    mlir::Value getUncheckedRefValue() { return getOperand(1); }
+  }];
 }
 
 //===----------------------------------------------------------------------===//

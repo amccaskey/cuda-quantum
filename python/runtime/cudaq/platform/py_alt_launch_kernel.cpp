@@ -190,18 +190,31 @@ ExecutionEngine *jitKernel(const std::string &name, MlirModule module,
     opts.enableGDBNotificationListener = false;
     opts.enablePerfNotificationListener = false;
     opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
-    opts.jitCodeGenOptLevel = llvm::CodeGenOpt::None;
+    opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::None;
     SmallVector<StringRef, 4> sharedLibs;
     opts.llvmModuleBuilder =
         [](Operation *module,
            llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
-      llvmContext.setOpaquePointers(false);
       auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
       if (!llvmModule) {
         llvm::errs() << "Failed to emit LLVM IR\n";
         return nullptr;
       }
-      ExecutionEngine::setupTargetTriple(llvmModule.get());
+      // Create target machine and configure the LLVM Module
+      auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
+      if (!tmBuilderOrError) {
+        llvm::errs() << "Could not create JITTargetMachineBuilder\n";
+        return {};
+      }
+
+      auto tmOrError = tmBuilderOrError->createTargetMachine();
+      if (!tmOrError) {
+        llvm::errs() << "Could not create TargetMachine\n";
+        return {};
+      }
+
+      ExecutionEngine::setupTargetTripleAndDataLayout(llvmModule.get(),
+                                                      tmOrError.get().get());
       return llvmModule;
     };
 
@@ -848,7 +861,6 @@ std::string getQIR(const std::string &name, MlirModule module,
   std::free(rawArgs);
 
   llvm::LLVMContext llvmContext;
-  llvmContext.setOpaquePointers(false);
   auto llvmModule = translateModuleToLLVMIR(cloned, llvmContext);
   auto optPipeline = cudaq::makeOptimizingTransformer(
       /*optLevel=*/3, /*sizeLevel=*/0,

@@ -199,9 +199,9 @@ static LogicalResult emitOperation(nlohmann::json &json,
       .Case<arith::ConstantOp>([](auto) { return success(); })
       .Default([&](Operation *) -> LogicalResult {
         // Allow LLVM and cc dialect ops (for storing measure results).
-        if (op.getName().getDialectNamespace().equals("llvm") ||
-            op.getName().getDialectNamespace().equals("cc") ||
-            op.getName().getDialectNamespace().equals("arith"))
+        if (op.getName().getDialectNamespace() == "llvm" ||
+            op.getName().getDialectNamespace() == "cc" ||
+            op.getName().getDialectNamespace() == "arith")
           return success();
         return op.emitOpError() << "unable to translate op to IQM Json "
                                 << op.getName().getIdentifier().str();

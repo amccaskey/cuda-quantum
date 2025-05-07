@@ -315,7 +315,7 @@ public:
                                                             counter);
     LLVM_DEBUG(llvm::dbgs() << "Before globalizing array values:\n"
                             << module << '\n');
-    if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(module, std::move(patterns))))
       signalPassFailure();
       return;
     }

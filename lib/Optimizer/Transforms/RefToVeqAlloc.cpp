@@ -49,7 +49,7 @@ public:
     auto *ctx = &getContext();
     RewritePatternSet patterns(ctx);
     patterns.insert<AllocaPat>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       op->emitOpError("could not promote allocations");
       signalPassFailure();
     }

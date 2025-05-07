@@ -15,6 +15,7 @@
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/Mangle.h"
+#include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Analysis/CallGraph.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendAction.h"
@@ -777,7 +778,7 @@ inline bool isInNamespace(const clang::Decl *x, mlir::StringRef nsName) {
   do {
     if (const auto *nsd = dyn_cast<clang::NamespaceDecl>(declCtx))
       if (const auto *nsi = nsd->getIdentifier())
-        if (nsi->getName().equals(nsName))
+        if (nsi->getName() == nsName)
           return true;
     declCtx = declCtx->getParent();
   } while (declCtx);
@@ -792,7 +793,7 @@ inline bool isInClassInNamespace(const clang::Decl *x,
   assert(x && "decl is null");
   if (const auto *cld = dyn_cast<clang::RecordDecl>(x->getDeclContext()))
     if (const auto *cli = cld->getIdentifier())
-      return cli->getName().equals(className) && isInNamespace(cld, nsName);
+      return cli->getName() == className && isInNamespace(cld, nsName);
   return false;
 }
 

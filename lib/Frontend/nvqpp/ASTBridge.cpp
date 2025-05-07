@@ -326,7 +326,7 @@ public:
     if (isTupleReverseVar(x)) {
       auto loc = x->getLocation();
       auto opt = x->getAnyInitializer()->getIntegerConstantExpr(
-          x->getASTContext(), &loc, false);
+          x->getASTContext(), &loc);
       if (opt) {
         LLVM_DEBUG(llvm::dbgs() << "tuples are reversed: " << *opt << '\n');
         tuplesAreReversed = !opt->isZero();
@@ -359,8 +359,8 @@ public:
           if (auto *id = decl->getIdentifier()) {
             auto name = id->getName();
             if (name == "qubit" || name == "qudit" || name == "qspan" ||
-                name.startswith("qreg") || name.startswith("qvector") ||
-                name.startswith("qarray") || name.startswith("qview"))
+                name.starts_with("qreg") || name.starts_with("qvector") ||
+                name.starts_with("qarray") || name.starts_with("qview"))
               cudaq::details::reportClangError(
                   x, mangler,
                   "may not use quantum types in non-kernel functions");
@@ -710,7 +710,8 @@ std::string getCxxMangledTypeName(clang::QualType ty,
                                   clang::ItaniumMangleContext *mangler) {
   std::string s;
   llvm::raw_string_ostream os(s);
-  mangler->mangleTypeName(ty, os);
+  // TODO: what is the correct value of normalizeIntegers?
+  mangler->mangleCXXRTTIName(ty, os, /*normalizeIntegers=*/false);
   os.flush();
   LLVM_DEBUG(llvm::dbgs() << "type name mangled as '" << s << "'\n");
   return s;

@@ -760,13 +760,13 @@ protected:
   std::string getOpName() override {
     if (isa<arith::ConstantOp>(associated)) {
       if (auto cstf = dyn_cast<arith::ConstantFloatOp>(associated)) {
-        auto value = cstf.getValue().cast<FloatAttr>().getValueAsDouble();
+        auto value = cast<FloatAttr>(cstf.getValue()).getValueAsDouble();
         return std::to_string(value);
       } else if (auto cstidx = dyn_cast<arith::ConstantIndexOp>(associated)) {
-        auto value = cstidx.getValue().cast<IntegerAttr>().getInt();
+        auto value = cast<IntegerAttr>(cstidx.getValue()).getInt();
         return std::to_string(value);
       } else if (auto cstint = dyn_cast<arith::ConstantIntOp>(associated)) {
-        auto value = cstint.getValue().cast<IntegerAttr>().getInt();
+        auto value = cast<IntegerAttr>(cstint.getValue()).getInt();
         return std::to_string(value);
       }
     }
@@ -3137,7 +3137,7 @@ public:
     // and thus should have a memoized dnode for defOp, fail if not
     assert(defOp->hasAttr("dnodeid") && "No dnodeid found for operation");
 
-    auto id = defOp->getAttr("dnodeid").cast<IntegerAttr>().getUInt();
+    auto id = cast<IntegerAttr>(defOp->getAttr("dnodeid")).getUInt();
     auto dnode = perOp[id];
 
     if (!ifStack.empty() && defOp->getParentOp() != ifStack.back() &&

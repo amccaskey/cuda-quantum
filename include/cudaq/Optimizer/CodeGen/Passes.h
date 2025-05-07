@@ -13,6 +13,7 @@
 /// particular quantum target representation. There is a bevy of such targets
 /// that provide platforms on which the quantum code can be run.
 
+#include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
@@ -60,6 +61,8 @@ void registerTargetPipelines();
 void registerCodeGenDialect(mlir::DialectRegistry &registry);
 
 mlir::LLVM::LLVMStructType lambdaAsPairOfPointers(mlir::MLIRContext *context);
+mlir::LLVM::LLVMFunctionType
+getQISFunctionType(mlir::MLIRContext *ctx, llvm::ArrayRef<mlir::Type> argTys);
 
 /// The pipeline for lowering Quake code to the QIR API. There will be three
 /// distinct flavors of QIR that can be generated with this pipeline. These

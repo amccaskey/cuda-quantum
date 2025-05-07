@@ -554,7 +554,7 @@ struct ForwardRelaxedSizePattern : public OpRewritePattern<quake::RelaxSizeOp> {
                                 PatternRewriter &rewriter) const override {
     auto inpVec = relax.getInputVec();
     bool replaced = false;
-    rewriter.replaceOpWithIf(relax, inpVec, [&](OpOperand &use) {
+    rewriter.replaceUsesWithIf(relax, inpVec, [&](OpOperand &use) {
       bool res = false;
       if (Operation *user = use.getOwner())
         res = isQuakeOperation(user) && !isa<quake::ApplyOp>(user);

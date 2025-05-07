@@ -187,7 +187,6 @@ struct AllocaOpToCallsRewrite : public OpConversionPattern<quake::AllocaOp> {
     }
 
     // Create a QIR call to allocate the qubits.
-    StringRef qirQubitArrayAllocate = cudaq::opt::QIRArrayQubitAllocateArray;
     Type arrayQubitTy = M::getArrayType(rewriter.getContext());
 
     // AllocaOp could have a size operand, or the size could be compile time
@@ -195,7 +194,7 @@ struct AllocaOpToCallsRewrite : public OpConversionPattern<quake::AllocaOp> {
     Value sizeOperand;
     auto loc = alloc.getLoc();
     if (adaptor.getOperands().empty()) {
-      auto type = alloc.getType().cast<quake::VeqType>();
+      auto type = cast<quake::VeqType>(alloc.getType());
       if (!type.hasSpecifiedSize())
         return failure();
       auto constantSize = type.getSize();
@@ -214,9 +213,9 @@ struct AllocaOpToCallsRewrite : public OpConversionPattern<quake::AllocaOp> {
     }
 
     // Replace the AllocaOp with the QIR call.
-    rewriter.replaceOpWithNewOp<func::CallOp>(alloc, TypeRange{arrayQubitTy},
-                                              qirQubitArrayAllocate,
-                                              ValueRange{sizeOperand});
+    rewriter.replaceOpWithNewOp<func::CallOp>(
+        alloc, TypeRange{arrayQubitTy}, cudaq::opt::QIRArrayQubitAllocateArray,
+        ValueRange{sizeOperand});
     return success();
   }
 };
@@ -1527,7 +1526,7 @@ struct FuncSignaturePattern : public OpConversionPattern<func::FuncOp> {
         blockArg.setType(newTy);
     }
     // Replace the signature.
-    rewriter.updateRootInPlace(func, [&]() {
+    rewriter.modifyOpInPlace(func, [&]() {
       func.setFunctionType(newFuncTy);
       func->setAttr(FuncIsQIRAPI, rewriter.getUnitAttr());
     });
@@ -1555,8 +1554,8 @@ struct CreateLambdaPattern
         blockArg.setType(argTy);
     }
     // Replace the signature.
-    rewriter.updateRootInPlace(op,
-                               [&]() { op.getSignature().setType(newSigTy); });
+    rewriter.modifyOpInPlace(op,
+                             [&]() { op.getSignature().setType(newSigTy); });
     return success();
   }
 };
@@ -1728,11 +1727,7 @@ static void commonQuakeHandlingPatterns(RewritePatternSet &patterns,
 
 template <bool opaquePtr>
 Type GetLLVMPointerType(MLIRContext *ctx) {
-  if constexpr (opaquePtr) {
-    return LLVM::LLVMPointerType::get(ctx);
-  } else {
-    return LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
-  }
+  return LLVM::LLVMPointerType::get(ctx);
 }
 
 /// The modifier class for the "full QIR" API.
@@ -2047,7 +2042,7 @@ struct QuakeToQIRAPIPrepPass
       RewritePatternSet patterns(ctx);
       QIRAPITypeConverter typeConverter(opaquePtr);
       cudaq::opt::populateQuakeToCCPrepPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns)))) {
+      if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
         signalPassFailure();
         return;
       }
@@ -2216,7 +2211,7 @@ struct QuakeToQIRAPIFinalPass
     RewritePatternSet patterns(ctx);
     patterns.insert<MaterializeConstantArrayOpRewrite,
                     AnnotateKernelsWithMeasurementStringsPattern>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns))))
+    if (failed(applyPatternsGreedily(module, std::move(patterns))))
       signalPassFailure();
   }
 };

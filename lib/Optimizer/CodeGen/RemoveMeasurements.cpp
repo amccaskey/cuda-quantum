@@ -32,8 +32,8 @@ public:
   LogicalResult matchAndRewrite(LLVM::CallOp call,
                                 PatternRewriter &rewriter) const override {
     if (auto callee = call.getCallee()) {
-      if (callee->equals(cudaq::opt::QIRMeasureBody) ||
-          callee->equals(cudaq::opt::QIRRecordOutput)) {
+      if (*callee == cudaq::opt::QIRMeasureBody ||
+          *callee == cudaq::opt::QIRRecordOutput) {
         rewriter.eraseOp(call);
         return success();
       }
@@ -57,7 +57,7 @@ struct RemoveMeasurementsPass
     RewritePatternSet patterns(context);
     patterns.insert<EraseMeasurements>(context);
     LLVM_DEBUG(llvm::dbgs() << "Before measurement erasure:\n" << *op);
-    if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns))))
+    if (failed(applyPatternsGreedily(op, std::move(patterns))))
       signalPassFailure();
     LLVM_DEBUG(llvm::dbgs() << "After measurement erasure:\n" << *op);
   }

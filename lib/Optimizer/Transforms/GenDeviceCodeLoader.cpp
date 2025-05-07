@@ -89,7 +89,7 @@ public:
       auto funcOp = dyn_cast<func::FuncOp>(op);
       if (!funcOp)
         continue;
-      if (!funcOp.getName().startswith(cudaq::runtime::cudaqGenPrefixName))
+      if (!funcOp.getName().starts_with(cudaq::runtime::cudaqGenPrefixName))
         continue;
       if (funcOp->hasAttr(cudaq::generatorAnnotation) || funcOp.empty())
         continue;
@@ -163,7 +163,7 @@ public:
           LLVM::LLVMFunctionType::get(cudaq::opt::factory::getVoidType(ctx),
                                       {}));
       auto insPt = builder.saveInsertionPoint();
-      auto *initFunEntry = initFun.addEntryBlock();
+      auto *initFunEntry = initFun.addEntryBlock(builder);
       builder.setInsertionPointToStart(initFunEntry);
       auto devRef = builder.create<LLVM::AddressOfOp>(
           loc, cudaq::opt::factory::getPointerType(devName.getType()),

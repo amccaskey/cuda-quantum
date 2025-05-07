@@ -113,7 +113,7 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 if(NOT LLVM_VERSION_MAJOR)
-  set(LLVM_VERSION_MAJOR 16)
+  set(LLVM_VERSION_MAJOR 21)
 endif()
 
 find_package(Git QUIET)
@@ -262,7 +262,11 @@ endif()
 # using `LLVM_VERSION_MAJOR`, e.g. "-LLVM_VERSION_MAJOR=16".  Note that this
 # version variable is set to the latest LLVM version by default, and setting it
 # to an older version might break the project.
-find_package(LLVM ${LLVM_VERSION_MAJOR} CONFIG QUIET)
+if(NOT MLIR_DIR)
+  set(MLIR_DIR ${LLVM_BINARY_DIR}/lib/cmake/mlir)
+endif()
+
+find_package(MLIR REQUIRED CONFIG)
 
 if(NOT LLVM_DIR)
   message(STATUS "LLVM_DIR not found, will try with llvm-config executable.")
@@ -328,11 +332,7 @@ if(NOT LLVM_DIR)
   endif()
 endif()
 
-if(NOT MLIR_DIR)
-  set(MLIR_DIR ${LLVM_BINARY_DIR}/lib/cmake/mlir)
-endif()
-
-find_package(MLIR REQUIRED CONFIG)
+find_package(LLVM ${LLVM_VERSION_MAJOR} CONFIG QUIET)
 
 if(NOT Clang_DIR)
   set(Clang_DIR ${LLVM_BINARY_DIR}/lib/cmake/clang)
@@ -445,25 +445,12 @@ endif()
 
 # Third-party libraries (tpls)
 # ==============================================================================
-set(FMT_INSTALL ON)
-cmake_policy(PUSH)
-# CMP0146: The FindCUDA module is removed.
-# CMake 3.27 and above no longer provide the modules.
-# https://cmake.org/cmake/help/latest/policy/CMP0146.html
-if(POLICY CMP0146)
-  cmake_policy(SET CMP0146 OLD)
-endif()
 add_subdirectory(tpls/fmt)
-cmake_policy(POP)
+
 include_directories(SYSTEM tpls/json/include)
 
-# Add spdlog 
-set(SPDLOG_BUILD_SHARED OFF)
-set(SPDLOG_FMT_EXTERNAL ON)
-set(SPDLOG_BUILD_PIC ON)
-set(SPDLOG_SYSTEM_INCLUDES ON)
 add_subdirectory(tpls/spdlog)
-target_compile_options(spdlog PRIVATE -Wno-covered-switch-default)
+find_package(spdlog REQUIRED)
 
 if (OPENSSL_FOUND AND CUDAQ_ENABLE_REST)
   # Look for CURL
@@ -593,6 +580,11 @@ if (CUDAQ_ENABLE_PYTHON)
   # Python bindings generated as part of the CUDA-Q build and bindings generated for 
   # third party CUDA-Q libraries; see also https://github.com/pybind/pybind11/issues/1262
   add_subdirectory(tpls/pybind11)
+
+  execute_process(COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
+  find_package(nanobind CONFIG REQUIRED)
+
   add_subdirectory(python)
 endif()
 

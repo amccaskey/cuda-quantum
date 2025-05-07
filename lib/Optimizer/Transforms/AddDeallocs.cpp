@@ -144,7 +144,7 @@ template <typename RET, typename OP>
 LogicalResult addDeallocations(OP wrapper, PatternRewriter &rewriter,
                                const DeallocationAnalysisInfo &infoMap,
                                const DominanceInfo &domInfo) {
-  rewriter.startRootUpdate(wrapper);
+  rewriter.startOpModification(wrapper);
   llvm::DenseSet<Operation *> allocs;
   for (auto &[op, done] : infoMap.allocMap)
     if ((op->getParentOp() == wrapper.getOperation()) && !done)
@@ -199,7 +199,7 @@ LogicalResult addDeallocations(OP wrapper, PatternRewriter &rewriter,
   generateDeallocsForSet(rewriter, allocs);
   rewriter.create<RET>(wrapper.getLoc(), exitBlock->getArguments());
 
-  rewriter.finalizeRootUpdate(wrapper);
+  rewriter.finalizeOpModification(wrapper);
   LLVM_DEBUG(llvm::dbgs() << "updated " << wrapper.getOperation() << '\n');
   return success();
 }

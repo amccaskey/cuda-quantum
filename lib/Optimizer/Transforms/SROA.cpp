@@ -196,7 +196,7 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "Before SROA:\n" << *op << '\n');
     RewritePatternSet patterns(ctx);
     patterns.insert<AllocaAggregate, StoreAggregate>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(op, std::move(patterns))))
       signalPassFailure();
       return;
     }

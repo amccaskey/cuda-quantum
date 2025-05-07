@@ -43,7 +43,7 @@ inline Value createDivF(Location loc, Value numerator, double denominator,
 /// @brief Returns true if \p op contains any `ControlType` operands.
 inline bool containsControlTypes(quake::OperatorInterface op) {
   return llvm::any_of(op.getControls(), [](const Value &v) {
-    return v.getType().isa<quake::ControlType>();
+    return isa<quake::ControlType>(v.getType());
   });
 }
 
@@ -60,7 +60,7 @@ public:
   /// builder for cases when you have one input ValueRange.
   SmallVector<Type> getResultType(ValueRange operands) {
     std::size_t numOutputWires = llvm::count_if(operands, [](const Value &v) {
-      return v.getType().isa<quake::WireType>();
+      return isa<quake::WireType>(v.getType());
     });
 
     return SmallVector<Type>(numOutputWires,
@@ -73,9 +73,9 @@ public:
     std::size_t numOutputWires =
         llvm::count_if(
             operands1,
-            [](const Value &v) { return v.getType().isa<quake::WireType>(); }) +
+            [](const Value &v) { return isa<quake::WireType>(v.getType()); }) +
         llvm::count_if(operands2, [](const Value &v) {
-          return v.getType().isa<quake::WireType>();
+          return isa<quake::WireType>(v.getType());
         });
 
     return SmallVector<Type>(numOutputWires,
@@ -87,7 +87,7 @@ public:
   void selectWiresAndReplaceUses(Operation *op, ValueRange newValues) {
     SmallVector<Value, 4> newWireValues;
     for (const auto &v : newValues)
-      if (v.getType().isa<quake::WireType>())
+      if (isa<quake::WireType>(v.getType()))
         newWireValues.push_back(v);
     assert(op->getResults().size() == newWireValues.size() &&
            "incorrect number of output wires provided");
@@ -100,9 +100,9 @@ public:
                                  Value target) {
     SmallVector<Value, 4> newWireValues;
     for (const auto &v : controls)
-      if (v.getType().isa<quake::WireType>())
+      if (isa<quake::WireType>(v.getType()))
         newWireValues.push_back(v);
-    if (target.getType().isa<quake::WireType>())
+    if (isa<quake::WireType>(target.getType()))
       newWireValues.push_back(target);
     assert(op->getResults().size() == newWireValues.size() &&
            "incorrect number of output wires provided");
@@ -118,7 +118,7 @@ public:
     auto resultWires = op.getWires();
     auto resultIt = resultWires.begin();
     auto resultWiresEnd = resultWires.end();
-    if (target.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+    if (isa<quake::WireType>(target.getType()) && resultIt != resultWiresEnd)
       target = *resultIt;
     return op;
   }
@@ -132,7 +132,7 @@ public:
     auto resultWires = op.getWires();
     auto resultIt = resultWires.begin();
     auto resultWiresEnd = resultWires.end();
-    if (target.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+    if (isa<quake::WireType>(target.getType()) && resultIt != resultWiresEnd)
       target = *resultIt;
     return op;
   }
@@ -146,9 +146,9 @@ public:
     auto resultWires = op.getWires();
     auto resultIt = resultWires.begin();
     auto resultWiresEnd = resultWires.end();
-    if (control.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+    if (isa<quake::WireType>(control.getType()) && resultIt != resultWiresEnd)
       control = *resultIt++;
-    if (target.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+    if (isa<quake::WireType>(target.getType()) && resultIt != resultWiresEnd)
       target = *resultIt;
     return op;
   }
@@ -164,9 +164,9 @@ public:
     auto resultIt = resultWires.begin();
     auto resultWiresEnd = resultWires.end();
     for (auto &c : controls)
-      if (c.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+      if (isa<quake::WireType>(c.getType()) && resultIt != resultWiresEnd)
         c = *resultIt++;
-    if (target.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+    if (isa<quake::WireType>(target.getType()) && resultIt != resultWiresEnd)
       target = *resultIt;
     return op;
   }
@@ -182,9 +182,9 @@ public:
     auto resultIt = resultWires.begin();
     auto resultWiresEnd = resultWires.end();
     for (auto &c : controls)
-      if (c.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+      if (isa<quake::WireType>(c.getType()) && resultIt != resultWiresEnd)
         c = *resultIt++;
-    if (target.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+    if (isa<quake::WireType>(target.getType()) && resultIt != resultWiresEnd)
       target = *resultIt;
     return op;
   }
@@ -200,9 +200,9 @@ public:
     auto resultIt = resultWires.begin();
     auto resultWiresEnd = resultWires.end();
     for (auto &c : controls)
-      if (c.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+      if (isa<quake::WireType>(c.getType()) && resultIt != resultWiresEnd)
         c = *resultIt++;
-    if (target.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+    if (isa<quake::WireType>(target.getType()) && resultIt != resultWiresEnd)
       target = *resultIt;
     return op;
   }
@@ -217,7 +217,7 @@ public:
     auto resultIt = resultWires.begin();
     auto resultWiresEnd = resultWires.end();
     for (auto &t : targets)
-      if (t.getType().isa<quake::WireType>() && resultIt != resultWiresEnd)
+      if (isa<quake::WireType>(t.getType()) && resultIt != resultWiresEnd)
         t = *resultIt++;
     return op;
   }

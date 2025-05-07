@@ -181,7 +181,7 @@ public:
     auto argsCreatorFunc = builder.create<func::FuncOp>(
         loc, classNameStr + ".argsCreator", funcType);
     OpBuilder::InsertionGuard guard(builder);
-    auto *entry = argsCreatorFunc.addEntryBlock();
+    auto *entry = argsCreatorFunc.addEntryBlock(builder);
     builder.setInsertionPointToStart(entry);
 
     // Convert all the arguments passed in the array of void* to appear as if
@@ -283,7 +283,7 @@ public:
     auto thunk =
         builder.create<func::FuncOp>(loc, classNameStr + ".thunk", thunkTy);
     OpBuilder::InsertionGuard guard(builder);
-    auto *thunkEntry = thunk.addEntryBlock();
+    auto *thunkEntry = thunk.addEntryBlock(builder);
     builder.setInsertionPointToStart(thunkEntry);
     auto castOp = builder.create<cudaq::cc::CastOp>(loc, structPtrTy,
                                                     thunkEntry->getArgument(0));
@@ -405,7 +405,7 @@ public:
     auto structPtrTy = cudaq::cc::PointerType::get(structTy);
     const std::int32_t offset = devFuncTy.getNumInputs();
 
-    Block *hostFuncEntryBlock = hostFunc.addEntryBlock();
+    Block *hostFuncEntryBlock = hostFunc.addEntryBlock(builder);
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToStart(hostFuncEntryBlock);
 
@@ -720,7 +720,7 @@ public:
         loc, classNameStr + ".kernelRegFunc",
         LLVM::LLVMFunctionType::get(cudaq::opt::factory::getVoidType(ctx), {}));
     OpBuilder::InsertionGuard guard(builder);
-    auto *initFunEntry = initFun.addEntryBlock();
+    auto *initFunEntry = initFun.addEntryBlock(builder);
     builder.setInsertionPointToStart(initFunEntry);
     auto kernRef = builder.create<LLVM::AddressOfOp>(
         loc, cudaq::opt::factory::getPointerType(kernelNameObj.getType()),
@@ -868,7 +868,7 @@ public:
     SmallVector<func::FuncOp> workList;
     for (auto &op : *module.getBody())
       if (auto funcOp = dyn_cast<func::FuncOp>(op))
-        if (funcOp.getName().startswith(cudaq::runtime::cudaqGenPrefixName) &&
+        if (funcOp.getName().starts_with(cudaq::runtime::cudaqGenPrefixName) &&
             cudaq::opt::marshal::hasLegalType(funcOp.getFunctionType()))
           workList.push_back(funcOp);
 

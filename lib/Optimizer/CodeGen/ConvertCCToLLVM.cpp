@@ -41,6 +41,11 @@ LLVM::LLVMStructType cudaq::opt::lambdaAsPairOfPointers(MLIRContext *context) {
   return LLVM::LLVMStructType::getLiteral(context, pairOfPointers);
 }
 
+LLVM::LLVMFunctionType cudaq::opt::getQISFunctionType(MLIRContext *ctx,
+                                                      ArrayRef<Type> argTys) {
+  return LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTys);
+}
+
 void cudaq::opt::populateCCTypeConversions(LLVMTypeConverter *converter) {
   converter->addConversion([](cc::IndirectCallableType type) {
     return IntegerType::get(type.getContext(), 64);

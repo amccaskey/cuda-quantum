@@ -98,8 +98,19 @@ invokeWrappedKernel(std::string_view irString, const std::string &entryPointFn,
 
   if (mangledKernelNames.first.empty() || mangledKernelNames.second.empty())
     throw std::runtime_error("Failed to locate symbols from the IR");
-
-  mlir::ExecutionEngine::setupTargetTriple(llvmModule.get());
+  // Create target machine and configure the LLVM Module
+  auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
+  if (!tmBuilderOrError) {
+    llvm::errs() << "Could not create JITTargetMachineBuilder\n";
+    return;
+  }
+  auto tmOrError = tmBuilderOrError->createTargetMachine();
+  if (!tmOrError) {
+    llvm::errs() << "Could not create TargetMachine\n";
+    return;
+  }
+  mlir::ExecutionEngine::setupTargetTripleAndDataLayout(llvmModule.get(),
+                                                        tmOrError.get().get());
   auto dataLayout = llvmModule->getDataLayout();
 
   // Create the object layer

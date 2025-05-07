@@ -54,7 +54,7 @@ static LogicalResult fuseSubgraphPatterns(MLIRContext *ctx, ModuleOp module) {
   RewritePatternSet patterns(ctx);
   cudaq::codegen::populateQuakeToCodegenPatterns(patterns);
   LLVM_DEBUG(llvm::dbgs() << "Before codegen dialect:\n"; module.dump());
-  if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns))))
+  if (failed(applyPatternsGreedily(module, std::move(patterns))))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << "After codegen dialect:\n"; module.dump());
   return success();

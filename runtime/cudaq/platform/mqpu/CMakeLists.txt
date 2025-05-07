@@ -32,7 +32,7 @@ target_link_libraries(${LIBRARY_NAME}
     mqpu_util
     CUDAQTargetConfigUtil
     pthread
-    spdlog::spdlog 
+    spdlog::spdlog
     fmt::fmt-header-only 
 )
 

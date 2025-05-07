@@ -42,8 +42,7 @@ class CCOp<string mnemonic, list<Trait> traits = []> :
 def cc_ScopeOp : CCOp<"scope",
         [AutomaticAllocationScope, RecursiveMemoryEffects, NoRegionArguments,
          DeclareOpInterfaceMethods<RegionBranchOpInterface,
-                                   ["getNumRegionInvocations",
-                                    "getRegionInvocationBounds"]>]> {
+           ["getNumRegionInvocations", "getRegionInvocationBounds"]>]> {
   let summary = "A compound statement in which allocations are scoped.";
   let description = [{
     A ScopeOp is used to delineate the scope of local allocations, such as
@@ -307,11 +306,15 @@ def cc_LoopOp : CCOp<"loop",
       return getWhileBlock()->getArguments();
     }
 
+    std::size_t getNumWhileArguments() { return getWhileArguments().size(); }
     mlir::Block *getDoEntryBlock() { return &getBodyRegion().front(); }
     mlir::Block::BlockArgListType getDoEntryArguments() {
       return getDoEntryBlock()->getArguments();
     }
 
+    std::size_t getNumDoEntryArguments() {
+      return getDoEntryArguments().size();
+    }
     bool hasStep() { return !getStepRegion().empty(); }
     mlir::Block *getStepBlock() {
       // The step region is expected to have 0 or 1 block.
@@ -322,6 +325,7 @@ def cc_LoopOp : CCOp<"loop",
         return getStepBlock()->getArguments();
       return {};
     }
+    std::size_t getNumStepArguments() { return getStepArguments().size(); }
 
     bool hasPythonElse() { return !getElseRegion().empty(); }
     mlir::Block *getElseEntryBlock() {
@@ -331,9 +335,11 @@ def cc_LoopOp : CCOp<"loop",
       return hasPythonElse() ? getElseEntryBlock()->getArguments() :
         mlir::Block::BlockArgListType{};
     }
+    std::size_t getNumElseEntryArguments() {
+      return getElseEntryArguments().size();
+    }
 
-    mlir::OperandRange
-    getSuccessorEntryOperands(std::optional<unsigned> index);
+    mlir::OperandRange getEntrySuccessorOperands(mlir::RegionBranchPoint point);
 
     bool hasBreakInBody();
   }];
@@ -345,8 +351,8 @@ def cc_LoopOp : CCOp<"loop",
 
 def cc_IfOp : CCOp<"if",
     [DeclareOpInterfaceMethods<RegionBranchOpInterface,
-                               ["getNumRegionInvocations",
-                                "getRegionInvocationBounds"]>,
+      ["getNumRegionInvocations", "getRegionInvocationBounds",
+       "getEntrySuccessorRegions"]>,
      RecursiveMemoryEffects, LinearTypeArgsTrait]> {
   let summary = "if-then-else operation";
   let description = [{
@@ -1541,7 +1547,9 @@ def cc_CallCallableOp : CCOp<"call_callable", [CallOpInterface]> {
 
   let arguments = (ins
     AnyCallableType:$callee,
-    Variadic<AnyType>:$args
+    Variadic<AnyType>:$args,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs Variadic<AnyType>:$results);
   let hasVerifier = 1;
@@ -1551,6 +1559,8 @@ def cc_CallCallableOp : CCOp<"call_callable", [CallOpInterface]> {
   }];
 
   let extraClassDeclaration = [{
+    static constexpr mlir::StringRef getCalleeAttrNameStr() { return "callee"; }
+
     /// Get the argument operands to the called function.
     operand_range getArgOperands() {
       return {arg_operand_begin(), arg_operand_end()};
@@ -1559,8 +1569,17 @@ def cc_CallCallableOp : CCOp<"call_callable", [CallOpInterface]> {
     operand_iterator arg_operand_begin() { return ++operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
 
+    mlir::MutableOperandRange getArgOperandsMutable() {
+      return getArgsMutable();
+    }
+
     /// Return the callee of this operation.
     mlir::CallInterfaceCallable getCallableForCallee() { return getCallee(); }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
+      setOperand(0, cast<mlir::Value>(callee));
+    }
 
     mlir::FunctionType getFunctionType() {
       return mlir::FunctionType::get(getContext(), getOperands().getType(),
@@ -1583,7 +1602,9 @@ def cc_CallIndirectCallableOp :
 
   let arguments = (ins
     cc_IndirectCallableType:$callee,
-    Variadic<AnyType>:$args
+    Variadic<AnyType>:$args,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs Variadic<AnyType>:$results);
   let hasVerifier = 1;
@@ -1602,8 +1623,17 @@ def cc_CallIndirectCallableOp :
     operand_iterator arg_operand_begin() { return ++operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
 
+    mlir::MutableOperandRange getArgOperandsMutable() {
+      return getArgsMutable();
+    }
+
     /// Return the callee of this operation.
     mlir::CallInterfaceCallable getCallableForCallee() { return getCallee(); }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
+      setOperand(0, cast<mlir::Value>(callee));
+    }
 
     mlir::FunctionType getFunctionType() {
       return mlir::FunctionType::get(getContext(), getOperands().getType(),
@@ -1900,7 +1930,9 @@ def cc_VarargCallOp :
 
   let arguments = (ins
     FlatSymbolRefAttr:$callee,
-    Variadic<AnyType>:$args
+    Variadic<AnyType>:$args,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
   );
   let results = (outs Variadic<AnyType>);
 
@@ -1916,9 +1948,19 @@ def cc_VarargCallOp :
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
 
+    mlir::MutableOperandRange getArgOperandsMutable() {
+      return getArgsMutable();
+    }
+
     /// Return the callee of this operation.
     mlir::CallInterfaceCallable getCallableForCallee() {
       return getCalleeAttr();
+    }
+
+    /// Set the callee for this operation.
+    void setCalleeFromCallable(mlir::CallInterfaceCallable callee) {
+      (*this)->setAttr(getCalleeAttrName(),
+                       llvm::cast<mlir::SymbolRefAttr>(callee));
     }
 
     mlir::LogicalResult verifySymbolUses(mlir::SymbolTableCollection &);

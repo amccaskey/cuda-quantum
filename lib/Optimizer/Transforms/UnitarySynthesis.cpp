@@ -499,7 +499,7 @@ public:
       RewritePatternSet patterns(ctx);
       patterns.insert<CustomUnitaryPattern>(ctx);
       LLVM_DEBUG(llvm::dbgs() << "Before unitary synthesis: " << func << '\n');
-      if (failed(applyPatternsAndFoldGreedily(func.getOperation(),
+      if (failed(applyPatternsGreedily(func.getOperation(),
                                               std::move(patterns))))
         signalPassFailure();
       LLVM_DEBUG(llvm::dbgs() << "After unitary synthesis: " << func << '\n');
