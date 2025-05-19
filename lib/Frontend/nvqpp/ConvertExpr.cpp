@@ -2353,9 +2353,9 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
   auto mlirFuncTy = cast<FunctionType>(calleeOp.getType());
   auto funcResults = mlirFuncTy.getResults();
   auto convertedArgs =
-      convertKernelArgs(loc, 0, args, mlirFuncTy.getInputs(), x);
-  auto call = builder.create<func::CallIndirectOp>(loc, funcResults, calleeOp,
-                                                   convertedArgs);
+      convertKernelArgs(builder, loc, 0, args, mlirFuncTy.getInputs());
+  auto call = builder.create<func::CallIndirectOp>(
+      loc, funcResults, calleeOp, convertedArgs, ArrayAttr{}, ArrayAttr{});
   if (call.getNumResults() > 0) {
     if (call.getNumResults() != 1) {
       reportClangError(x, mangler, "expect exactly one return value");
@@ -2553,7 +2553,8 @@ bool QuakeBridgeVisitor::VisitCXXOperatorCallExpr(
         auto convertedArgs =
             convertKernelArgs(loc, 0, args, funcTy.getInputs(), x);
         auto call = builder.create<func::CallIndirectOp>(
-            loc, funcTy.getResults(), indirect, convertedArgs);
+            loc, funcTy.getResults(), indirect, convertedArgs, ArrayAttr{},
+            ArrayAttr{});
         if (call.getResults().empty())
           return true;
         return pushValue(call.getResult(0));

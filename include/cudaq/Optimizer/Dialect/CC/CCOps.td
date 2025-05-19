@@ -1558,6 +1558,14 @@ def cc_CallCallableOp : CCOp<"call_callable", [CallOpInterface]> {
     $callee (`,` $args^)? `:` functional-type(operands, results) attr-dict
   }];
 
+  let builders = [
+    OpBuilder<(ins "mlir::TypeRange":$result, "mlir::Value":$callee,
+        "mlir::ValueRange":$args), [{
+      return build($_builder, $_state, result, callee, args, mlir::ArrayAttr{},
+        mlir::ArrayAttr{});
+    }]>
+  ];
+
   let extraClassDeclaration = [{
     static constexpr mlir::StringRef getCalleeAttrNameStr() { return "callee"; }
 
@@ -1613,6 +1621,14 @@ def cc_CallIndirectCallableOp :
   let assemblyFormat = [{
     $callee (`,` $args^)? `:` functional-type(operands, results) attr-dict
   }];
+
+  let builders = [
+    OpBuilder<(ins "mlir::TypeRange":$result, "mlir::Value":$callee,
+        "mlir::ValueRange":$args), [{
+      return build($_builder, $_state, result, callee, args, mlir::ArrayAttr{},
+        mlir::ArrayAttr{});
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     /// Get the argument operands to the called function.
