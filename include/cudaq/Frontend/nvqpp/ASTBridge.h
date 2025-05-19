@@ -465,8 +465,11 @@ public:
     auto valTy = val.getType();
     if (isa<cudaq::cc::PointerType>(valTy))
       return builder.create<cudaq::cc::LoadOp>(val.getLoc(), val);
-    if (isa<mlir::LLVM::LLVMPointerType>(valTy))
-      return builder.create<mlir::LLVM::LoadOp>(val.getLoc(), val);
+    if (isa<mlir::LLVM::LLVMPointerType>(valTy)) {
+      assert(false && "need the element type but all we have is 'ptr'");
+      return builder.create<mlir::LLVM::LoadOp>(val.getLoc(), mlir::Type{},
+                                                val);
+    }
     return val;
   }
 

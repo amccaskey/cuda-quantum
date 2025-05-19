@@ -1956,6 +1956,14 @@ def cc_VarargCallOp :
     $callee `(` $args `)` `:` functional-type(operands, results) attr-dict
   }];
 
+  let builders = [
+    OpBuilder<(ins "mlir::TypeRange":$result, "mlir::FlatSymbolRefAttr":$callee,
+        "mlir::ValueRange":$args), [{
+      return build($_builder, $_state, result, callee, args, mlir::ArrayAttr{},
+        mlir::ArrayAttr{});
+    }]>
+  ];
+
   let extraClassDeclaration = [{
     operand_range getArgOperands() {
       return {arg_operand_begin(), arg_operand_end()};
