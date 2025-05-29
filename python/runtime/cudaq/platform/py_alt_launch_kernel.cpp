@@ -321,7 +321,6 @@ pyAltLaunchKernelBase(const std::string &name, MlirModule module,
   auto [jit, rawArgs, size, returnOffset] = jitAndCreateArgs(
       name, module, runtimeArgs, names, returnType, startingArgIdx);
 
-  auto mod = unwrap(module);
   auto thunkName = name + ".thunk";
   auto thunkPtr = jit->lookup(thunkName);
   if (!thunkPtr)
@@ -363,16 +362,14 @@ pyAltLaunchKernelBase(const std::string &name, MlirModule module,
         !isRemoteSimulator && (platform.is_remote() || platform.is_emulated());
 
     if (isRemoteSimulator) {
+      // AJM Refactor May 29 2025 - this path probably not needed.
       // Remote simulator - use altLaunchKernel to support returning values.
       // TODO: after cudaq::run support this should be merged with the quantum
       // device case.
-      auto *wrapper = new cudaq::ArgWrapper{mod, names, rawArgs};
-      auto dynamicResult = cudaq::altLaunchKernel(
-          name.c_str(), thunk, reinterpret_cast<void *>(wrapper), size,
-          uReturnOffset);
+      auto dynamicResult = cudaq::altLaunchKernel(name.c_str(), thunk, rawArgs,
+                                                  size, uReturnOffset);
       if (dynamicResult.data_buffer || dynamicResult.size)
         throw std::runtime_error("not implemented: support dynamic results");
-      delete wrapper;
     } else if (isQuantumDevice) {
       // Quantum devices or their emulation - we can use streamlinedLaunchKernel
       // as quantum platform do not support direct returns.
