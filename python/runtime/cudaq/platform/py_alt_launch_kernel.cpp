@@ -430,7 +430,6 @@ pyAltLaunchKernelBase(const std::string &name, MlirModule module,
   auto [jit, rawArgs, size, returnOffset] = jitAndCreateArgs(
       name, module, runtimeArgs, names, returnType, startingArgIdx);
 
-  auto mod = unwrap(module);
   auto thunkName = name + ".thunk";
   auto thunkPtr = jit->lookup(thunkName);
   if (!thunkPtr)
@@ -464,7 +463,7 @@ pyAltLaunchKernelBase(const std::string &name, MlirModule module,
   kernelReg();
 
   if (launch)
-    pyLaunchKernel(name, thunk, mod, runtimeArgs, rawArgs, size, returnOffset,
+    pyLaunchKernel(name, thunk, unwrap(module), runtimeArgs, rawArgs, size, returnOffset,
                    names);
 
   return std::make_tuple(rawArgs, size, returnOffset, thunk);

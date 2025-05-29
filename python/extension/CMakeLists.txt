@@ -93,8 +93,8 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
     
     # FIXME Come back and remove these with new pattern
     ../runtime/utils/PyFermioniqRESTQPU.cpp
-    ../runtime/utils/PyRemoteSimulatorQPU.cpp
-    ../runtime/utils/PyRestRemoteClient.cpp
+    # ../runtime/utils/PyRemoteSimulatorQPU.cpp
+    # ../runtime/utils/PyRestRemoteClient.cpp
     ../utils/LinkedLibraryHolder.cpp
     # ../../runtime/common/ArgumentConversion.cpp
     ../../runtime/common/RunTheKernel.cpp
@@ -130,7 +130,7 @@ target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE
     cudaq-em-default
     cudaq-em-photonics
     fmt::fmt-header-only
-    # unzip_util
+    unzip_util
 )
 
 ################################################################################
