@@ -18,7 +18,8 @@ class RemoteSimulatorQPU : public cudaq::BaseRemoteSimulatorQPU {
 
 public:
   RemoteSimulatorQPU() : BaseRemoteSimulatorQPU() {
-    m_mlirContext = cudaq::initializeMLIR(false);
+    m_mlirContext = cudaq::initializeMLIR(
+        /* FIXME better way to know when to set this */ false);
   }
 
   RemoteSimulatorQPU(RemoteSimulatorQPU &&) = delete;
@@ -29,8 +30,7 @@ public:
 class NvcfSimulatorQPU : public cudaq::BaseNvcfSimulatorQPU {
 public:
   NvcfSimulatorQPU() : BaseNvcfSimulatorQPU() {
-    m_mlirContext = cudaq::initializeMLIR(
-        /* FIXME better way to know when to set this */ false);
+    m_mlirContext = cudaq::initializeMLIR();
   }
 
   NvcfSimulatorQPU(NvcfSimulatorQPU &&) = delete;
