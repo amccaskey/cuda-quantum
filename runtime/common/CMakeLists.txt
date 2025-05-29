@@ -21,6 +21,7 @@ set(COMMON_RUNTIME_SRC
   Resources.cpp
   ServerHelper.cpp 
   Trace.cpp
+  matrix.cpp
 )
 
 # Create the cudaq-common library

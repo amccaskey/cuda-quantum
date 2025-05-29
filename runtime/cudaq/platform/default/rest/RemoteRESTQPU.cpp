@@ -31,7 +31,8 @@ protected:
   std::tuple<ModuleOp, MLIRContext *, void *>
   extractQuakeCodeAndContext(const std::string &kernelName,
                              void *data) override {
-    auto contextPtr = cudaq::initializeMLIR();
+    auto contextPtr = cudaq::initializeMLIR(
+        /* FIXME better way to know when to set this */ false);
     MLIRContext &context = *contextPtr.get();
 
     // Get the quake representation of the kernel

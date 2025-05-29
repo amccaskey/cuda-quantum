@@ -17,9 +17,19 @@ include(AddMLIRPython)
 # top level package (the API has been embedded in a relocatable way).
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=cudaq.mlir.")
 
-################################################################################
-# Sources
-################################################################################
+# For any plugin that uses MLIR (cudaq-mlir-runtime) 
+# we must "sanitize" that plugin for use with Python. 
+# Specifically, we have to manually remove the dynamic link 
+# to cudaq-mlir-runtime, and rely on those symbols being present 
+# in the holistic Python module / shared library setup here.
+# These libraries then need to be dynamically loaded by the 
+# LinkedLibraryHolder, along with CUDAQuantumPythonCAPI
+cudaq_sanitize_plugin_for_python(cudaq-rest-qpu)
+cudaq_sanitize_plugin_for_python(rest-remote-platform-client)
+cudaq_sanitize_plugin_for_python(cudaq-remote-simulator-qpu 
+  REMOVE_DEPENDENCIES 
+    librest-remote-platform-client.so 
+    libcudaq-mlir-runtime.so)
 
 declare_mlir_python_sources(CUDAQuantumPythonSources)
 
@@ -75,14 +85,14 @@ declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
     ../runtime/cudaq/target/py_runtime_target.cpp
     ../runtime/cudaq/target/py_testing_utils.cpp
     ../runtime/mlir/py_register_dialects.cpp
-    ../runtime/utils/PyRemoteRESTQPU.cpp
+    ../utils/LinkedLibraryHolder.cpp
+    ../../runtime/cudaq/platform/common/QuantumExecutionQueue.cpp
+    ../../runtime/cudaq/platform/default/rest_server/RemoteRuntimeClient.cpp
+    
+    # FIXME Come back and remove these with new pattern
     ../runtime/utils/PyFermioniqRESTQPU.cpp
     ../runtime/utils/PyRemoteSimulatorQPU.cpp
     ../runtime/utils/PyRestRemoteClient.cpp
-    ../utils/LinkedLibraryHolder.cpp
-    ../../runtime/common/ArgumentConversion.cpp
-    ../../runtime/cudaq/platform/common/QuantumExecutionQueue.cpp
-    ../../runtime/cudaq/platform/default/rest_server/RemoteRuntimeClient.cpp
     ../../runtime/cudaq/platform/orca/OrcaExecutor.cpp
     ../../runtime/cudaq/platform/orca/OrcaQPU.cpp
     ../../runtime/cudaq/platform/orca/OrcaRemoteRESTQPU.cpp
@@ -113,7 +123,7 @@ target_link_libraries(CUDAQuantumPythonSources.Extension INTERFACE
     cudaq-em-default
     cudaq-em-photonics
     fmt::fmt-header-only
-    unzip_util
+    # unzip_util
 )
 
 ################################################################################
@@ -149,6 +159,39 @@ add_mlir_python_modules(CUDAQuantumPythonModules
   COMMON_CAPI_LINK_LIBS
     CUDAQuantumPythonCAPI
   )
+
+
+# Add the Runtime MLIR Code we would have gotten from cudaq-mlir-runtime
+target_sources(CUDAQuantumPythonCAPI PRIVATE  
+  ../../runtime/common/RuntimeMLIR.cpp     
+  ../../runtime/common/ArgumentConversion.cpp
+  )
+# That code needs exceptions 
+target_compile_options(CUDAQuantumPythonCAPI PRIVATE -fexceptions )
+
+# Need RTTI for ArgumentConversion.cpp
+target_compile_options(CUDAQuantumPythonCAPI PRIVATE -frtti)
+
+# Add our required (those we needed in cudaq-mlir-runtime) libs here
+target_link_libraries(CUDAQuantumPythonCAPI 
+  PRIVATE 
+    fmt::fmt-header-only 
+    OptCodeGen 
+    OptTransforms 
+    MLIRTranslateLib
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRTranslateLib
+    MLIRSupport
+    MLIROptLib
+    MLIRExecutionEngine
+    MLIRTransforms
+    MLIRTargetLLVMIRExport
+    MLIRLLVMCommonConversion
+    MLIRLLVMToLLVMIRTranslation
+    cudaq-common 
+    cudaq)
 
 ## The Python bindings module for Quake dialect depends on CUDAQ libraries 
 ## which it can't locate since they are in "../../lib" and the 'rpath' is set

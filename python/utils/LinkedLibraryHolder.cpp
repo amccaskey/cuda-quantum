@@ -231,6 +231,15 @@ LinkedLibraryHolder::LinkedLibraryHolder() {
 
   // We have to ensure that nvqir and cudaq are loaded
   std::vector<std::filesystem::path> libPaths{
+      // FIXME Maybe we can have a cleaner way to provide all these
+      // libraries, something declarative from file or something like that
+      cudaqLibPath / ".." / "python" / "cudaq" / "mlir" / "_mlir_libs" /
+          fmt::format("libCUDAQuantumPythonCAPI.{}", libSuffix),
+      cudaqLibPath / fmt::format("libpy-cudaq-rest-qpu.{}", libSuffix),
+      cudaqLibPath /
+          fmt::format("libpy-rest-remote-platform-client.{}", libSuffix),
+      cudaqLibPath /
+          fmt::format("libpy-cudaq-remote-simulator-qpu.{}", libSuffix),
       cudaqLibPath / fmt::format("libnvqir.{}", libSuffix),
       cudaqLibPath / fmt::format("libcudaq.{}", libSuffix)};
 

@@ -35,7 +35,7 @@ using TranslateFromMLIRFunction = std::function<mlir::LogicalResult(
 
 /// @brief Initialize MLIR with CUDA-Q dialects and return the
 /// MLIRContext.
-std::unique_ptr<mlir::MLIRContext> initializeMLIR();
+std::unique_ptr<mlir::MLIRContext> initializeMLIR(bool reg = true);
 /// @brief Given an LLVM Module, set its target triple corresponding to the
 /// current host machine.
 bool setupTargetTriple(llvm::Module *);
