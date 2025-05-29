@@ -72,16 +72,25 @@ namespace cudaq {
 
 static std::once_flag mlir_init_flag;
 
-std::unique_ptr<MLIRContext> initializeMLIR() {
+std::unique_ptr<MLIRContext> initializeMLIR(bool reg) {
   // One-time initialization of LLVM/MLIR components
-  std::call_once(mlir_init_flag, []() {
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    cudaq::registerAllPasses();
+  if (reg)
+    std::call_once(mlir_init_flag, []() {
+      llvm::InitializeNativeTarget();
+      llvm::InitializeNativeTargetAsmPrinter();
+      cudaq::registerCudaqPassesAndPipelines();
+      registerToQIRTranslation();
+      registerToOpenQASMTranslation();
+      registerToIQMJsonTranslation();
+    });
+  
+  static bool initOnce = [&] {
     registerToQIRTranslation();
     registerToOpenQASMTranslation();
     registerToIQMJsonTranslation();
-  });
+    return true;
+  }();
+  (void)initOnce;
 
   // Per-context initialization
   DialectRegistry registry;
