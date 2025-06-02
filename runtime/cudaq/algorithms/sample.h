@@ -147,7 +147,7 @@ auto runSamplingAsync(KernelFunctor &&wrappedKernel, quantum_platform &platform,
 
   // If we are remote, then create the sampling executor with `cudaq::future`
   // provided
-  if (platform.is_remote(qpu_id)) {
+  if (platform.is_remote(qpu_id) && !platform.is_simulator()) {
     details::future futureResult;
     details::runSampling(std::forward<KernelFunctor>(wrappedKernel), platform,
                          kernelName, shots, explicitMeasurements, qpu_id,

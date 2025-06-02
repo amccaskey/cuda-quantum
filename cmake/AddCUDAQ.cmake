@@ -248,5 +248,7 @@ function(cudaq_sanitize_plugin_for_python TARGET_NAME)
             INTERFACE_INCLUDE_DIRECTORIES "${INTERFACE_INCLUDE_DIRS}"
         )
     endif()
+
+    install(FILES ${PY_LIB_PATH} DESTINATION lib)
     
 endfunction()

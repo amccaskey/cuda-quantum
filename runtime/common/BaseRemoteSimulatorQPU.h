@@ -50,6 +50,8 @@ public:
   BaseRemoteSimulatorQPU(BaseRemoteSimulatorQPU &&) = delete;
   virtual ~BaseRemoteSimulatorQPU() = default;
 
+  bool isRemote() override { return true; }
+
   std::thread::id getExecutionThreadId() const {
     return execution_queue->getExecutionThreadId();
   }
@@ -134,6 +136,8 @@ public:
         getExecutionContextForMyThread();
 
     if (executionContextPtr && executionContextPtr->name == "tracer") {
+      throw std::runtime_error(
+          "tracer operation is not supported with cudaq target remote-mqpu!");
       return {};
     }
 

@@ -154,7 +154,7 @@ auto runObservationAsync(KernelFunctor &&wrappedKernel, const spin_op &H,
   // Could be that the platform we are running on is
   // remotely hosted, if so, we can't do asynchronous execution with a
   // separate thread, the separate thread is the remote server invocation
-  if (platform.is_remote(qpu_id)) {
+  if (platform.is_remote(qpu_id) && !platform.is_simulator()) {
     // In this case, everything we need can be dumped into a details::future
     // type. Just return that wrapped in an async_result
     details::future futureResult;

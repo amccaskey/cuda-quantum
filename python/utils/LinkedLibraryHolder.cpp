@@ -235,11 +235,14 @@ LinkedLibraryHolder::LinkedLibraryHolder() {
 
   cudaq::info("Init: Library Path is {}.", cudaqLibPath.string());
 
+  auto libCudaQPyCAPITopLevel = cudaqLibPath / ".." / "cudaq";
+  if (!std::filesystem::exists(libCudaQPyCAPITopLevel))
+    libCudaQPyCAPITopLevel = cudaqLibPath / ".." / "python" / "cudaq";
   // We have to ensure that nvqir and cudaq are loaded
   std::vector<std::filesystem::path> libPaths{
       // FIXME Maybe we can have a cleaner way to provide all these
       // libraries, something declarative from file or something like that
-      cudaqLibPath / ".." / "python" / "cudaq" / "mlir" / "_mlir_libs" /
+      libCudaQPyCAPITopLevel / "mlir" / "_mlir_libs" /
           fmt::format("libCUDAQuantumPythonCAPI.{}", libSuffix),
       cudaqLibPath / fmt::format("libpy-cudaq-rest-qpu.{}", libSuffix),
       cudaqLibPath /
@@ -260,9 +263,14 @@ LinkedLibraryHolder::LinkedLibraryHolder() {
   }
 
   // Load all the defaults
-  for (auto &p : libPaths)
+  for (auto &p : libPaths) {
     libHandles.emplace(p.string(),
                        dlopen(p.string().c_str(), RTLD_GLOBAL | RTLD_NOW));
+    if (auto *maybeError = dlerror())
+      throw std::runtime_error(
+          fmt::format("CUDA-Q failed to open required library ({}) - {}",
+                      p.string(), maybeError));
+  }
 
   // directory_iterator ordering is unspecified, so sort it to make it
   // repeatable and consistent.

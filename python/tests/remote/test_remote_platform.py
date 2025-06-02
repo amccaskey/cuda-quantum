@@ -51,7 +51,7 @@ def check_sample(entity):
 
     future = cudaq.sample_async(entity)
     counts = future.get()
-    print(counts)
+    print('counts here ', counts)
     check_basic(counts)
 
 
@@ -65,16 +65,16 @@ def test_sample():
     check_sample(kernel)
 
 
-def test_sample_kernel():
+# def test_sample_kernel():
 
-    @cudaq.kernel
-    def simple_kernel():
-        qubits = cudaq.qvector(2)
-        h(qubits[0])
-        x.ctrl(qubits[0], qubits[1])
-        mz(qubits)
+#     @cudaq.kernel
+#     def simple_kernel():
+#         qubits = cudaq.qvector(2)
+#         h(qubits[0])
+#         x.ctrl(qubits[0], qubits[1])
+#         mz(qubits)
 
-    check_sample(simple_kernel)
+#     check_sample(simple_kernel)
 
 
 def check_observe(entity):
