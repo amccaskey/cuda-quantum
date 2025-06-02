@@ -9,3 +9,6 @@
 add_cudaq_dialect(Quake quake)
 add_cudaq_interface(QuakeInterfaces)
 add_cudaq_dialect_doc(QuakeDialect quake)
+
+file (GLOB QUAKE_TBLGEN *.td)
+install(FILES ${QUAKE_TBLGEN} DESTINATION include/cudaq/Optimizer/Dialect/Quake)

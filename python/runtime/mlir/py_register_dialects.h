@@ -14,4 +14,7 @@ namespace py = pybind11;
 
 namespace cudaq {
 void bindRegisterDialects(py::module &mod);
+void registerQuakeDialectAndTypes(py::module &m,
+                                  const std::string superClassName);
+void registerCCDialectAndTypes(py::module &m, const std::string superClassName);
 } // namespace cudaq

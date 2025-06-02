@@ -1,77 +1,50 @@
-/*******************************************************************************
- * Copyright (c) 2022 - 2025 NVIDIA Corporation & Affiliates.                  *
- * All rights reserved.                                                        *
- *                                                                             *
- * This source code and the accompanying materials are made available under    *
- * the terms of the Apache License 2.0 which accompanies this distribution.    *
- ******************************************************************************/
+#pragma once
 
-#include "cudaq/Optimizer/Builder/Intrinsics.h"
 #include "cudaq/Optimizer/CAPI/Dialects.h"
-#include "cudaq/Optimizer/CodeGen/Passes.h"
-#include "cudaq/Optimizer/CodeGen/Pipelines.h"
 #include "cudaq/Optimizer/Dialect/CC/CCDialect.h"
 #include "cudaq/Optimizer/Dialect/CC/CCOps.h"
 #include "cudaq/Optimizer/Dialect/CC/CCTypes.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeTypes.h"
-#include "cudaq/Optimizer/InitAllPasses.h"
-#include "cudaq/Optimizer/Transforms/Passes.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
-#include "mlir/InitAllDialects.h"
-#include <fmt/core.h>
-#include <pybind11/complex.h>
-#include <pybind11/stl.h>
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 using namespace mlir;
 
 namespace cudaq {
-static bool registered = false;
 
 void registerQuakeDialectAndTypes(
-    py::module &m,
-    const std::string superClassName = MAKE_MLIR_PYTHON_QUALNAME("ir")) {
+    py::module &m, const std::function<void()> extraRegistration) {
   auto quakeMod = m.def_submodule("quake");
-
-  auto superCls = py::module::import(superClassName.c_str()).attr("Type");
 
   quakeMod.def(
       "register_dialect",
-      [](MlirContext context, bool load) {
+      [extraRegistration](MlirContext context, bool load) {
         MlirDialectHandle handle = mlirGetDialectHandle__quake__();
         mlirDialectHandleRegisterDialect(handle, context);
         if (load)
           mlirDialectHandleLoadDialect(handle, context);
 
-        if (!registered) {
-          cudaq::registerCudaqPassesAndPipelines();
-          registered = true;
-        }
+        extraRegistration();
       },
       py::arg("context") = py::none(), py::arg("load") = true);
 
-  mlir_type_subclass(
-      quakeMod, "RefType",
-      [](MlirType type) { return unwrap(type).isa<quake::RefType>(); },
-      superCls)
-      .def_classmethod("get", [](py::object cls, MlirContext ctx) {
-        return wrap(quake::RefType::get(unwrap(ctx)));
-      });
+  mlir_type_subclass(quakeMod, "RefType", [](MlirType type) {
+    return unwrap(type).isa<quake::RefType>();
+  }).def_classmethod("get", [](py::object cls, MlirContext ctx) {
+    return wrap(quake::RefType::get(unwrap(ctx)));
+  });
 
-  mlir_type_subclass(
-      quakeMod, "MeasureType",
-      [](MlirType type) { return unwrap(type).isa<quake::MeasureType>(); },
-      superCls)
-      .def_classmethod("get", [](py::object cls, MlirContext ctx) {
-        return wrap(quake::MeasureType::get(unwrap(ctx)));
-      });
+  mlir_type_subclass(quakeMod, "MeasureType", [](MlirType type) {
+    return unwrap(type).isa<quake::MeasureType>();
+  }).def_classmethod("get", [](py::object cls, MlirContext ctx) {
+    return wrap(quake::MeasureType::get(unwrap(ctx)));
+  });
 
   mlir_type_subclass(
       quakeMod, "VeqType",
-      [](MlirType type) { return unwrap(type).isa<quake::VeqType>(); },
-      superCls)
+      [](MlirType type) { return unwrap(type).isa<quake::VeqType>(); })
       .def_classmethod(
           "get",
           [](py::object cls, MlirContext ctx, std::size_t size) {
@@ -104,8 +77,7 @@ void registerQuakeDialectAndTypes(
 
   mlir_type_subclass(
       quakeMod, "StruqType",
-      [](MlirType type) { return unwrap(type).isa<quake::StruqType>(); },
-      superCls)
+      [](MlirType type) { return unwrap(type).isa<quake::StruqType>(); })
       .def_classmethod(
           "get",
           [](py::object cls, MlirContext ctx, py::list aggregateTypes) {
@@ -148,12 +120,9 @@ void registerQuakeDialectAndTypes(
       });
 }
 
-void registerCCDialectAndTypes(
-    py::module &m,
-    const std::string superClassName = MAKE_MLIR_PYTHON_QUALNAME("ir")) {
+void registerCCDialectAndTypes(py::module &m) {
 
   auto ccMod = m.def_submodule("cc");
-  auto superCls = py::module::import(superClassName.c_str()).attr("Type");
 
   ccMod.def(
       "register_dialect",
@@ -166,26 +135,21 @@ void registerCCDialectAndTypes(
       },
       py::arg("context") = py::none(), py::arg("load") = true);
 
-  mlir_type_subclass(
-      ccMod, "CharspanType",
-      [](MlirType type) { return unwrap(type).isa<cudaq::cc::CharspanType>(); },
-      superCls)
-      .def_classmethod("get", [](py::object cls, MlirContext ctx) {
-        return wrap(cudaq::cc::CharspanType::get(unwrap(ctx)));
-      });
+  mlir_type_subclass(ccMod, "CharspanType", [](MlirType type) {
+    return unwrap(type).isa<cudaq::cc::CharspanType>();
+  }).def_classmethod("get", [](py::object cls, MlirContext ctx) {
+    return wrap(cudaq::cc::CharspanType::get(unwrap(ctx)));
+  });
 
-  mlir_type_subclass(
-      ccMod, "StateType",
-      [](MlirType type) { return unwrap(type).isa<quake::StateType>(); },
-      superCls)
-      .def_classmethod("get", [](py::object cls, MlirContext ctx) {
-        return wrap(quake::StateType::get(unwrap(ctx)));
-      });
+  mlir_type_subclass(ccMod, "StateType", [](MlirType type) {
+    return unwrap(type).isa<quake::StateType>();
+  }).def_classmethod("get", [](py::object cls, MlirContext ctx) {
+    return wrap(quake::StateType::get(unwrap(ctx)));
+  });
 
   mlir_type_subclass(
       ccMod, "PointerType",
-      [](MlirType type) { return unwrap(type).isa<cudaq::cc::PointerType>(); },
-      superCls)
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::PointerType>(); })
       .def_classmethod(
           "getElementType",
           [](py::object cls, MlirType type) {
@@ -205,8 +169,7 @@ void registerCCDialectAndTypes(
 
   mlir_type_subclass(
       ccMod, "ArrayType",
-      [](MlirType type) { return unwrap(type).isa<cudaq::cc::ArrayType>(); },
-      superCls)
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::ArrayType>(); })
       .def_classmethod(
           "getElementType",
           [](py::object cls, MlirType type) {
@@ -230,8 +193,7 @@ void registerCCDialectAndTypes(
 
   mlir_type_subclass(
       ccMod, "StructType",
-      [](MlirType type) { return unwrap(type).isa<cudaq::cc::StructType>(); },
-      superCls)
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::StructType>(); })
       .def_classmethod(
           "get",
           [](py::object cls, MlirContext ctx, py::list aggregateTypes) {
@@ -275,8 +237,7 @@ void registerCCDialectAndTypes(
 
   mlir_type_subclass(
       ccMod, "CallableType",
-      [](MlirType type) { return unwrap(type).isa<cudaq::cc::CallableType>(); },
-      superCls)
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::CallableType>(); })
       .def_classmethod("get",
                        [](py::object cls, MlirContext ctx, py::list inTypes) {
                          SmallVector<Type> inTys;
@@ -294,8 +255,7 @@ void registerCCDialectAndTypes(
 
   mlir_type_subclass(
       ccMod, "StdvecType",
-      [](MlirType type) { return unwrap(type).isa<cudaq::cc::StdvecType>(); },
-      superCls)
+      [](MlirType type) { return unwrap(type).isa<cudaq::cc::StdvecType>(); })
       .def_classmethod(
           "getElementType",
           [](py::object cls, MlirType type) {
@@ -314,35 +274,4 @@ void registerCCDialectAndTypes(
           });
 }
 
-void bindRegisterDialects(py::module &mod) {
-  registerQuakeDialectAndTypes(mod);
-  registerCCDialectAndTypes(mod);
-
-  mod.def("load_intrinsic", [](MlirModule module, std::string name) {
-    auto unwrapped = unwrap(module);
-    cudaq::IRBuilder builder = IRBuilder::atBlockEnd(unwrapped.getBody());
-    if (failed(builder.loadIntrinsic(unwrapped, name)))
-      unwrapped.emitError("failed to load intrinsic " + name);
-  });
-
-  mod.def("register_all_dialects", [](MlirContext context) {
-    DialectRegistry registry;
-    registry.insert<quake::QuakeDialect, cudaq::cc::CCDialect>();
-    cudaq::opt::registerCodeGenDialect(registry);
-    registerAllDialects(registry);
-    auto *mlirContext = unwrap(context);
-    mlirContext->appendDialectRegistry(registry);
-    mlirContext->loadAllAvailableDialects();
-  });
-
-  mod.def("gen_vector_of_complex_constant",
-          [](MlirLocation loc, MlirModule module, std::string name,
-             const std::vector<std::complex<double>> &values) {
-            ModuleOp modOp = unwrap(module);
-            cudaq::IRBuilder builder = IRBuilder::atBlockEnd(modOp.getBody());
-            SmallVector<std::complex<double>> newValues{values.begin(),
-                                                        values.end()};
-            builder.genVectorOfConstants(unwrap(loc), modOp, name, newValues);
-          });
-}
 } // namespace cudaq

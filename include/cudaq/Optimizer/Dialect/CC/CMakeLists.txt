@@ -9,3 +9,6 @@
 add_cudaq_dialect(CC cc)
 add_cudaq_interface(CCInterfaces)
 add_cudaq_dialect_doc(CCDialect cc)
+
+file (GLOB CC_TBLGEN *.td)
+install(FILES ${CC_TBLGEN} DESTINATION include/cudaq/Optimizer/Dialect/CC)

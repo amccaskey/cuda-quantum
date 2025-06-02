@@ -8,3 +8,6 @@
 
 add_subdirectory(CC)
 add_subdirectory(Quake)
+
+file (GLOB COMMON_TBLGEN Common/*.td)
+install(FILES ${COMMON_TBLGEN} DESTINATION include/cudaq/Optimizer/Dialect/Common)

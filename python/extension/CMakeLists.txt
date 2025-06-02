@@ -49,6 +49,16 @@ declare_mlir_dialect_python_bindings(
     dialects/cc.py
   DIALECT_NAME cc)
 
+# Make our dialect registration extensible so other 
+# products can use them 
+# FIXME Work Here...
+install(FILES 
+  ../runtime/mlir/cudaq_pybind_dialects.h
+  ../cudaq/mlir/dialects/CCOps.td
+  ../cudaq/mlir/dialects/QuakeOps.td 
+  DESTINATION include/cudaq/python
+)
+
 declare_mlir_python_extension(CUDAQuantumPythonSources.Extension
   MODULE_NAME _quakeDialects
   ADD_TO_PARENT CUDAQuantumPythonSources
