@@ -106,8 +106,7 @@ cudaq::details::RunResultSpan cudaq::details::runTheKernel(
     const std::string &kernel_name, std::size_t shots) {
   ScopedTraceWithContext(cudaq::TIMING_RUN, "runTheKernel");
   // 1. Clear the outputLog.
-  auto *circuitSimulator = nvqir::getCircuitSimulatorInternal();
-
+  auto *circuitSimulator = platform.as<v2::simulation_trait>();
   circuitSimulator->outputLog.clear();
 
   // 2. Launch the kernel on the QPU.

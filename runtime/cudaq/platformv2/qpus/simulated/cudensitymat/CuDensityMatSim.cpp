@@ -6,11 +6,7 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-<<<<<<< HEAD:runtime/nvqir/cudensitymat/CuDensityMatSim.cpp
-#include "CircuitSimulator.h"
 #include "CuDensityMatContext.h"
-=======
->>>>>>> 0ad0cec2 (Runtime Refactor 2025):runtime/cudaq/platformv2/qpus/simulated/cudensitymat/CuDensityMatSim.cpp
 #include "CuDensityMatErrorHandling.h"
 #include "CuDensityMatState.h"
 #include "cudaq.h"

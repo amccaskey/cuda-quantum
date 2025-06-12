@@ -115,7 +115,8 @@ public:
     throw std::runtime_error("remote launch_vqe not supported for this qpu.");
   }
 
-  virtual std::optional<cudaq::state> local_state_from_data(const state_data&) {
+  virtual std::optional<cudaq::state>
+  local_state_from_data(const state_data &) {
     return std::nullopt;
   }
 };
@@ -123,6 +124,9 @@ public:
 /// \brief Trait interface for simulation capability on QPUs.
 class simulation_trait {
 public:
+  // FIXME This should not be how we do this for run()
+  std::string outputLog = "";
+
   /// \brief Dump the current quantum state to the given output stream.
   /// \param os Output stream to write the state to.
   virtual void dump_state(std::ostream &os) = 0;

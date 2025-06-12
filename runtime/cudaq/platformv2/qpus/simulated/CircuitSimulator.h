@@ -404,9 +404,6 @@ public:
   virtual bool isSinglePrecision() const = 0;
   bool isDoublePrecision() const { return !isSinglePrecision(); }
 
-  /// A string containing the output logging of a kernel launched with
-  /// `cudaq::run()`.
-  std::string outputLog;
 };
 
 /// @brief The CircuitSimulatorBase is the type that is meant to

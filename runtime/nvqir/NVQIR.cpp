@@ -527,7 +527,12 @@ void __quantum__qis__cphase(double d, Qubit *q, Qubit *r) {
 
 void __quantum__qis__phased_rx(double theta, double phi, Qubit *q) {
   auto qI = qubitToSizeT(q);
-  nvqir::getCircuitSimulatorInternal()->phased_rx(theta, phi, qI);
+  std::complex<double> i(0, 1.);
+  std::vector<std::complex<double>> matrix{
+      std::cos(theta / 2.), -i * std::exp(-i * phi) * std::sin(theta / 2.),
+      -i * std::exp(i * phi) * std::sin(theta / 2.), std::cos(theta / 2.)};
+  nvqir::getCircuitSimulatorInternal()->apply(matrix, {}, {qI},
+                                              {"phased_rx", {theta}});
 }
 
 void __quantum__qis__phased_rx__body(double theta, double phi, Qubit *q) {
