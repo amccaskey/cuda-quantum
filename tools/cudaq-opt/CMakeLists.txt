@@ -29,7 +29,6 @@ target_link_libraries(cudaq-opt
   MLIROpenMPToLLVM
   ${dialect_libs}
   ${translation_libs}
-
   CCDialect
   QuakeDialect
   OptCodeGen

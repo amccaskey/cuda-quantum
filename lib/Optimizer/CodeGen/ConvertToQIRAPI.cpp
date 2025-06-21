@@ -341,9 +341,11 @@ struct ApplyNoiseOpRewrite : public OpConversionPattern<quake::ApplyNoiseOp> {
                     adaptor.getParameters().end());
       }
       args.append(adaptor.getQubits().begin(), adaptor.getQubits().end());
+      auto context = rewriter.getContext();
 
       rewriter.replaceOpWithNewOp<cudaq::cc::VarargCallOp>(
-          noise, TypeRange{}, cudaq::opt::QISApplyKrausChannel, args);
+          noise, TypeRange{}, cudaq::opt::QISApplyKrausChannel, args,
+          ArrayAttr::get(context, {}), ArrayAttr::get(context, {}));
       return success();
     }
 
@@ -1426,10 +1428,12 @@ struct QuantumGatePattern : public OpConversionPattern<OP> {
     args.append(opArrCtrls.begin(), opArrCtrls.end());
     args.append(opQubitCtrls.begin(), opQubitCtrls.end());
     args.append(opTargs.begin(), opTargs.end());
+    auto context = rewriter.getContext();
 
     // Call the generalized version of the gate invocation.
     rewriter.create<cudaq::cc::VarargCallOp>(
-        loc, TypeRange{}, cudaq::opt::NVQIRGeneralizedInvokeAny, args);
+        loc, TypeRange{}, cudaq::opt::NVQIRGeneralizedInvokeAny, args,
+        ArrayAttr::get(context, {}), ArrayAttr::get(context, {}));
     return forwardOrEraseOp();
   }
 

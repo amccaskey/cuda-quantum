@@ -2378,11 +2378,11 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
       auto len = builder.create<cudaq::cc::StdvecSizeOp>(loc, i64Ty,
                                                          call.getResult(0));
       auto eleSize = builder.create<cudaq::cc::SizeOfOp>(loc, i64Ty, eleTy);
-      auto size = builder.create<arith::MulIOp>(loc, len, eleSize);
+      Value size = builder.create<arith::MulIOp>(loc, len, eleSize);
       auto buffer = builder.create<cudaq::cc::AllocaOp>(loc, eleTy, size);
       auto i8PtrTy = cudaq::cc::PointerType::get(builder.getI8Type());
-      auto cbuffer = builder.create<cudaq::cc::CastOp>(loc, i8PtrTy, buffer);
-      auto cdata = builder.create<cudaq::cc::CastOp>(loc, i8PtrTy, data);
+      Value cbuffer = builder.create<cudaq::cc::CastOp>(loc, i8PtrTy, buffer);
+      Value cdata = builder.create<cudaq::cc::CastOp>(loc, i8PtrTy, data);
       builder.create<func::CallOp>(loc, TypeRange{},
                                    "__nvqpp_vectorCopyToStack",
                                    ValueRange{cbuffer, cdata, size});
