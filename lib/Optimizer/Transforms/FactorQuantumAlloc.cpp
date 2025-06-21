@@ -129,7 +129,7 @@ public:
   void runOnOperation() override {
     [[maybe_unused]] func::FuncOp func = getOperation();
     LLVM_DEBUG(llvm::dbgs() << "Function before factoring quake alloca:\n"
-                            << func << "\n\n");
+                            << getOperation() << "\n\n");
 
     // 1) Factor (expand) any deallocations that are veqs of constant size.
     if (failed(factorDeallocations()))

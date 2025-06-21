@@ -35,7 +35,6 @@ target_link_libraries(cudaq-quake
   MLIROpenMPToLLVM
   ${dialect_libs}
   ${translation_libs}
-
   clangCodeGen
   clangFrontendTool
   clangFrontend

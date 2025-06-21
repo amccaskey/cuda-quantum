@@ -315,7 +315,9 @@ public:
       args.push_back(a);
     }
     auto call = builder.create<cudaq::cc::NoInlineCallOp>(
-        loc, funcTy.getResults(), funcOp.getName(), args);
+        loc, funcTy.getResults(), funcOp.getName(), args,
+        ArrayAttr::get(builder.getContext(), {}),
+        ArrayAttr::get(builder.getContext(), {}));
     const bool hasVectorResult =
         funcTy.getNumResults() == 1 &&
         isa<cudaq::cc::SpanLikeType>(funcTy.getResult(0));
