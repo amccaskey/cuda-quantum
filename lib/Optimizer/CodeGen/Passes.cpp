@@ -18,9 +18,8 @@ static SmallVector<std::string> z_disabledPatterns = {"R1ToU3"};
 
 static void addAnyonPPipeline(OpPassManager &pm) {
   using namespace cudaq::opt;
-  std::string basis[] = {
-      "h", "s", "t", "rx", "ry", "rz", "x", "y", "z", "z(1)",
-  };
+  SmallVector<std::string> basis = {"h",  "s", "t", "rx", "ry",
+                                    "rz", "x", "y", "z",  "z(1)"};
   BasisConversionPassOptions options;
   options.basis = basis;
   options.disabledPatterns = z_disabledPatterns;
@@ -29,9 +28,8 @@ static void addAnyonPPipeline(OpPassManager &pm) {
 
 static void addAnyonCPipeline(OpPassManager &pm) {
   using namespace cudaq::opt;
-  std::string basis[] = {
-      "h", "s", "t", "rx", "ry", "rz", "x", "y", "z", "x(1)",
-  };
+  SmallVector<std::string> basis = {"h",  "s", "t", "rx", "ry",
+                                    "rz", "x", "y", "z",  "x(1)"};
   BasisConversionPassOptions options;
   options.basis = basis;
   options.disabledPatterns = z_disabledPatterns;
@@ -40,10 +38,9 @@ static void addAnyonCPipeline(OpPassManager &pm) {
 
 static void addOQCPipeline(OpPassManager &pm) {
   using namespace cudaq::opt;
-  std::string basis[] = {
-      // TODO: make this our native gate set
-      "h", "s", "t", "r1", "rx", "ry", "rz", "x", "y", "z", "x(1)",
-  };
+  SmallVector<std::string> basis = {// TODO: make this our native gate set
+                                    "h",  "s", "t", "r1", "rx",  "ry",
+                                    "rz", "x", "y", "z",  "x(1)"};
   BasisConversionPassOptions options;
   options.basis = basis;
   options.disabledPatterns = z_disabledPatterns;
@@ -52,9 +49,8 @@ static void addOQCPipeline(OpPassManager &pm) {
 
 static void addQuantinuumPipeline(OpPassManager &pm) {
   using namespace cudaq::opt;
-  std::string basis[] = {
-      "h", "s", "t", "rx", "ry", "rz", "x", "y", "z", "x(1)",
-  };
+  SmallVector<std::string> basis = {"h",  "s", "t", "rx", "ry",
+                                    "rz", "x", "y", "z",  "x(1)"};
   BasisConversionPassOptions options;
   options.basis = basis;
   options.disabledPatterns = z_disabledPatterns;
@@ -63,7 +59,7 @@ static void addQuantinuumPipeline(OpPassManager &pm) {
 
 static void addIQMPipeline(OpPassManager &pm) {
   using namespace cudaq::opt;
-  std::string basis[] = {
+  SmallVector<std::string> basis = {
       "phased_rx",
       "z(1)",
   };
@@ -75,9 +71,9 @@ static void addIQMPipeline(OpPassManager &pm) {
 
 static void addIonQPipeline(OpPassManager &pm) {
   using namespace cudaq::opt;
-  std::string basis[] = {
+  SmallVector<std::string> basis = {
       "h",  "s", "t", "rx", "ry",
-      "rz", "x", "y", "z",  "x(1)", // TODO set to ms, gpi, gpi2
+      "rz", "x", "y", "z",  "x(1)" // TODO set to ms, gpi, gpi2
   };
   BasisConversionPassOptions options;
   options.basis = basis;
@@ -87,9 +83,8 @@ static void addIonQPipeline(OpPassManager &pm) {
 
 static void addFermioniqPipeline(OpPassManager &pm) {
   using namespace cudaq::opt;
-  std::string basis[] = {
-      "h", "s", "t", "rx", "ry", "rz", "x", "y", "z", "x(1)",
-  };
+  SmallVector<std::string> basis = {"h",  "s", "t", "rx", "ry",
+                                    "rz", "x", "y", "z",  "x(1)"};
   BasisConversionPassOptions options;
   options.basis = basis;
   options.disabledPatterns = z_disabledPatterns;

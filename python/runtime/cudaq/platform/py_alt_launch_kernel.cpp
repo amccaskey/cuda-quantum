@@ -28,11 +28,10 @@
 #include "runtime/cudaq/algorithms/py_utils.h"
 #include "utils/OpaqueArguments.h"
 #include "utils/PyTypes.h"
-#include "llvm/MC/SubtargetFeature.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Error.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/CAPI/ExecutionEngine.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -85,14 +84,15 @@ static std::string createDataLayout() {
 
   std::string cpu(llvm::sys::getHostCPUName());
   llvm::SubtargetFeatures features;
-  llvm::StringMap<bool> hostFeatures;
+  llvm::StringMap<bool> hostFeatures = llvm::sys::getHostCPUFeatures();
 
-  if (llvm::sys::getHostCPUFeatures(hostFeatures))
+  if (!hostFeatures.empty())
     for (auto &f : hostFeatures)
       features.AddFeature(f.first(), f.second);
 
-  std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
-      targetTriple, cpu, features.getString(), {}, {}));
+  llvm::Triple triple{targetTriple};
+  std::unique_ptr<llvm::TargetMachine> machine(
+      target->createTargetMachine(triple, cpu, features.getString(), {}, {}));
   if (!machine)
     throw std::runtime_error("Cannot create target machine");
 
@@ -189,10 +189,11 @@ ExecutionEngine *jitKernel(const std::string &name, MlirModule module,
     ExecutionEngineOptions opts;
     opts.enableGDBNotificationListener = false;
     opts.enablePerfNotificationListener = false;
-    opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
+    auto transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
+    opts.transformer = transformer;
     opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::None;
     SmallVector<StringRef, 4> sharedLibs;
-    opts.llvmModuleBuilder =
+    auto builder =
         [](Operation *module,
            llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
       auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
@@ -217,6 +218,7 @@ ExecutionEngine *jitKernel(const std::string &name, MlirModule module,
                                                       tmOrError.get().get());
       return llvmModule;
     };
+    opts.llvmModuleBuilder = builder;
 
     auto jitOrError = ExecutionEngine::create(cloned, opts);
     assert(!!jitOrError);
@@ -914,7 +916,8 @@ std::string getASM(const std::string &name, MlirModule module,
   pm.addNestedPass<func::FuncOp>(
       cudaq::opt::createMultiControlDecompositionPass());
   pm.addPass(cudaq::opt::createDecompositionPass(
-      {.enabledPatterns = {"SToR1", "TToR1", "R1ToU3", "U3ToRotations",
+      {.disabledPatterns = {},
+       .enabledPatterns = {"SToR1", "TToR1", "R1ToU3", "U3ToRotations",
                            "CHToCX", "CCZToCX", "CRzToCX", "CRyToCX", "CRxToCX",
                            "CR1ToCX", "CCZToCX", "RxAdjToRx", "RyAdjToRy",
                            "RzAdjToRz"}}));

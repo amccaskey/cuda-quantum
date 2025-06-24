@@ -181,7 +181,7 @@ public:
     auto argsCreatorFunc = builder.create<func::FuncOp>(
         loc, classNameStr + ".argsCreator", funcType);
     OpBuilder::InsertionGuard guard(builder);
-    auto *entry = argsCreatorFunc.addEntryBlock(builder);
+    auto *entry = argsCreatorFunc.addEntryBlock();
     builder.setInsertionPointToStart(entry);
 
     // Convert all the arguments passed in the array of void* to appear as if
@@ -283,7 +283,7 @@ public:
     auto thunk =
         builder.create<func::FuncOp>(loc, classNameStr + ".thunk", thunkTy);
     OpBuilder::InsertionGuard guard(builder);
-    auto *thunkEntry = thunk.addEntryBlock(builder);
+    auto *thunkEntry = thunk.addEntryBlock();
     builder.setInsertionPointToStart(thunkEntry);
     auto castOp = builder.create<cudaq::cc::CastOp>(loc, structPtrTy,
                                                     thunkEntry->getArgument(0));
@@ -405,7 +405,7 @@ public:
     auto structPtrTy = cudaq::cc::PointerType::get(structTy);
     const std::int32_t offset = devFuncTy.getNumInputs();
 
-    Block *hostFuncEntryBlock = hostFunc.addEntryBlock(builder);
+    Block *hostFuncEntryBlock = hostFunc.addEntryBlock();
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointToStart(hostFuncEntryBlock);
 

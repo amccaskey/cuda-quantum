@@ -41,7 +41,7 @@ listReachableFunctions(clang::CallGraphNode *cgn) {
   llvm::SmallVector<clang::Decl *> result;
   for (auto call : *cgn) {
     auto *decl = call.Callee->getDecl();
-    if (auto *nd = dyn_cast<clang::NamedDecl>(decl)) {
+    if ([[maybe_unused]] auto *nd = dyn_cast<clang::NamedDecl>(decl)) {
       LLVM_DEBUG(llvm::dbgs() << "adding function: "
                               << nd->getQualifiedNameAsString() << '\n');
     }
@@ -337,7 +337,7 @@ public:
       // This constexpr is the sizeof a pauli_word and a std::string.
       auto loc = x->getLocation();
       auto opt = x->getAnyInitializer()->getIntegerConstantExpr(
-          x->getASTContext(), &loc, false);
+          x->getASTContext(), &loc);
       assert(opt && "must compute the sizeof a cudaq::pauli_word");
       auto sizeofString = opt->getZExtValue();
       auto sizeAttr = module->getAttr(cudaq::runtime::sizeofStringAttrName);

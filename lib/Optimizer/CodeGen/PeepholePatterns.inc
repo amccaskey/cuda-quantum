@@ -27,9 +27,12 @@ struct XCtrlOneTargetToCNot : public OpRewritePattern<LLVM::CallOp> {
       return failure();
     auto *ctx = rewriter.getContext();
     auto funcSymbol = FlatSymbolRefAttr::get(ctx, cudaq::opt::QIRCnot);
-    rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        call, TypeRange{}, funcSymbol, args.drop_front(2),
-        call.getFastmathFlagsAttr(), call.getBranchWeightsAttr());
+    LLVM::CallOp::Properties properties;
+    properties.setBranchWeights(call.getBranchWeightsAttr());
+    properties.setFastmathFlags(call.getFastmathFlagsAttr());
+    properties.setCallee(funcSymbol);
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(call, TypeRange{},
+                                              args.drop_front(2), properties);
     return success();
   }
 };
@@ -73,9 +76,12 @@ struct CalleeConv : public OpRewritePattern<LLVM::CallOp> {
       return failure();
     auto *ctx = rewriter.getContext();
     auto symbol = FlatSymbolRefAttr::get(ctx, callee->str() + "__body");
-    rewriter.replaceOpWithNewOp<LLVM::CallOp>(
-        call, TypeRange{}, symbol, call.getOperands(),
-        call.getFastmathFlagsAttr(), call.getBranchWeightsAttr());
+    LLVM::CallOp::Properties properties;
+    properties.setBranchWeights(call.getBranchWeightsAttr());
+    properties.setFastmathFlags(call.getFastmathFlagsAttr());
+    properties.setCallee(symbol);
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(call, TypeRange{},
+                                              call.getOperands(), properties);
     return success();
   }
 };

@@ -127,7 +127,7 @@ public:
   using FactorQuantumAllocationsBase::FactorQuantumAllocationsBase;
 
   void runOnOperation() override {
-    func::FuncOp func = getOperation();
+    [[maybe_unused]] func::FuncOp func = getOperation();
     LLVM_DEBUG(llvm::dbgs() << "Function before factoring quake alloca:\n"
                             << func << "\n\n");
 

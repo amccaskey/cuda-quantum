@@ -124,7 +124,7 @@ QuakeValue QuakeValue::operator[](const std::size_t idx) {
   // must be a std vec type
   value->addUniqueExtraction(idx);
 
-  Type eleTy = vectorValue.getType().cast<cc::StdvecType>().getElementType();
+  Type eleTy = cast<cc::StdvecType>(vectorValue.getType()).getElementType();
 
   auto arrPtrTy = cc::PointerType::get(cc::ArrayType::get(eleTy));
   Value vecPtr = opBuilder.create<cc::StdvecDataOp>(arrPtrTy, vectorValue);
@@ -162,7 +162,7 @@ QuakeValue QuakeValue::operator[](const QuakeValue &idx) {
   // been passed in correctly.
   canValidateVectorNumElements = false;
 
-  Type eleTy = vectorValue.getType().cast<cc::StdvecType>().getElementType();
+  Type eleTy = cast<cc::StdvecType>(vectorValue.getType()).getElementType();
   auto arrEleTy = cc::PointerType::get(cc::ArrayType::get(eleTy));
   Value vecPtr = opBuilder.create<cc::StdvecDataOp>(arrEleTy, vectorValue);
   auto elePtrTy = cc::PointerType::get(eleTy);
@@ -208,7 +208,7 @@ QuakeValue QuakeValue::slice(const std::size_t startIdx,
 
   Value startIdxValue = opBuilder.create<arith::ConstantIntOp>(startIdx, 64);
   Value countValue = opBuilder.create<arith::ConstantIntOp>(count, 64);
-  if (auto veqType = type.dyn_cast_or_null<quake::VeqType>()) {
+  if (auto veqType = dyn_cast_or_null<quake::VeqType>(type)) {
     auto veqSize = veqType.getSize();
     if (startIdx + count > veqSize)
       throw std::runtime_error("Invalid number of elements requested in slice, "

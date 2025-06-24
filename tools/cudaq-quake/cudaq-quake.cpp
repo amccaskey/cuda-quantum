@@ -181,7 +181,7 @@ public:
     applyConsumers(&clang::ASTConsumer::CompleteTentativeDefinition,
                    std::move(D));
   }
-  void CompleteExternalDeclaration(clang::VarDecl *D) override {
+  void CompleteExternalDeclaration(clang::DeclaratorDecl *D) override {
     applyConsumers(&clang::ASTConsumer::CompleteExternalDeclaration,
                    std::move(D));
   }

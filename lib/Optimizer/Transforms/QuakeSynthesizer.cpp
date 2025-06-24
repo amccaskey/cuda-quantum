@@ -747,7 +747,11 @@ public:
         return;
       }
     }
-    funcOp.eraseArguments(argsToErase);
+    if (failed(funcOp.eraseArguments(argsToErase))) {
+      LLVM_DEBUG(llvm::dbgs() << "failed to erase arguments for "
+                              << funcOp.getName() << '\n');
+      signalPassFailure();
+    }
   }
 };
 

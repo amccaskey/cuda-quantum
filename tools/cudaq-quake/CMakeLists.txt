@@ -7,6 +7,8 @@
 # ============================================================================ #
 
 set(LLVM_LINK_COMPONENTS Support ${LLVM_TARGETS_TO_BUILD})
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(translation_libs GLOBAL PROPERTY MLIR_TRANSLATION_LIBS)
 
 add_llvm_executable(cudaq-quake cudaq-quake.cpp)
 
@@ -24,6 +26,15 @@ target_link_libraries(cudaq-quake
   MLIRTargetLLVMIRExport
   MLIRLLVMCommonConversion
   MLIRLLVMToLLVMIRTranslation
+  MLIRConvertToEmitC
+  MLIRFuncToEmitC
+  MLIRFuncTransforms
+  MLIRTensorAllExtensions
+  MLIRMPIToLLVM
+  MLIRFuncAllExtensions
+  MLIROpenMPToLLVM
+  ${dialect_libs}
+  ${translation_libs}
 
   clangCodeGen
   clangFrontendTool

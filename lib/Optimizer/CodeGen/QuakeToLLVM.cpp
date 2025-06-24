@@ -304,7 +304,7 @@ public:
     auto qir_array_get_element_ptr_1d = cudaq::opt::QIRArrayGetElementPtr1d;
 
     auto array_qbit_type = cudaq::opt::getArrayType(context);
-    auto qbit_element_ptr_type = LLVM::LLVMPointerType::get(context);
+    auto qbit_element_ptr_type = cudaq::opt::factory::getPointerType(context);
 
     FlatSymbolRefAttr symbolRef = cudaq::opt::factory::createLLVMFunctionSymbol(
         qir_array_get_element_ptr_1d, qbit_element_ptr_type,
@@ -328,7 +328,7 @@ public:
         llvm::ArrayRef({adaptor.getOperands().front(), idx_operand}));
 
     auto bitcast = rewriter.create<LLVM::BitcastOp>(
-        loc, LLVM::LLVMPointerType::get(context),
+        loc, cudaq::opt::factory::getPointerType(context),
         get_qbit_qir_call.getResult());
     rewriter.replaceOpWithNewOp<LLVM::LoadOp>(
         extract, cudaq::opt::getQubitType(context), bitcast.getResult());
@@ -476,20 +476,26 @@ public:
     // a pauli_word directly `{i8*,i64}` or a string literal
     // `ptr<i8>`. If it is a string literal, we need to map it to
     // a pauli word.
+    Type pauliEleTy;
     if (instOp.getPauliLiteralAttr()) {
       auto builder = cudaq::IRBuilder::atBlockEnd(parentModule.getBody());
       auto pauliConst = builder.genCStringLiteralAppendNul(
           loc, parentModule, *instOp.getPauliLiteral());
+      pauliEleTy = pauliConst.getType();
       // Create a pauli reference and make it the last operand.
       operands.push_back(rewriter.create<LLVM::AddressOfOp>(
-          loc, cudaq::opt::factory::getPointerType(pauliConst.getType()),
+          loc, cudaq::opt::factory::getPointerType(pauliEleTy),
           pauliConst.getSymName()));
+    } else {
+      if (auto ptrTy =
+              dyn_cast<cudaq::cc::PointerType>(instOp.getPauli().getType()))
+        pauliEleTy = ptrTy.getElementType();
     }
     auto pauliWord = operands.back();
     if (auto ptrTy = dyn_cast<LLVM::LLVMPointerType>(pauliWord.getType())) {
       // Make sure we have the right types to extract the
       // length of the string literal
-      auto ptrEleTy = ptrTy.getElementType();
+      auto ptrEleTy = pauliEleTy;
       auto innerArrTy = dyn_cast<LLVM::LLVMArrayType>(ptrEleTy);
       if (!innerArrTy)
         return instOp.emitError(
@@ -502,13 +508,13 @@ public:
       operands.pop_back();
 
       // We must create the {i8*, i64} struct from the string literal
-      SmallVector<Type> structTys{LLVM::LLVMPointerType::get(context),
+      SmallVector<Type> structTys{cudaq::opt::factory::getPointerType(context),
                                   rewriter.getI64Type()};
       auto structTy = LLVM::LLVMStructType::getLiteral(context, structTys);
 
       // Allocate the char span struct
       Value alloca = cudaq::opt::factory::createLLVMTemporary(
-          loc, rewriter, LLVM::LLVMPointerType::get(structTy));
+          loc, rewriter, cudaq::opt::factory::getPointerType(structTy));
 
       // We'll need these constants
       auto zero = cudaq::opt::factory::genLlvmI64Constant(loc, rewriter, 0);
@@ -518,17 +524,17 @@ public:
 
       // Set the string literal data
       auto charPtrTy = cudaq::opt::factory::getPointerType(context);
-      auto strPtrTy = LLVM::LLVMPointerType::get(context);
-      auto strPtr = rewriter.create<LLVM::GEPOp>(loc, strPtrTy, alloca,
-                                                 ValueRange{zero, zero});
+      auto strPtrTy = cudaq::opt::factory::getPointerType(context);
+      auto strPtr = rewriter.create<LLVM::GEPOp>(
+          loc, charPtrTy, strPtrTy, alloca, ValueRange{zero, zero});
       auto castedPauli =
           rewriter.create<LLVM::BitcastOp>(loc, charPtrTy, pauliWord);
       rewriter.create<LLVM::StoreOp>(loc, castedPauli, strPtr);
 
       // Set the integer length
-      auto intPtr =
-          rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(context),
-                                       alloca, ValueRange{zero, one});
+      auto intPtr = rewriter.create<LLVM::GEPOp>(
+          loc, structTy, cudaq::opt::factory::getPointerType(context), alloca,
+          ValueRange{zero, one});
       rewriter.create<LLVM::StoreOp>(loc, size, intPtr);
 
       // Cast to raw opaque pointer
@@ -544,7 +550,7 @@ public:
     // Allocate a stack slot for it and store what we have to that pointer,
     // pass the pointer to NVQIR
     Value alloca = cudaq::opt::factory::createLLVMTemporary(
-        loc, rewriter, LLVM::LLVMPointerType::get(context));
+        loc, rewriter, cudaq::opt::factory::getPointerType(context));
     rewriter.create<LLVM::StoreOp>(loc, pauliWord, alloca);
     auto castedPauli = rewriter.create<LLVM::BitcastOp>(
         loc, cudaq::opt::factory::getPointerType(context), alloca);
@@ -595,8 +601,6 @@ public:
       return failure();
     if (numTargetOperands == 2)
       argTys.push_back(qirQubitPointerType);
-    auto instOpQISFunctionType =
-        LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(context), argTys);
 
     // Get the function pointer for the ctrl operation
     auto qirFunctionSymbolRef = cudaq::opt::factory::createLLVMFunctionSymbol(
@@ -619,7 +623,8 @@ public:
     FlatSymbolRefAttr applyMultiControlFunction;
     SmallVector<Value> args;
     Value ctrlOpPointer = rewriter.create<LLVM::AddressOfOp>(
-        loc, LLVM::LLVMPointerType::get(context), qirFunctionSymbolRef);
+        loc, cudaq::opt::factory::getPointerType(context),
+        qirFunctionSymbolRef);
     Value numControlOperands =
         rewriter.create<LLVM::ConstantOp>(loc, i64Type, numControls);
     args.push_back(numControlOperands);
@@ -639,7 +644,8 @@ public:
       applyMultiControlFunction = cudaq::opt::factory::createLLVMFunctionSymbol(
           cudaq::opt::NVQIRInvokeWithControlBits,
           LLVM::LLVMVoidType::get(context),
-          {i64Type, LLVM::LLVMPointerType::get(context)}, parentModule, true);
+          {i64Type, cudaq::opt::factory::getPointerType(context)}, parentModule,
+          true);
     } else {
       // Otherwise use the general function, which can handle registers of
       // qubits and multiple target qubits. Get symbol for the
@@ -647,8 +653,8 @@ public:
       applyMultiControlFunction = cudaq::opt::factory::createLLVMFunctionSymbol(
           cudaq::opt::NVQIRInvokeWithControlRegisterOrBits,
           LLVM::LLVMVoidType::get(context),
-          {i64Type, LLVM::LLVMPointerType::get(context), i64Type,
-           LLVM::LLVMPointerType::get(context)},
+          {i64Type, cudaq::opt::factory::getPointerType(context), i64Type,
+           cudaq::opt::factory::getPointerType(context)},
           parentModule, true);
 
       // The total number of control qubits may be more than the number of
@@ -734,7 +740,7 @@ public:
 
     auto qubitIndexType = cudaq::opt::getQubitType(context);
     auto qubitArrayType = cudaq::opt::getArrayType(context);
-    auto paramType = FloatType::getF64(context);
+    auto paramType = Float64Type::get(context);
 
     SmallVector<Value> funcArgs;
     auto castToDouble = [&](Value v) {
@@ -765,9 +771,6 @@ public:
     qirFunctionName += "__ctl";
 
     // __quantum__qis__NAME__ctl(double, Array*, Qubit*) Type
-    auto instOpQISFunctionType = LLVM::LLVMFunctionType::get(
-        LLVM::LLVMVoidType::get(context),
-        {paramType, qubitArrayType, qubitIndexType});
 
     // Get function pointer to ctrl operation
     FlatSymbolRefAttr instSymbolRef =
@@ -797,7 +800,7 @@ public:
     // invokeRotationWithControlQubits function.
 
     Value ctrlOpPointer = rewriter.create<LLVM::AddressOfOp>(
-        loc, LLVM::LLVMPointerType::get(context), instSymbolRef);
+        loc, cudaq::opt::factory::getPointerType(context), instSymbolRef);
 
     // Get symbol for
     // void invokeRotationWithControlQubits(double param, const std::size_t
@@ -808,8 +811,8 @@ public:
         cudaq::opt::factory::createLLVMFunctionSymbol(
             cudaq::opt::NVQIRInvokeRotationWithControlBits,
             LLVM::LLVMVoidType::get(context),
-            {paramType, i64Type, LLVM::LLVMPointerType::get(context),
-             LLVM::LLVMPointerType::get(context)},
+            {paramType, i64Type, cudaq::opt::factory::getPointerType(context),
+             cudaq::opt::factory::getPointerType(context)},
             parentModule, true);
 
     // Create an integer array where the kth element is N if the kth
@@ -851,7 +854,7 @@ public:
     SmallVector<Type> tmpArgTypes;
     auto qubitIndexType = cudaq::opt::getQubitType(context);
 
-    auto paramType = FloatType::getF64(context);
+    auto paramType = Float64Type::get(context);
     tmpArgTypes.push_back(paramType);
     tmpArgTypes.push_back(paramType);
     tmpArgTypes.push_back(qubitIndexType);
@@ -910,7 +913,7 @@ public:
 
     auto qubitIndexType = cudaq::opt::getQubitType(context);
     auto qubitArrayType = cudaq::opt::getArrayType(context);
-    auto paramType = FloatType::getF64(context);
+    auto paramType = Float64Type::get(context);
 
     SmallVector<Value> funcArgs;
     auto castToDouble = [&](Value v) {
@@ -944,9 +947,6 @@ public:
     qirFunctionName += "__ctl";
 
     // __quantum__qis__u3__ctl(double, double, double, Array*, Qubit*) Type
-    auto instOpQISFunctionType = LLVM::LLVMFunctionType::get(
-        LLVM::LLVMVoidType::get(context),
-        {paramType, paramType, paramType, qubitArrayType, qubitIndexType});
 
     // Get function pointer to ctrl operation
     FlatSymbolRefAttr instSymbolRef =
@@ -977,7 +977,7 @@ public:
     // invokeU3RotationWithControlQubits function.
 
     Value ctrlOpPointer = rewriter.create<LLVM::AddressOfOp>(
-        loc, LLVM::LLVMPointerType::get(context), instSymbolRef);
+        loc, cudaq::opt::factory::getPointerType(context), instSymbolRef);
 
     // Get symbol for void invokeU3RotationWithControlQubits(double theta,
     // double phi, double lambda, const std::size_t numControlOperands, i64*
@@ -989,8 +989,8 @@ public:
             cudaq::opt::NVQIRInvokeU3RotationWithControlBits,
             LLVM::LLVMVoidType::get(context),
             {paramType, paramType, paramType, i64Type,
-             LLVM::LLVMPointerType::get(context),
-             LLVM::LLVMPointerType::get(context)},
+             cudaq::opt::factory::getPointerType(context),
+             cudaq::opt::factory::getPointerType(context)},
             parentModule, true);
 
     // Create an integer array where the kth element is N if the kth
@@ -1082,7 +1082,7 @@ public:
       // Change the function name
       qFunctionName += "__to__register";
       // Append a string type argument
-      funcTypes.push_back(LLVM::LLVMPointerType::get(context));
+      funcTypes.push_back(cudaq::opt::factory::getPointerType(context));
       appendName = true;
     } else {
       // If no register name is supplied, make one up. Zero pad the counter so
@@ -1137,7 +1137,7 @@ public:
     if (regName)
       callOp->setAttr("registerName", regName);
     auto i1Ty = rewriter.getI1Type();
-    auto i1PtrTy = LLVM::LLVMPointerType::get(context);
+    auto i1PtrTy = cudaq::opt::factory::getPointerType(context);
     auto cast =
         rewriter.create<LLVM::BitcastOp>(loc, i1PtrTy, callOp.getResult());
     rewriter.replaceOpWithNewOp<LLVM::LoadOp>(measure, i1Ty, cast);
@@ -1203,7 +1203,7 @@ public:
       // functions always have a single result, this should be fine. If things
       // change, we will need to update this.
       auto bitcast = rewriter.create<LLVM::BitcastOp>(
-          loc, LLVM::LLVMPointerType::get(context),
+          loc, cudaq::opt::factory::getPointerType(context),
           adaptor.getOperands().front());
 
       // Load the bool
@@ -1373,7 +1373,7 @@ public:
 
     auto complex64Ty =
         typeConverter->convertType(ComplexType::get(rewriter.getF64Type()));
-    auto complex64PtrTy = LLVM::LLVMPointerType::get(context);
+    auto complex64PtrTy = cudaq::opt::factory::getPointerType(complex64Ty);
     Type type = typeConverter->convertType(globalOp.getType());
     auto addrOp = rewriter.create<LLVM::AddressOfOp>(loc, type, generatorName);
     auto unitaryData =
@@ -1387,7 +1387,7 @@ public:
             qirFunctionName, LLVM::LLVMVoidType::get(context),
             {complex64PtrTy, cudaq::opt::getArrayType(context),
              cudaq::opt::getArrayType(context),
-             LLVM::LLVMPointerType::get(context)},
+             cudaq::opt::factory::getPointerType(context)},
             parentModule);
 
     rewriter.replaceOpWithNewOp<LLVM::CallOp>(

@@ -94,8 +94,8 @@ private:
       if (auto store = dyn_cast<cudaq::cc::StoreOp>(&op)) {
         auto ptr = store.getPtrvalue().getDefiningOp();
         if (isStoreToStack(store)) {
-          auto &[b, ptrToStores] = blockInfo.FindAndConstruct(block);
-          auto &[p, stores] = ptrToStores.FindAndConstruct(ptr);
+          auto ptrToStores = blockInfo[block];
+          auto stores = ptrToStores[ptr];
           stores.push_back(&op);
         }
       }
@@ -113,7 +113,7 @@ private:
   /// cc.store %c0_i64, %3 : !cc.ptr<i64>
   /// ```
   static bool isStoreToStack(cudaq::cc::StoreOp store) {
-    auto ptrOp = store.getPtrvalue();
+    Value ptrOp = store.getPtrvalue();
     if (auto cast = ptrOp.getDefiningOp<cudaq::cc::CastOp>())
       ptrOp = cast.getOperand();
 

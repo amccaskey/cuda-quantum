@@ -405,8 +405,8 @@ public:
       for (auto &op : moduleOp) {
         if (op.hasAttr(cudaq::entryPointAttrName) &&
             op.hasAttr("output_names")) {
-          if (auto strAttr = op.getAttr(cudaq::opt::QIROutputNamesAttrName)
-                                 .dyn_cast_or_null<mlir::StringAttr>()) {
+          if (auto strAttr = dyn_cast_or_null<mlir::StringAttr>(
+                  op.getAttr(cudaq::opt::QIROutputNamesAttrName))) {
             output_names = nlohmann::json::parse(strAttr.getValue());
             break;
           }

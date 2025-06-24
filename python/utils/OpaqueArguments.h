@@ -134,7 +134,7 @@ inline mlir::func::FuncOp getKernelFuncOp(MlirModule module,
   ModuleOp mod = unwrap(module);
   func::FuncOp kernelFunc;
   mod.walk([&](func::FuncOp function) {
-    if (function.getName().equals("__nvqpp__mlirgen__" + kernelName)) {
+    if (function.getName() == "__nvqpp__mlirgen__" + kernelName) {
       kernelFunc = function;
       return WalkResult::interrupt();
     }

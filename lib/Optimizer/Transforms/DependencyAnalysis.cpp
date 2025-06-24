@@ -432,6 +432,7 @@ public:
     }
 
     assert(false && "Couldn't find successor for linear type!");
+    return {};
   }
 
   /// Recursively find nodes scheduled at a given cycle
@@ -800,9 +801,9 @@ protected:
     auto oldOp = associated;
     auto operands = gatherOperands(builder);
 
-    associated =
-        Operation::create(oldOp->getLoc(), oldOp->getName(),
-                          oldOp->getResultTypes(), operands, oldOp->getAttrs());
+    associated = Operation::create(
+        oldOp->getLoc(), oldOp->getName(), oldOp->getResultTypes(), operands,
+        oldOp->getAttrs(), OpaqueProperties{nullptr});
     associated->removeAttr("dnodeid");
     builder.insert(associated);
   }
@@ -1400,6 +1401,7 @@ public:
         return root;
 
     assert(false && "Could not find root for qid");
+    return {};
   }
 
   /// Returns the alloc node for the physical qubit \p qubit, fails if no such
@@ -1417,6 +1419,7 @@ public:
       if (root->getQubits().contains(qubit))
         return root;
     assert(false && "Could not find root for qubit");
+    return {};
   }
 
   /// Generate code for all nodes at the given cycle in the graph,
@@ -2177,7 +2180,7 @@ public:
   /// ArgDependencyNode for \p qid
   void removeArgument(VirtualQID qid) {
     unsigned i = 0;
-    bool found = false;
+    [[maybe_unused]] bool found = false;
     for (; i < argdnodes.size(); i++) {
       if (argdnodes[i]->qids.contains(qid)) {
         delete argdnodes[i];

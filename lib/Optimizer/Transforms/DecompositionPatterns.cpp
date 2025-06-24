@@ -401,13 +401,13 @@ struct ExpPauliDecomposition : public OpRewritePattern<quake::ExpPauliOp> {
               } else if (auto global = dyn_cast<cudaq::cc::GlobalOp>(symbol)) {
                 auto attr = global.getValue();
                 auto elementsAttr = cast<mlir::ElementsAttr>(attr.value());
-                auto eleTy = elementsAttr.getElementType();
+                [[maybe_unused]] auto eleTy = elementsAttr.getElementType();
                 auto values = elementsAttr.getValues<mlir::Attribute>();
 
                 std::string pauliWordString;
                 pauliWordString.reserve(values.size());
                 for (auto it = values.begin(); it != values.end(); ++it) {
-                  assert(isa<IntegerType>(eleTy));
+                  assert(isa<IntegerType>(eleTy) && "expected integral type");
                   char v = static_cast<char>(cast<IntegerAttr>(*it).getInt());
                   pauliWordString.push_back(v);
                 }

@@ -180,11 +180,14 @@ static void createInitFunc(OpBuilder &builder, ModuleOp moduleOp,
         newBuilder.setInsertionPointAfter(alloc);
 
         if (!arg) {
-          initFunc.insertArgument(argPos, retTy, {}, loc);
+          if (failed(initFunc.insertArgument(argPos, retTy, {}, loc))) {
+            assert(false && "argument failed to insert");
+            return;
+          }
           arg = initFunc.getArgument(argPos);
         }
 
-        auto allocSize = alloc.getSize();
+        Value allocSize = alloc.getSize();
         if (!allocSize)
           allocSize = newBuilder.create<arith::ConstantIntOp>(
               loc, quake::getAllocationSize(alloc.getType()), 64);
@@ -276,7 +279,7 @@ static void createNumQubitsFunc(OpBuilder &builder, ModuleOp moduleOp,
     for (auto &op : block) {
       // Calculate allocation size (existing allocation size plus new one)
       if (auto alloc = dyn_cast<quake::AllocaOp>(&op)) {
-        auto allocSize = alloc.getSize();
+        Value allocSize = alloc.getSize();
         if (!allocSize)
           allocSize = newBuilder.create<arith::ConstantIntOp>(
               loc, quake::getAllocationSize(alloc.getType()), 64);

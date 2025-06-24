@@ -2353,7 +2353,7 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
   auto mlirFuncTy = cast<FunctionType>(calleeOp.getType());
   auto funcResults = mlirFuncTy.getResults();
   auto convertedArgs =
-      convertKernelArgs(builder, loc, 0, args, mlirFuncTy.getInputs());
+      convertKernelArgs(loc, 0, args, mlirFuncTy.getInputs(), x);
   auto call = builder.create<func::CallIndirectOp>(
       loc, funcResults, calleeOp, convertedArgs, ArrayAttr{}, ArrayAttr{});
   if (call.getNumResults() > 0) {

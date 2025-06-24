@@ -7,6 +7,8 @@
 # ============================================================================ #
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-type-limits")
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(translation_libs GLOBAL PROPERTY MLIR_TRANSLATION_LIBS)
 
 add_llvm_executable(cudaq-opt cudaq-opt.cpp)
 
@@ -18,6 +20,15 @@ target_link_libraries(cudaq-opt
   MLIRIR
   MLIRFuncDialect
   MLIRArithDialect
+  MLIRConvertToEmitC
+  MLIRFuncToEmitC
+  MLIRFuncTransforms
+  MLIRTensorAllExtensions
+  MLIRMPIToLLVM
+  MLIRFuncAllExtensions
+  MLIROpenMPToLLVM
+  ${dialect_libs}
+  ${translation_libs}
 
   CCDialect
   QuakeDialect

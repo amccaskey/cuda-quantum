@@ -90,7 +90,8 @@ public:
     auto createStateFunc = is64Bit ? cudaq::createCudaqStateFromDataFP64
                                    : cudaq::createCudaqStateFromDataFP32;
     cudaq::IRBuilder irBuilder(ctx);
-    auto result = irBuilder.loadIntrinsic(module, createStateFunc);
+    [[maybe_unused]] auto result =
+        irBuilder.loadIntrinsic(module, createStateFunc);
     assert(succeeded(result) && "loading intrinsic should never fail");
 
     auto stateTy = quake::StateType::get(ctx);
@@ -115,7 +116,8 @@ public:
     auto state = deleteStateOp.getOperand();
 
     cudaq::IRBuilder irBuilder(ctx);
-    auto result = irBuilder.loadIntrinsic(module, cudaq::deleteCudaqState);
+    [[maybe_unused]] auto result =
+        irBuilder.loadIntrinsic(module, cudaq::deleteCudaqState);
     assert(succeeded(result) && "loading intrinsic should never fail");
 
     rewriter.replaceOpWithNewOp<func::CallOp>(deleteStateOp, std::nullopt,
@@ -137,7 +139,7 @@ public:
     auto state = getNumQubitsOp.getOperand();
 
     cudaq::IRBuilder irBuilder(ctx);
-    auto result =
+    [[maybe_unused]] auto result =
         irBuilder.loadIntrinsic(module, cudaq::getNumQubitsFromCudaqState);
     assert(succeeded(result) && "loading intrinsic should never fail");
 

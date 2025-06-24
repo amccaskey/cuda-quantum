@@ -150,7 +150,7 @@ public:
         func.walk([&](Operation *op) {
           if (isa<func::ReturnOp>(op)) {
             auto loc = op->getLoc();
-            auto result =
+            [[maybe_unused]] auto result =
                 irBuilder.loadIntrinsic(module, cudaq::deleteCudaqState);
             assert(succeeded(result) && "loading intrinsic should never fail");
 

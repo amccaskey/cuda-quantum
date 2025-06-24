@@ -231,8 +231,8 @@ public:
 
     LLVM_DEBUG(llvm::dbgs() << "Before constant prop:\n" << func << '\n');
 
-    if (failed(applyPatternsAndFoldGreedily(func.getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(
+            applyPatternsGreedily(func.getOperation(), std::move(patterns)))) {
       signalPassFailure();
       return;
     }

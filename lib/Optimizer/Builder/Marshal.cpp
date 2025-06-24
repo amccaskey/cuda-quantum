@@ -648,7 +648,7 @@ Value populateDynamicAddendum(Location loc, OpBuilder &builder, ModuleOp module,
                                            addendum);
   }
   auto devStrTy = cast<cudaq::cc::StructType>(devArgTy);
-  auto hostStrTy = cast<cudaq::cc::StructType>(
+  [[maybe_unused]] auto hostStrTy = cast<cudaq::cc::StructType>(
       cast<cudaq::cc::PointerType>(sizeSlot.getType()).getElementType());
   assert(devStrTy.getNumMembers() == hostStrTy.getNumMembers());
   for (auto iter : llvm::enumerate(devStrTy.getMembers())) {

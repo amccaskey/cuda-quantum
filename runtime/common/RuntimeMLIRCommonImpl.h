@@ -57,19 +57,17 @@ bool setupTargetTriple(llvm::Module *llvmModule) {
 
   std::string cpu = llvm::sys::getHostCPUName().str();
   llvm::SubtargetFeatures features;
-  llvm::StringMap<bool> hostFeatures;
-
-  if (llvm::sys::getHostCPUFeatures(hostFeatures))
-    for (auto &f : hostFeatures)
-      features.AddFeature(f.first(), f.second);
+  llvm::StringMap<bool> hostFeatures = llvm::sys::getHostCPUFeatures();
+  for (auto &f : hostFeatures)
+    features.AddFeature(f.first(), f.second);
 
   std::unique_ptr<llvm::TargetMachine> machine(target->createTargetMachine(
-      targetTriple, cpu, features.getString(), {}, {}));
+      llvm::Triple{targetTriple}, cpu, features.getString(), {}, {}));
   if (!machine)
     return false;
 
   llvmModule->setDataLayout(machine->createDataLayout());
-  llvmModule->setTargetTriple(targetTriple);
+  llvmModule->setTargetTriple(llvm::Triple{targetTriple});
 
   return true;
 }
@@ -721,9 +719,10 @@ mlir::ExecutionEngine *createQIRJITEngine(mlir::ModuleOp &moduleOp,
   llvm::cl::ParseCommandLineOptions(2, argv);
 
   mlir::ExecutionEngineOptions opts;
-  opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
+  auto myTransformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
+  opts.transformer = myTransformer;
   opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::None;
-  opts.llvmModuleBuilder =
+  auto myBuilder =
       [convertTo = convertTo.str()](
           mlir::Operation *module,
           llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
@@ -791,10 +790,11 @@ mlir::ExecutionEngine *createQIRJITEngine(mlir::ModuleOp &moduleOp,
       return {};
     }
 
-    ExecutionEngine::setupTargetTripleAndDataLayout(llvmModule.get(),
+    mlir::ExecutionEngine::setupTargetTripleAndDataLayout(llvmModule.get(),
                                                     tmOrError.get().get());
     return llvmModule;
   };
+  opts.llvmModuleBuilder = myBuilder;
 
   auto jitOrError = mlir::ExecutionEngine::create(moduleOp, opts);
   assert(!!jitOrError && "ExecutionEngine creation failed.");

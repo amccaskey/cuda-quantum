@@ -266,9 +266,9 @@ struct ReifySpanPattern : public OpRewritePattern<cudaq::cc::ReifySpanOp> {
         members.push_back(rewriter.create<cudaq::cc::StdvecInitOp>(
             loc, cudaq::cc::CharspanType::get(ctx), strLit, size));
       } else if (auto a = dyn_cast<IntegerAttr>(attr)) {
-        members.push_back(rewriter.create<arith::ConstantOp>(loc, a, eleTy));
+        members.push_back(rewriter.create<arith::ConstantOp>(loc, eleTy, a));
       } else if (auto a = dyn_cast<FloatAttr>(attr)) {
-        members.push_back(rewriter.create<arith::ConstantOp>(loc, a, eleTy));
+        members.push_back(rewriter.create<arith::ConstantOp>(loc, eleTy, a));
       } else {
         // Unexpected attribute.
         LLVM_DEBUG(llvm::dbgs() << "unexpected attribute: " << attr << '\n');
@@ -315,7 +315,7 @@ public:
                                                             counter);
     LLVM_DEBUG(llvm::dbgs() << "Before globalizing array values:\n"
                             << module << '\n');
-    if (failed(applyPatternsGreedily(module, std::move(patterns))))
+    if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
       signalPassFailure();
       return;
     }

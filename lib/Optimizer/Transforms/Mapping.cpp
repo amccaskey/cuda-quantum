@@ -14,8 +14,8 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/ScopedPrinter.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "quantum-mapper"
 
@@ -877,7 +877,7 @@ struct MappingFunc : public cudaq::opt::impl::MappingFuncBase<MappingFunc> {
     // unsigned highestMappedQubit = 0;
     builder.setInsertionPoint(block.getTerminator());
     auto phyToWire = router.getPhyToWire();
-    for (auto &[i, s] : llvm::enumerate(sources)) {
+    for (auto [i, s] : llvm::enumerate(sources)) {
       if (s->getUsers().empty()) {
         s->erase();
       } else {

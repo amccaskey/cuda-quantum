@@ -450,7 +450,6 @@ add_subdirectory(tpls/fmt)
 include_directories(SYSTEM tpls/json/include)
 
 add_subdirectory(tpls/spdlog)
-find_package(spdlog REQUIRED)
 
 if (OPENSSL_FOUND AND CUDAQ_ENABLE_REST)
   # Look for CURL

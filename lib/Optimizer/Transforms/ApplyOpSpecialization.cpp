@@ -726,7 +726,7 @@ public:
     auto *ctx = module.getContext();
     RewritePatternSet patterns(ctx);
     patterns.insert<ApplyOpPattern>(ctx, constantPropagation);
-    if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns))))
+    if (failed(applyPatternsGreedily(module, std::move(patterns))))
       signalPassFailure();
     LLVM_DEBUG(llvm::dbgs() << "After apply specialization:\n"
                             << module << "\n\n");

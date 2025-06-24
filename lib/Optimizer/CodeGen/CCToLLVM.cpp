@@ -311,6 +311,8 @@ public:
                   ConversionPatternRewriter &rewriter) const override {
     auto operands = adaptor.getOperands();
     auto toTy = getTypeConverter()->convertType(cpOp.getType());
+    auto eleTy = getTypeConverter()->convertType(
+        cast<cudaq::cc::PointerType>(cpOp.getType()).getElementType());
     // The first operand is the base pointer.
     Value base = operands[0];
     if (cpOp.llvmNormalForm()) {
@@ -322,7 +324,8 @@ public:
       auto newOpnds = interleaveConstantsAndOperands(
           operands.drop_front(), cpOp.getRawConstantIndices());
       // Rewrite the ComputePtrOp as a LLVM::GEPOp.
-      rewriter.replaceOpWithNewOp<LLVM::GEPOp>(cpOp, toTy, base, newOpnds);
+      rewriter.replaceOpWithNewOp<LLVM::GEPOp>(cpOp, eleTy, toTy, base,
+                                               newOpnds);
     } else {
       // If the `cc.compute_ptr` operation has a base argument that is not in
       // LLVM normal form, we implicitly assume that pointer's element type
@@ -336,7 +339,8 @@ public:
                           cpOp.getRawConstantIndices().end());
       auto newOpnds =
           interleaveConstantsAndOperands(operands.drop_front(), constIndices);
-      rewriter.replaceOpWithNewOp<LLVM::GEPOp>(cpOp, toTy, base, newOpnds);
+      rewriter.replaceOpWithNewOp<LLVM::GEPOp>(cpOp, eleTy, toTy, base,
+                                               newOpnds);
     }
     return success();
   }
@@ -451,7 +455,7 @@ public:
     Value tmp;
     auto tupleArgTy = cudaq::opt::lambdaAsPairOfPointers(ctx);
     if (callable.getNoCapture()) {
-      auto zero = cudaq::opt::factory::genLlvmI64Constant(loc, rewriter, 0);
+      Value zero = cudaq::opt::factory::genLlvmI64Constant(loc, rewriter, 0);
       tmp =
           rewriter.create<LLVM::IntToPtrOp>(loc, tupleArgTy.getBody()[1], zero);
     } else {
@@ -613,10 +617,10 @@ public:
                                                        one);
     } else {
       std::int64_t arrSize =
-          llvm::cast<LLVM::LLVMArrayType>(
-              llvm::cast<LLVM::LLVMPointerType>(operands[0].getType())
+          llvm::cast<cudaq::cc::ArrayType>(
+              llvm::cast<cudaq::cc::PointerType>(init.getBuffer().getType())
                   .getElementType())
-              .getNumElements();
+              .getSize();
       auto i64Ty = rewriter.getI64Type();
       Value len = rewriter.create<LLVM::ConstantOp>(
           loc, i64Ty, IntegerAttr::get(i64Ty, arrSize));

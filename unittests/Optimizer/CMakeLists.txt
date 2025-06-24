@@ -8,11 +8,15 @@
 
 include(HandleLLVMOptions)
 
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+
 add_executable(OptimizerUnitTests HermitianTrait.cpp)
 
 target_link_libraries(OptimizerUnitTests
   PRIVATE
     QuakeDialect
+    CCDialect
+    ${dialect_libs}
     gtest_main
 )
 
@@ -30,7 +34,8 @@ target_link_libraries(test_quake_synth
   nvqir-qpp 
   nvqir
   cudaq-em-default
-  gtest_main)
+  gtest_main
+)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
   target_link_options(test_quake_synth PRIVATE -Wl,--no-as-needed)
 endif()

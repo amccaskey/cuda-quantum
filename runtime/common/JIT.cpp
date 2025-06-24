@@ -102,25 +102,23 @@ invokeWrappedKernel(std::string_view irString, const std::string &entryPointFn,
   auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
   if (!tmBuilderOrError) {
     llvm::errs() << "Could not create JITTargetMachineBuilder\n";
-    return;
+    return {};
   }
   auto tmOrError = tmBuilderOrError->createTargetMachine();
   if (!tmOrError) {
     llvm::errs() << "Could not create TargetMachine\n";
-    return;
+    return {};
   }
   mlir::ExecutionEngine::setupTargetTripleAndDataLayout(llvmModule.get(),
                                                         tmOrError.get().get());
   auto dataLayout = llvmModule->getDataLayout();
 
   // Create the object layer
-  auto objectLinkingLayerCreator = [&](llvm::orc::ExecutionSession &session,
-                                       const llvm::Triple &tt) {
-    auto objectLayer =
-        std::make_unique<llvm::orc::RTDyldObjectLinkingLayer>(session, []() {
+  auto objectLinkingLayerCreator = [&](llvm::orc::ExecutionSession &session) {
+    auto objectLayer = std::make_unique<llvm::orc::RTDyldObjectLinkingLayer>(
+        session, [](const llvm::MemoryBuffer &) {
           return std::make_unique<llvm::SectionMemoryManager>();
         });
-    llvm::Triple targetTriple(llvm::Twine(llvmModule->getTargetTriple()));
     return objectLayer;
   };
 

@@ -191,7 +191,8 @@ public:
         if (isa<cudaq::cc::CallableType>(op.getArgument(argIndex).getType()))
           argsToErase.set(argIndex);
 
-      op.eraseArguments(argsToErase);
+      if (failed(op.eraseArguments(argsToErase)))
+        signalPassFailure();
     }
   }
 };

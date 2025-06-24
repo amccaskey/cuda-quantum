@@ -321,8 +321,7 @@ public:
 
     auto measTy = quake::MeasureType::get(builder.getContext());
     auto wireTy = quake::WireType::get(builder.getContext());
-    for (auto &[measureNum, qubitToMeasure] :
-         llvm::enumerate(qubitsToMeasure)) {
+    for (auto [measureNum, qubitToMeasure] : llvm::enumerate(qubitsToMeasure)) {
       // add the measure
       char regName[16];
       std::snprintf(regName, sizeof(regName), "r%05lu", measureNum);

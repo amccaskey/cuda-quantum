@@ -446,8 +446,9 @@ bool QuakeBridgeVisitor::TraverseFunctionDecl(clang::FunctionDecl *x) {
   skipCompoundScope = true;
 
   // Visit the trailing requires clause, if any.
-  if (auto *trailingRequiresClause = x->getTrailingRequiresClause())
-    if (!TraverseStmt(trailingRequiresClause))
+  if (const auto &trailingRequiresClause = x->getTrailingRequiresClause())
+    if (!TraverseStmt(
+            const_cast<clang::Expr *>(trailingRequiresClause.ConstraintExpr)))
       return false;
 
   if (auto *ctor = dyn_cast<clang::CXXConstructorDecl>(x)) {

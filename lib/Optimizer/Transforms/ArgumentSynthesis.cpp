@@ -143,7 +143,11 @@ public:
 
       // 4. Finish specializing func and erase any of func's arguments that were
       // substituted.
-      func.eraseArguments(replacedArgs);
+      if (failed(func.eraseArguments(replacedArgs))) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "failed to erase arguments of " << funcName << '\n');
+        signalPassFailure();
+      }
     }
   }
 };

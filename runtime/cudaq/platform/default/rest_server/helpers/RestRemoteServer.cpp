@@ -480,7 +480,8 @@ protected:
     cudaq::info("Running jitCode.");
     auto module = currentModule.clone();
     ExecutionEngineOptions opts;
-    opts.transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
+    auto transformer = [](llvm::Module *m) { return llvm::ErrorSuccess(); };
+    opts.transformer = transformer;
     opts.enableObjectDump = true;
     opts.jitCodeGenOptLevel = llvm::CodeGenOptLevel::None;
     SmallVector<StringRef, 4> sharedLibs;
@@ -540,7 +541,7 @@ protected:
       cudaq::info("- Finish IR input verification.");
     }
 
-    opts.llvmModuleBuilder =
+    auto builder =
         [](Operation *module,
            llvm::LLVMContext &llvmContext) -> std::unique_ptr<llvm::Module> {
       auto llvmModule = translateModuleToLLVMIR(module, llvmContext);
@@ -566,6 +567,7 @@ protected:
                                                       tmOrError.get().get());
       return llvmModule;
     };
+    opts.llvmModuleBuilder = builder;
 
     cudaq::info("- Creating the MLIR ExecutionEngine");
     auto uniqueJit =
