@@ -647,8 +647,9 @@ MPSSettings::MPSSettings() {
         errorMsg << "  - " << configStr << "\n";
       throw std::runtime_error(errorMsg.str());
     }
-    int num = gaugeOption = iter->second;
-    cudaq::info("Setting MPS GAUGE option to {} ({}).", iter->first, num);
+    gaugeOption = iter->second;
+    cudaq::info("Setting MPS GAUGE option to {} ({}).", iter->first,
+                (int) iter->second);
   }
 }
 
