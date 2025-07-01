@@ -1007,17 +1007,15 @@ using EffectsVectorImpl =
 [[maybe_unused]] inline static void
 getModelessEffectsImpl(EffectsVectorImpl &effects, ValueRange controls,
                        ValueRange targets) {
-#if 0
-  for (auto v : controls)
-    effects.emplace_back(MemoryEffects::Read::get(), v,
+  for ([[maybe_unused]] auto v : controls)
+    effects.emplace_back(MemoryEffects::Read::get(), 
                          SideEffects::DefaultResource::get());
-  for (auto v : targets) {
-    effects.emplace_back(MemoryEffects::Read::get(), v,
+  for ([[maybe_unused]]auto v : targets) {
+    effects.emplace_back(MemoryEffects::Read::get(), 
                          SideEffects::DefaultResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(), v,
+    effects.emplace_back(MemoryEffects::Write::get(), 
                          SideEffects::DefaultResource::get());
   }
-#endif
 }
 
 /// For an operation with moded effects, the operation conditionally has
@@ -1029,19 +1027,17 @@ getModelessEffectsImpl(EffectsVectorImpl &effects, ValueRange controls,
 inline static void getModedEffectsImpl(EffectsVectorImpl &effects,
                                        ValueRange controls,
                                        ValueRange targets) {
-#if 0
-  for (auto v : controls)
+  for ([[maybe_unused]]auto v : controls)
     if (isa<quake::RefType, quake::VeqType>(v.getType()))
-      effects.emplace_back(MemoryEffects::Read::get(), v,
+      effects.emplace_back(MemoryEffects::Read::get(),
                            SideEffects::DefaultResource::get());
-  for (auto v : targets)
+  for ([[maybe_unused]] auto v : targets)
     if (isa<quake::RefType, quake::VeqType>(v.getType())) {
-      effects.emplace_back(MemoryEffects::Read::get(), v,
+      effects.emplace_back(MemoryEffects::Read::get(),
                            SideEffects::DefaultResource::get());
-      effects.emplace_back(MemoryEffects::Write::get(), v,
+      effects.emplace_back(MemoryEffects::Write::get(), 
                            SideEffects::DefaultResource::get());
     }
-#endif
 }
 
 /// Quake reset has modeless effects.

@@ -45,7 +45,6 @@ struct VerifyQIRProfilePass
     bool passFailed = false;
     if (!func->hasAttr(cudaq::entryPointAttrName))
       return;
-    auto *ctx = &getContext();
     bool isBaseProfile = convertTo.getValue() == "qir-base";
     func.walk([&](Operation *op) {
       if (auto call = dyn_cast<LLVM::CallOp>(op)) {
@@ -60,24 +59,26 @@ struct VerifyQIRProfilePass
           return WalkResult::advance();
         }
 
+        // AJM June 30 2025 - this is no longer valid for opaque pointers (ptr)
         // Check that qubits are unique values.
-        const std::size_t numOpnds = call.getNumOperands();
-        auto qubitTy = cudaq::opt::getQubitType(ctx);
-        if (numOpnds > 0)
-          for (std::size_t i = 0; i < numOpnds - 1; ++i)
-            if (call.getOperand(i).getType() == qubitTy)
-              for (std::size_t j = i + 1; j < numOpnds; ++j)
-                if (call.getOperand(j).getType() == qubitTy) {
-                  auto i1 =
-                      call.getOperand(i).getDefiningOp<LLVM::IntToPtrOp>();
-                  auto j1 =
-                      call.getOperand(j).getDefiningOp<LLVM::IntToPtrOp>();
-                  if (i1 && j1 && i1.getOperand() == j1.getOperand()) {
-                    call.emitOpError("uses same qubit as multiple operands");
-                    passFailed = true;
-                    return WalkResult::interrupt();
-                  }
-                }
+        // const std::size_t numOpnds = call.getNumOperands();
+        // auto qubitTy = cudaq::opt::getQubitType(ctx);
+        // if (numOpnds > 0)
+        //   for (std::size_t i = 0; i < numOpnds - 1; ++i)
+        //     if (call.getOperand(i).getType() == qubitTy)
+        //       for (std::size_t j = i + 1; j < numOpnds; ++j)
+        //         if (call.getOperand(j).getType() == qubitTy) {
+        //           auto i1 =
+        //               call.getOperand(i).getDefiningOp<LLVM::IntToPtrOp>();
+        //           auto j1 =
+        //               call.getOperand(j).getDefiningOp<LLVM::IntToPtrOp>();
+        //           // if (i1 && j1 && i1.getOperand() == j1.getOperand()) {
+        //           //   call.emitOpError("uses same qubit as multiple
+        //           operands");
+        //           //   passFailed = true;
+        //           //   return WalkResult::interrupt();
+        //           // }
+        //         }
         return WalkResult::advance();
       }
       if (isBaseProfile && isa<LLVM::BrOp, LLVM::CondBrOp, LLVM::ResumeOp,
