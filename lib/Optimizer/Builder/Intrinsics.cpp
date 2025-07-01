@@ -426,8 +426,10 @@ static constexpr IntrinsicCode intrinsicTable[] = {
       cudaq::runtime::getLinkableKernelKey},
      "func.func private @cudaqRegisterKernelName(!cc.ptr<i8>) -> ()"},
 
-    {cudaq::runtime::CudaqRegisterLambdaName, {}, R"#(
-  llvm.func @cudaqRegisterLambdaName(!llvm.ptr<i8>, !llvm.ptr<i8>) attributes {sym_visibility = "private"}
+    {cudaq::runtime::CudaqRegisterLambdaName,
+     {},
+     R"#(
+  llvm.func @cudaqRegisterLambdaName(!llvm.ptr, !llvm.ptr) attributes {sym_visibility = "private"}
 )#"},
 
     {"free", {}, "func.func private @free(!cc.ptr<i8>) -> ()"},
@@ -573,16 +575,26 @@ static constexpr IntrinsicCode intrinsicTable[] = {
   !qir_qubit = !cc.ptr<none>
   !qir_result = !cc.ptr<none>
   !qir_charptr = !cc.ptr<none>
+<<<<<<< HEAD
   !qir_llvmptr = !llvm.ptr<i8>
 )#"},
+=======
+  !qir_llvmptr = !llvm.ptr
+    )#"},
+>>>>>>> 1b7ed95cf9 (work on tests)
     // Use the obsolete LLVM opaque struct type.
     {"qir_opaque_struct", {}, R"#(
   !qir_array = !cc.ptr<!llvm.struct<"Array", opaque>>
   !qir_qubit = !cc.ptr<!llvm.struct<"Qubit", opaque>>
   !qir_result = !cc.ptr<!llvm.struct<"Result", opaque>>
   !qir_charptr = !cc.ptr<i8>
+<<<<<<< HEAD
   !qir_llvmptr = !llvm.ptr<i8>
 )#"},
+=======
+  !qir_llvmptr = !llvm.ptr
+    )#"},
+>>>>>>> 1b7ed95cf9 (work on tests)
 
     // The QIR defined output logging functions.
     {"qir_output_logging",

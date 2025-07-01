@@ -32,7 +32,7 @@ class AddressOfOpPattern
     : public ConvertOpToLLVMPattern<cudaq::cc::AddressOfOp> {
 public:
   using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
-
+  // %6 = cc.alloca !cc.array<i8 x 1>
   // One-to-one conversion to llvm.addressof op.
   LogicalResult
   matchAndRewrite(cudaq::cc::AddressOfOp addr, OpAdaptor adaptor,
@@ -57,8 +57,8 @@ public:
     if (operands.empty()) {
       rewriter.replaceOpWithNewOp<LLVM::AllocaOp>(
           alloc, toTy,
-          ArrayRef<Value>{cudaq::opt::factory::genLlvmI32Constant(
-              alloc.getLoc(), rewriter, 1)});
+          getTypeConverter()->convertType(adaptor.getElementType()),
+          cudaq::opt::factory::genLlvmI32Constant(alloc.getLoc(), rewriter, 1));
     } else {
       rewriter.replaceOpWithNewOp<LLVM::AllocaOp>(alloc, toTy, operands);
     }
@@ -313,6 +313,7 @@ public:
     auto toTy = getTypeConverter()->convertType(cpOp.getType());
     auto eleTy = getTypeConverter()->convertType(
         cast<cudaq::cc::PointerType>(cpOp.getType()).getElementType());
+    auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
     // The first operand is the base pointer.
     Value base = operands[0];
     if (cpOp.llvmNormalForm()) {
@@ -339,8 +340,10 @@ public:
                           cpOp.getRawConstantIndices().end());
       auto newOpnds =
           interleaveConstantsAndOperands(operands.drop_front(), constIndices);
-      rewriter.replaceOpWithNewOp<LLVM::GEPOp>(cpOp, eleTy, toTy, base,
-                                               newOpnds);
+      rewriter.replaceOpWithNewOp<LLVM::GEPOp>(
+          cpOp, ptrTy,
+          LLVM::LLVMArrayType::get(eleTy, cpOp.getRawConstantIndices().size()),
+          base, newOpnds);
     }
     return success();
   }

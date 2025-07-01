@@ -1056,7 +1056,6 @@ class QuakeOperator<string mnemonic, list<Trait> traits = [],
     : QuakeOp<mnemonic,
         !listconcat([QuantumGate, AttrSizedOperandSegments, OperatorInterface,
           DeclareOpInterfaceMethods<MemoryEffectsOpInterface>], traits)> {
-
   let arguments = !con(extraArgs, (ins
     UnitAttr:$is_adj,
     Variadic<AnyFloat>:$parameters,
