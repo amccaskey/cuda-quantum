@@ -22,6 +22,7 @@ add_library(${LIBRARY_NAME}
                 utils/matrix.cpp
                 distributed/mpi_plugin.cpp
                 platformv2/platform.cpp 
+                platformv2/config.cpp
                 platformv2/qpus/qpu_state.cpp
                 platformv2/qpus/remote_state.cpp
                 )

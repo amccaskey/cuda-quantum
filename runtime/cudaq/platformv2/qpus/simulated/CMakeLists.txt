@@ -6,7 +6,7 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_library(cudaq-qpu-simulated SHARED simulator_qpu.cpp)
+add_library(cudaq-qpu-simulated SHARED simulator_qpu.cpp simulator_qpu_config.cpp)
 
 add_subdirectory(qpp)
 add_subdirectory(stim) 

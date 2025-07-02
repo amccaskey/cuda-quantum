@@ -53,6 +53,7 @@ if (CUSTATEVEC_ROOT AND CUDA_FOUND)
 
   # Create unit test for the MQPU support
   create_simulator_runtime_test(test_mqpu 
+      EXTRA_SOURCES mqpu/mqpu_tester.cpp
       BACKEND_CONFIG "nvidia"
       GPU_REQUIRED TRUE 
       DISABLE_INTEGRATION TRUE

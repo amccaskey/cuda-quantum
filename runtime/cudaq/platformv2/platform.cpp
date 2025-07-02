@@ -7,22 +7,22 @@
  ******************************************************************************/
 
 #include "platform.h"
+#include "config.h"
 
 #include "common/Logger.h"
 
 #include "cudaq/Support/TargetConfig.h"
 #include "cudaq/utils/cudaq_utils.h"
 
-#include "llvm/Support/Base64.h"
-
 #include <atomic>
 #include <filesystem>
 #include <fstream>
 
+// -- Extension Point Registrations --
 INSTANTIATE_REGISTRY_NO_ARGS(cudaq::v2::config::platform_config)
-
 INSTANTIATE_REGISTRY(cudaq::v2::qpu_handle,
                      const cudaq::v2::platform_metadata &)
+// -----------------------------------
 
 namespace cudaq::v2 {
 
@@ -31,50 +31,13 @@ static qpu_handle *manual_override_qpu;
 static std::unordered_map<std::size_t, std::size_t> current_qpu_idx_for_thread;
 std::size_t qpu_handle::uid_counter = 0;
 
+void qpu_handle::handle_async_task_launch() const {
+  set_qpu(qpu_uid);
+  handle_async_task_launch_impl();
+}
+
 void override_current_qpu(qpu_handle *q) { manual_override_qpu = q; }
 void reset_override_qpu() { manual_override_qpu = nullptr; }
-namespace config {
-
-std::vector<std::string> get_options(const std::string &encoded) {
-
-  llvm::SmallVector<llvm::StringRef> args;
-  std::string targetArgsString = encoded;
-  if (targetArgsString.starts_with("base64_")) {
-    if (targetArgsString.size() > 7) {
-      auto targetArgsStr = targetArgsString.substr(7);
-      std::vector<char> decodedStr;
-      if (auto err = llvm::decodeBase64(targetArgsStr, decodedStr)) {
-        llvm::errs() << "DecodeBase64 error for '" << targetArgsStr
-                     << "' string.";
-        abort();
-      }
-      std::string decoded(decodedStr.data(), decodedStr.size());
-      targetArgsString = decoded;
-    } else {
-      targetArgsString = "";
-    }
-  }
-  llvm::StringRef(targetArgsString).split(args, ' ', -1, false);
-  std::vector<std::string> targetArgv;
-  for (const auto &arg : args) {
-    std::string targetArgsStr = arg.str();
-    if (targetArgsStr.starts_with("base64_")) {
-      targetArgsStr.erase(0, 7); // erase "base64_"
-      std::vector<char> decodedStr;
-      if (auto err = llvm::decodeBase64(targetArgsStr, decodedStr)) {
-        llvm::errs() << "DecodeBase64 error for '" << targetArgsStr
-                     << "' string.";
-        abort();
-      }
-      std::string decoded(decodedStr.data(), decodedStr.size());
-      cudaq::info("Decoded '{}' from '{}'", decoded, targetArgsStr);
-      targetArgsStr = decoded;
-    }
-    targetArgv.emplace_back(targetArgsStr);
-  }
-  return targetArgv;
-}
-} // namespace config
 
 void initialize(const std::string &targetConfigName,
                 const std::string &encodedOptions) {
@@ -97,44 +60,25 @@ void initialize(const std::string &targetConfigName,
 
   // Could be that the semicolon separate string
   // has option;fp64, find that here
-  bool isFp64 = [&]() {
-    auto iter = configMap.find("option");
-    return iter != configMap.end() && iter->second == "fp64";
-  }();
-
-  if (isFp64) {
+  if (auto iter = configMap.find("option");
+      iter != configMap.end() && iter->second == "fp64") {
     options.push_back("--target-option");
     options.push_back("fp64");
   }
 
   // Could be that the semicolon separate string
   // has option;mqpu, find that here
-  bool isMqpu = [&]() {
-    auto iter = configMap.find("option");
-    return iter != configMap.end() && iter->second == "mqpu";
-  }();
-
-  if (isMqpu) {
+  if (auto iter = configMap.find("option");
+      iter != configMap.end() && iter->second == "mqpu") {
     options.push_back("--target-option");
     options.push_back("mqpu");
   }
 
   // Load the target YAML file
   cudaq::config::TargetConfig config;
-  {
-    std::filesystem::path cudaqLibPath{cudaq::getCUDAQLibraryPath()};
-    auto platformPath = cudaqLibPath.parent_path().parent_path() / "targets";
-    std::string fileName = mutableBackend + std::string(".yml");
-    auto configFilePath = platformPath / fileName;
-    cudaq::info("Config file path = {}", configFilePath.string());
-    std::ifstream configFile(configFilePath.string());
-    std::string configContents((std::istreambuf_iterator<char>(configFile)),
-                               std::istreambuf_iterator<char>());
-    llvm::yaml::Input Input(configContents.c_str());
-    Input >> config;
-  }
+  config::load_target_config(config, mutableBackend);
 
-  // FIXME Now we want to analyze runtime arguments / user requests,
+  // Now we want to analyze runtime arguments / user requests,
   // and the target config, in order to populate the platform_qpus.
 
   // some extension point that targets can contribute for configuration
@@ -188,6 +132,7 @@ void reset_platform(const std::string &cfg) {
   qpu_handle::reset_uid_counter();
   initialize(cfg, "");
 }
+
 qpu_handle &get_qpu(std::size_t idx) {
   if (idx >= platform_qpus.size())
     throw std::runtime_error(fmt::format(
@@ -195,6 +140,7 @@ qpu_handle &get_qpu(std::size_t idx) {
         platform_qpus.size(), idx));
   return *platform_qpus[idx].get();
 }
+
 qpu_handle &get_qpu() {
   if (manual_override_qpu)
     return *manual_override_qpu;
@@ -223,8 +169,6 @@ void set_qpu(std::size_t idx) {
 
   current_qpu_idx_for_thread.insert({currentThread, idx});
 }
-
-void set_qpu(const std::string &qpuName) {}
 
 } // namespace cudaq::v2
 

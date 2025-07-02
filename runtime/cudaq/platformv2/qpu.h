@@ -7,6 +7,7 @@
  ******************************************************************************/
 #pragma once
 
+#include "config.h"
 #include "qpu_traits.h"
 
 #include "cudaq/host_config.h"
@@ -39,35 +40,7 @@
 /// a dynamic cast.
 ///
 
-namespace cudaq::config {
-class TargetConfig;
-}
-
 namespace cudaq::v2 {
-
-/// \struct platform_metadata
-/// \brief Encapsulates platform and target configuration metadata for a QPU.
-///
-/// This struct holds references to the target configuration, target options,
-/// and the initial configuration string for the quantum platform.
-struct platform_metadata {
-  /// \brief Reference to the target configuration.
-  const cudaq::config::TargetConfig &target_config;
-  /// \brief List of target-specific options.
-  const std::vector<std::string> &target_options;
-  /// \brief Initial configuration string.
-  const std::string &initial_config_str;
-};
-
-/// \brief Set the current QPU for the calling thread.
-/// \param idx The QPU device index.
-void set_qpu(std::size_t);
-
-/// \class device
-/// \brief Represents a generic quantum device.
-class device {
-public:
-};
 
 /// \class qpu_handle
 /// \brief Abstract base class for a quantum processing unit (QPU) handle.
@@ -80,8 +53,10 @@ class qpu_handle
 protected:
   /// \brief Reference to the platform metadata.
   const platform_metadata &config;
+
   /// \brief Unique identifier for this QPU instance.
   std::size_t qpu_uid;
+
   /// \brief Static counter for unique QPU IDs.
   static std::size_t uid_counter;
 
@@ -190,10 +165,7 @@ public:
   virtual void handle_async_task_launch_impl() const {}
 
   /// \brief Handle any preprocessing necessary for async task launching.
-  void handle_async_task_launch() const {
-    set_qpu(qpu_uid);
-    handle_async_task_launch_impl();
-  }
+  void handle_async_task_launch() const;
 
   /// \brief Enqueue a task for asynchronous execution.
   /// \tparam TaskTy Callable task type.

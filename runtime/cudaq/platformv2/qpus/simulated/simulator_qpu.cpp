@@ -6,11 +6,9 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#include "../../platform.h"
 #include "../../qpu.h"
 
 #include "cudaq/Support/TargetConfig.h"
-
 #include "cudaq/utils/cudaq_utils.h"
 
 #include "CircuitSimulator.h"
@@ -25,86 +23,8 @@ INSTANTIATE_REGISTRY_NO_ARGS(cudaq::CircuitSimulator)
 
 namespace cudaq::v2 {
 
-class simulator_config : public config::platform_config {
-private:
-  int getCudaGetDeviceCount() {
-#ifdef CUDAQ_ENABLE_CUDA
-    int nDevices{0};
-    const auto status = cudaGetDeviceCount(&nDevices);
-    return status != cudaSuccess ? 0 : nDevices;
-#else
-    return 0;
-#endif
-  }
-
-public:
-  void configure_qpus(std::vector<std::unique_ptr<qpu_handle>> &platform_qpus,
-                      const platform_metadata &metadata) override {
-    const auto &options = metadata.target_options;
-    const auto &cfg = metadata.target_config;
-
-    // Did the user request MQPU?
-    bool isMqpu = false;
-    for (std::size_t idx = 0; idx < options.size();) {
-      const auto argsStr = options[idx + 1];
-      if (argsStr == "mqpu")
-        isMqpu = true;
-      idx += 2;
-    }
-
-    // If not, just add a single simulated qpu
-    if (!isMqpu) {
-      platform_qpus.emplace_back(
-          qpu_handle::get("circuit_simulator", metadata));
-      cudaq::info("Added 1 qpu to the platform {}", platform_qpus.size());
-      return;
-    }
-
-    // If so, get the number of available GPUs.
-    // If none print a warning
-    auto numGpus = getCudaGetDeviceCount();
-    if (numGpus == 0) {
-      cudaq::warn("mqpu platform requested, but could not find any GPUs.");
-      platform_qpus.emplace_back(
-          qpu_handle::get("circuit_simulator", metadata));
-      return;
-    }
-
-    cudaq::info("multi-qpu has been requested - numGPUs is {}", numGpus);
-
-    // Add the available simulators for each GPU.
-    for (int i = 0; i < numGpus; i++)
-      platform_qpus.emplace_back(
-          qpu_handle::get("circuit_simulator", metadata));
-  }
-
-  CUDAQ_EXTENSION_CREATOR_FUNCTION(config::platform_config, simulator_config)
-};
-CUDAQ_REGISTER_EXTENSION_TYPE(simulator_config)
-
-/// \brief Compute the adjoint (conjugate transpose) of a matrix given in
-/// row-major vector form.
-/// \param input The input matrix as a row-major vector.
-/// \param rows Number of rows in the matrix.
-/// \param cols Number of columns in the matrix.
-/// \return The adjoint matrix as a row-major vector.
 std::vector<cudaq::complex> getAdjoint(const std::vector<cudaq::complex> &input,
-                                       int rows, int cols) {
-  using namespace Eigen;
-  // Map input to row-major matrix
-  const Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor> original =
-      Map<const Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>>(
-          input.data(), rows, cols);
-
-  // Compute adjoint and map back to row-major vector
-  Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor> adjoint =
-      original.adjoint();
-  std::vector<std::complex<double>> output(adjoint.size());
-  Map<Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>>(
-      output.data(), adjoint.rows(), adjoint.cols()) = adjoint;
-
-  return output;
-}
+                                       int rows, int cols);
 
 class local_simulator : public qpu<
                             /*Implements LibraryMode Simulation*/
@@ -142,44 +62,7 @@ protected:
   /// \brief Handle the observation (expectation value) task for an
   /// ExecutionContext.
   /// \param localContext The execution context, must be in "observe" mode.
-  void handleObservation(ExecutionContext *localContext) {
-    // Only execute if this is an observe context.
-    bool execute = localContext && localContext->name == "observe";
-    if (!execute)
-      return;
-    ScopedTraceWithContext(cudaq::TIMING_OBSERVE,
-                           "QPU::handleObservation (after flush)");
-    double sum = 0.0;
-    if (!localContext->spin.has_value())
-      throw std::runtime_error("[QPU] Observe ExecutionContext specified "
-                               "without a cudaq::spin_op.");
-
-    std::vector<cudaq::ExecutionResult> results;
-    cudaq::spin_op &H = localContext->spin.value();
-    assert(cudaq::spin_op::canonicalize(H) == H);
-
-    // If the backend can handle the observe task natively, delegate to it.
-    if (localContext->canHandleObserve) {
-      simulator->measureSpinOp(H);
-      return;
-    }
-
-    // Manually compute the expectation value by looping over spin op terms.
-    for (const auto &term : H) {
-      if (term.is_identity())
-        sum += term.evaluate_coefficient().real();
-      else {
-        simulator->measureSpinOp(term);
-        auto exp = localContext->expectationValue.value();
-        results.emplace_back(localContext->result.to_map(), term.get_term_id(),
-                             exp);
-        sum += term.evaluate_coefficient().real() * exp;
-      }
-    };
-
-    localContext->expectationValue = sum;
-    localContext->result = cudaq::sample_result(sum, results);
-  }
+  void handleObservation(ExecutionContext *localContext);
 
 public:
   local_simulator(const platform_metadata &metadata) : qpu(metadata) {
@@ -553,4 +436,66 @@ public:
 
 const bool local_simulator::registered_ = local_simulator::register_type();
 
+/// \brief Compute the adjoint (conjugate transpose) of a matrix given in
+/// row-major vector form.
+/// \param input The input matrix as a row-major vector.
+/// \param rows Number of rows in the matrix.
+/// \param cols Number of columns in the matrix.
+/// \return The adjoint matrix as a row-major vector.
+std::vector<cudaq::complex> getAdjoint(const std::vector<cudaq::complex> &input,
+                                       int rows, int cols) {
+  using namespace Eigen;
+  // Map input to row-major matrix
+  const Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor> original =
+      Map<const Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>>(
+          input.data(), rows, cols);
+
+  // Compute adjoint and map back to row-major vector
+  Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor> adjoint =
+      original.adjoint();
+  std::vector<std::complex<double>> output(adjoint.size());
+  Map<Matrix<std::complex<double>, Dynamic, Dynamic, RowMajor>>(
+      output.data(), adjoint.rows(), adjoint.cols()) = adjoint;
+
+  return output;
+}
+
+void local_simulator::handleObservation(ExecutionContext *localContext) {
+  // Only execute if this is an observe context.
+  bool execute = localContext && localContext->name == "observe";
+  if (!execute)
+    return;
+  ScopedTraceWithContext(cudaq::TIMING_OBSERVE,
+                         "QPU::handleObservation (after flush)");
+  double sum = 0.0;
+  if (!localContext->spin.has_value())
+    throw std::runtime_error("[QPU] Observe ExecutionContext specified "
+                             "without a cudaq::spin_op.");
+
+  std::vector<cudaq::ExecutionResult> results;
+  cudaq::spin_op &H = localContext->spin.value();
+  assert(cudaq::spin_op::canonicalize(H) == H);
+
+  // If the backend can handle the observe task natively, delegate to it.
+  if (localContext->canHandleObserve) {
+    simulator->measureSpinOp(H);
+    return;
+  }
+
+  // Manually compute the expectation value by looping over spin op terms.
+  for (const auto &term : H) {
+    if (term.is_identity())
+      sum += term.evaluate_coefficient().real();
+    else {
+      simulator->measureSpinOp(term);
+      auto exp = localContext->expectationValue.value();
+      results.emplace_back(localContext->result.to_map(), term.get_term_id(),
+                           exp);
+      sum += term.evaluate_coefficient().real() * exp;
+    }
+  };
+
+  localContext->expectationValue = sum;
+  localContext->result = cudaq::sample_result(sum, results);
+}
 } // namespace cudaq::v2

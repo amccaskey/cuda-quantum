@@ -11,20 +11,6 @@
 
 namespace cudaq::v2 {
 
-namespace config {
-
-/// @brief platform_config is an extension point for CUDA-Q
-/// platform developers. Subtypes should implement configure_qpus
-/// in order to configure the platform based on the target and
-/// provided user information. Configure the platform implies
-/// setting the platform_qpus reference.
-class platform_config : public extension_point<platform_config> {
-public:
-  virtual void configure_qpus(std::vector<std::unique_ptr<qpu_handle>> &,
-                              const platform_metadata &) = 0;
-};
-} // namespace config
-
 /// @brief Initialize the platform from the given
 /// target config file name.
 /// @param targetConfigName
