@@ -102,6 +102,8 @@ public:
 ServerJobPayload
 QuantinuumServerHelper::createJob(std::vector<KernelExecution> &circuitCodes) {
 
+  auto extraPayloadProviders = getExtraPayloadProviders();
+
   std::vector<ServerMessage> messages;
   for (auto &circuitCode : circuitCodes) {
     // Construct the job itself
@@ -113,6 +115,10 @@ QuantinuumServerHelper::createJob(std::vector<KernelExecution> &circuitCodes) {
     j["count"] = shots;
     j["options"] = nullptr;
     j["name"] = circuitCode.name;
+    for (auto &provider : extraPayloadProviders)
+      if (provider.name == "quantinuum")
+        provider.provider(j);
+
     messages.push_back(j);
   }
 

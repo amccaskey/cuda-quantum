@@ -60,6 +60,13 @@ struct ResultInfoType {
 /// @brief Results information, indexed by 0-based result number
 using OutputNamesType = std::map<std::size_t, ResultInfoType>;
 
+struct ExtraPayloadProvider {
+  std::string name;
+  std::function<void(ServerMessage &)> provider;
+};
+void registerExtraPayloadProvider(const ExtraPayloadProvider &provider);
+const std::vector<ExtraPayloadProvider> getExtraPayloadProviders(); 
+
 /// @brief The ServerHelper is a Plugin type that abstracts away the
 /// server-specific information needed for submitting quantum jobs
 /// to a remote server. It enables clients to create server-specific job
@@ -84,6 +91,7 @@ protected:
   /// @brief Reordering indices indexed by jobID/taskID (used by mapping pass)
   std::map<std::string, std::vector<std::size_t>> reorderIdx;
 
+  // virtual void add_extra_payload
 public:
   ServerHelper() = default;
   virtual ~ServerHelper() = default;

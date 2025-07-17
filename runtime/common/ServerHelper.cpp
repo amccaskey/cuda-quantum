@@ -38,6 +38,14 @@ void ServerHelper::parseConfigForCommonParams(const BackendConfig &config) {
     }
   }
 }
+
+static std::vector<ExtraPayloadProvider> providers;
+void registerExtraPayloadProvider(const ExtraPayloadProvider &provider) {
+  providers.emplace_back(provider);
+}
+const std::vector<ExtraPayloadProvider> getExtraPayloadProviders() {
+  return providers;
+}
 } // namespace cudaq
 
 LLVM_INSTANTIATE_REGISTRY(cudaq::ServerHelper::RegistryType)
