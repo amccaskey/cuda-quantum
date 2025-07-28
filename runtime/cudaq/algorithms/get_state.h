@@ -12,7 +12,6 @@
 #include "cudaq/concepts.h"
 #include "cudaq/host_config.h"
 #include "cudaq/platform.h"
-#include "cudaq/platform/QuantumExecutionQueue.h"
 #include "cudaq/platform/qpu_state.h"
 #include "cudaq/qis/kernel_utils.h"
 #include "cudaq/qis/qkernel.h"
@@ -85,15 +84,14 @@ auto runGetStateAsync(KernelFunctor &&wrappedKernel,
         // Indicate that this is an async exec
         context.asyncExec = true;
         // Set the platform and the qpu id.
-        platform.set_exec_ctx(&context, qpu_id);
-        platform.set_current_qpu(qpu_id);
+        platform.get(qpu_id).set_exec_ctx(&context);
         func();
-        platform.reset_exec_ctx(qpu_id);
+        platform.get(qpu_id).reset_exec_ctx();
         // Extract state data
         p.set_value(state(context.simulationState.release()));
       });
 
-  platform.enqueueAsyncTask(qpu_id, wrapped);
+  platform.enqueueAsyncTask(qpu_id, std::move(wrapped));
   return f;
 }
 

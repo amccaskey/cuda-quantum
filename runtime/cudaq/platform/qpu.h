@@ -5,202 +5,322 @@
  * This source code and the accompanying materials are made available under    *
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
-
 #pragma once
 
-#include "QuantumExecutionQueue.h"
-#include "common/Logger.h"
-#include "common/Registry.h"
-#include "common/ThunkInterface.h"
-#include "common/Timing.h"
-#include "cudaq/qis/execution_manager.h"
-#include "cudaq/qis/qubit_qis.h"
+#include "qpu_traits.h"
+
+#include "cudaq/host_config.h"
+#include "cudaq/qis/state.h"
 #include "cudaq/remote_capabilities.h"
-#include "cudaq/utils/cudaq_utils.h"
-#include <optional>
+#include "cudaq/utils/extension_point.h"
+#include "cudaq/utils/heterogeneous_map.h"
+
+#include "common/ExecutionContext.h"
+#include "common/ThunkInterface.h"
+
+#include <queue>
+
+/// The core abstraction for the CUDA-Q runtime is the QPU.
+///
+/// The QPU provides an API for the quantum abstract machine.
+///
+/// We consider different types of QPUs - those that run as local
+/// or remote simulators, remote physical QPUs provided over the cloud,
+/// or logical QPUs in a tight integration context.
+///
+/// To support such a wide array of QPUs, we have designed the
+/// QPU via a template mixin pattern. QPU subtypes can choose
+/// to support specific traits or not (e.g. a local simulation
+/// QPU may not require APIs required for remote invocation, or one
+/// QPU may support efficient sampling while another may not).
+///
+/// The QPU is therefore templated on dynamically provided
+/// interface / trait template types that serve "turn on" specific
+/// capabilities for the QPU, and clients can access those via
+/// a dynamic cast.
+///
+
+namespace cudaq::config {
+class TargetConfig;
+}
 
 namespace cudaq {
-class gradient;
-class optimizer;
-class SerializedCodeExecutionContext;
 
-/// Expose the function that will return the current ExecutionManager
-ExecutionManager *getExecutionManager();
-
-/// A CUDA-Q QPU is an abstraction on the quantum processing
-/// unit which executes quantum kernel expressions. The QPU exposes
-/// certain information about the QPU being targeting, such as the
-/// number of available qubits, the logical ID for this QPU in a set
-/// of available QPUs, and its qubit connectivity. The QPU keeps
-/// track of an execution queue for enqueuing asynchronous tasks
-/// that execute quantum kernel expressions. The QPU also tracks the
-/// client-provided execution context to enable quantum kernel
-/// related tasks such as sampling and observation.
+/// \struct platform_metadata
+/// \brief Encapsulates platform and target configuration metadata for a QPU.
 ///
-/// This type is meant to be subtyped by concrete quantum_platform subtypes.
-class QPU : public registry::RegisteredType<QPU> {
+/// This struct holds references to the target configuration, target options,
+/// and the initial configuration string for the quantum platform.
+struct platform_metadata {
+  /// \brief Reference to the target configuration.
+  const cudaq::config::TargetConfig &target_config;
+  /// \brief List of target-specific options.
+  const std::vector<std::string> &target_options;
+  /// \brief Initial configuration string.
+  const std::string &initial_config_str;
+  /// @brief Custom options provided programmatically by the user
+  heterogeneous_map options;
+  platform_metadata(const cudaq::config::TargetConfig &tc,
+                    const std::vector<std::string> &to, const std::string &ics)
+      : target_config(tc), target_options(to), initial_config_str(ics) {}
+  platform_metadata(const cudaq::config::TargetConfig &tc,
+                    const std::vector<std::string> &to, const std::string &ics,
+                    const heterogeneous_map &o)
+      : target_config(tc), target_options(to), initial_config_str(ics),
+        options(o) {}
+};
+
+struct qpu_specs {
+  std::string name;
+  // need some more here...
+};
+
+/// \brief Set the current QPU for the calling thread.
+/// \param idx The QPU device index.
+void set_qpu(std::size_t);
+
+/// \class qpu_handle
+/// \brief Abstract base class for a quantum processing unit (QPU) handle.
+///
+/// Provides an interface for QPU implementations, including asynchronous
+/// task management, device capabilities, and context handling. Subclasses
+/// can mix in additional capabilities via template mixins.
+class qpu : public extension_point<qpu, const platform_metadata &> {
 protected:
-  /// The logical id of this QPU in the platform set of QPUs
-  std::size_t qpu_id = 0;
-  std::size_t numQubits = 30;
-  std::optional<std::vector<std::pair<std::size_t, std::size_t>>> connectivity;
-  std::unique_ptr<QuantumExecutionQueue> execution_queue;
+  /// \brief Reference to the platform metadata.
+  const platform_metadata &config;
+  /// \brief Unique identifier for this QPU instance.
+  std::size_t qpu_uid;
+  /// \brief Static counter for unique QPU IDs.
+  static std::size_t uid_counter;
 
-  /// @brief The current execution context.
-  ExecutionContext *executionContext = nullptr;
+  /// \struct execution_queue
+  /// \brief Internal execution queue for asynchronous task management.
+  struct execution_queue {
+  private:
+    /// \class task_base
+    /// \brief Abstract base for queued tasks.
+    struct task_base {
+      /// \brief Execute the task.
+      virtual void operator()() = 0;
+      virtual ~task_base() = default;
+    };
 
-  /// @brief Noise model specified for QPU execution.
-  const noise_model *noiseModel = nullptr;
+    /// \class task_impl
+    /// \brief Concrete implementation of a queued task.
+    /// \tparam F Callable task type.
+    template <typename F>
+    struct task_impl : task_base {
+      F func;
+      /// \brief Constructor.
+      /// \param f Callable object to execute.
+      task_impl(F &&f) : func(std::move(f)) {}
+      /// \brief Execute the stored callable.
+      void operator()() override { func(); }
+    };
 
-  /// @brief Check if the current execution context is a `spin_op`
-  /// observation and perform state-preparation circuit measurement
-  /// based on the `spin_op` terms.
-  void handleObservation(ExecutionContext *localContext) {
-    // The reason for the 2 if checks is simply to do a flushGateQueue() before
-    // initiating the trace.
-    bool execute = localContext && localContext->name == "observe";
-    if (execute) {
-      ScopedTraceWithContext(cudaq::TIMING_OBSERVE,
-                             "handleObservation flushGateQueue()");
-      getExecutionManager()->flushGateQueue();
+    std::mutex lock;    ///< Mutex for synchronizing queue access.
+    std::thread thread; ///< Worker thread for executing tasks.
+    std::queue<std::unique_ptr<task_base>>
+        exec_queue;             ///< Queue of tasks to execute.
+    std::condition_variable cv; ///< Condition variable for task notification.
+    bool quit = false;          ///< Flag to signal thread termination.
+
+    /// \brief Worker thread handler function.
+    ///
+    /// Waits for tasks to be enqueued and executes them sequentially.
+    void handler() {
+      std::unique_lock<std::mutex> l(lock);
+      do {
+        // Wait until we have data or a quit signal
+        cv.wait(l, [this] { return (exec_queue.size() || quit); });
+        // after wait, we own the lock
+        if (!quit && exec_queue.size()) {
+          auto op = std::move(exec_queue.front());
+          exec_queue.pop();
+          // unlock now that we're done messing with the queue
+          l.unlock();
+          (*op)();
+          l.lock();
+        }
+      } while (!quit);
     }
-    if (execute) {
-      ScopedTraceWithContext(cudaq::TIMING_OBSERVE,
-                             "QPU::handleObservation (after flush)");
-      double sum = 0.0;
-      if (!localContext->spin.has_value())
-        throw std::runtime_error("[QPU] Observe ExecutionContext specified "
-                                 "without a cudaq::spin_op.");
 
-      std::vector<cudaq::ExecutionResult> results;
-      cudaq::spin_op &H = localContext->spin.value();
-      assert(cudaq::spin_op::canonicalize(H) == H);
+  public:
+    /// \brief Constructor. Starts the worker thread.
+    execution_queue() { thread = std::thread(&execution_queue::handler, this); }
 
-      // If the backend supports the observe task,
-      // let it compute the expectation value instead of
-      // manually looping over terms, applying basis change ops,
-      // and computing <ZZ..ZZZ>
-      if (localContext->canHandleObserve) {
-        auto [exp, data] = cudaq::measure(H);
-        localContext->expectationValue = exp;
-        localContext->result = data;
-      } else {
-
-        // Loop over each term and compute coeff * <term>
-        for (const auto &term : H) {
-          if (term.is_identity())
-            sum += term.evaluate_coefficient().real();
-          else {
-            // This takes a longer time for the first iteration unless
-            // flushGateQueue() is called above.
-            auto [exp, data] = cudaq::measure(term);
-            results.emplace_back(data.to_map(), term.get_term_id(), exp);
-            sum += term.evaluate_coefficient().real() * exp;
-          }
-        };
-
-        localContext->expectationValue = sum;
-        localContext->result = cudaq::sample_result(sum, results);
+    /// \brief Destructor. Signals the thread to quit and joins it.
+    ~execution_queue() {
+      std::unique_lock<std::mutex> l(lock);
+      quit = true;
+      cv.notify_all();
+      l.unlock();
+      if (thread.joinable()) {
+        thread.join();
       }
     }
-  }
+
+    /// \brief Enqueue a task for execution.
+    /// \tparam F Callable task type.
+    /// \param task The function to execute asynchronously.
+    template <typename F>
+    void enqueue_task(F &&task) {
+      std::unique_lock<std::mutex> l(lock);
+      exec_queue.push(
+          std::make_unique<task_impl<std::decay_t<F>>>(std::forward<F>(task)));
+      cv.notify_one();
+    }
+
+    /// \brief Get the thread ID of the execution thread.
+    /// \return The std::thread::id of the worker thread.
+    std::thread::id getExecutionThreadId() const { return thread.get_id(); }
+  };
+
+  /// \brief Internal queue for managing asynchronous tasks.
+  execution_queue taskQueue;
+
+  /// Optional logging stream for platform output.
+  // If set, the platform and its QPUs will print info log to this stream.
+  // Otherwise, default output stream (std::cout) will be used.
+  std::ostream *platformLogStream = nullptr;
 
 public:
-  /// The constructor, initializes the execution queue
-  QPU() : execution_queue(std::make_unique<QuantumExecutionQueue>()) {}
-  /// The constructor, sets the current QPU Id and initializes the execution
-  /// queue
-  QPU(std::size_t _qpuId)
-      : qpu_id(_qpuId),
-        execution_queue(std::make_unique<QuantumExecutionQueue>()) {}
-  /// Move constructor
-  QPU(QPU &&) = default;
-  /// The destructor
-  virtual ~QPU() = default;
-  /// Set the current QPU Id
-  void setId(std::size_t _qpuId) { qpu_id = _qpuId; }
+  /// \brief Construct a QPU handle with the given platform metadata.
+  /// \param m Platform metadata reference.
+  qpu(const platform_metadata &m) : config(m), qpu_uid(uid_counter++) {}
 
-  /// Get id of the thread this QPU's queue executes on.
-  // If no execution_queue has been constructed, returns a 'null' id (does not
-  // represent a thread of execution).
-  std::thread::id getExecutionThreadId() const {
-    return execution_queue ? execution_queue->getExecutionThreadId()
-                           : std::thread::id();
+  virtual ~qpu() = default;
+  virtual std::string name() const = 0;
+
+  /// \brief Reset the static unique ID counter for QPUs.
+  static void reset_uid_counter() { uid_counter = 0; }
+  std::size_t get_uid() { return qpu_uid; }
+  virtual qpu_specs get_specs() const { return {.name = name()}; }
+
+  /// \brief Subtype-specific handling for async task launch.
+  virtual void handle_async_task_launch_impl() const {}
+
+  /// \brief Handle any preprocessing necessary for async task launching.
+  void handle_async_task_launch() const {
+    set_qpu(qpu_uid);
+    handle_async_task_launch_impl();
   }
 
-  virtual void setNoiseModel(const noise_model *model) { noiseModel = model; }
-  virtual const noise_model *getNoiseModel() { return noiseModel; }
+  /// \brief Enqueue a task for asynchronous execution.
+  /// \tparam TaskTy Callable task type.
+  /// \param task The function to execute.
+  template <typename TaskTy>
+  void enqueue_task(TaskTy &&task) {
+    taskQueue.enqueue_task([&, t = std::move(task)]() mutable {
+      // This is a new thread. Handle any
+      // preprocessing that needs to be done like setting the QPU id.
+      handle_async_task_launch();
+      // run the task
+      t();
+    });
+  }
 
-  /// Return the number of qubits
-  std::size_t getNumQubits() { return numQubits; }
-  /// Return the qubit connectivity
-  auto getConnectivity() { return connectivity; }
-  /// Is this QPU a simulator ?
-  virtual bool isSimulator() { return true; }
-
-  /// @brief Return whether this QPU has conditional feedback support
-  virtual bool supportsConditionalFeedback() { return false; }
-
-  /// @brief Return whether this QPU supports explicit measurements
-  virtual bool supportsExplicitMeasurements() { return true; }
-
-  /// @brief Return the remote capabilities for this platform.
-  virtual RemoteCapabilities getRemoteCapabilities() const {
+  /// \brief Get the remote capabilities of this QPU.
+  /// \return RemoteCapabilities object.
+  virtual RemoteCapabilities get_remote_capabilities() const {
     return RemoteCapabilities(/*initValues=*/false);
   }
 
-  /// Base class handling of shots is do-nothing,
-  /// subclasses can handle as they wish
-  virtual void setShots(int _nShots) {}
-  virtual void clearShots() {}
+  /// \brief Set the random seed for this QPU.
+  /// \param seed Random seed value.
+  virtual void set_random_seed(std::size_t seed) {}
 
-  virtual bool isRemote() { return false; }
+  /// \brief Indicates if execution is remotely hosted.
+  /// \return True if remote execution; false otherwise.
+  virtual bool is_remote() const = 0;
 
-  /// Is this a local emulator of a remote QPU?
-  virtual bool isEmulated() { return false; }
+  /// \brief Indicates if this QPU is a local simulator.
+  /// \return True if simulator; false otherwise.
+  virtual bool is_simulator() const = 0;
 
-  /// Enqueue a quantum task on the asynchronous execution queue.
-  virtual void
-  enqueue(QuantumTask &task) = 0; //{ execution_queue->enqueue(task); }
+  /// \brief Indicates if this QPU is an emulator.
+  /// \return True if emulator; false otherwise.
+  virtual bool is_emulator() const = 0;
 
-  /// Set the execution context, meant for subtype specification
-  virtual void setExecutionContext(ExecutionContext *context) = 0;
-  /// Reset the execution context, meant for subtype specification
-  virtual void resetExecutionContext() = 0;
-  virtual void setTargetBackend(const std::string &backend) {}
+  /// \brief Check if conditional feedback is supported.
+  /// \return True if supported; false otherwise.
+  virtual bool supports_conditional_feedback() const = 0;
 
-  virtual void launchVQE(const std::string &name, const void *kernelArgs,
-                         cudaq::gradient *gradient, const cudaq::spin_op &H,
-                         cudaq::optimizer &optimizer, const int n_params,
-                         const std::size_t shots) {}
+  /// \brief Check if explicit measurements are supported.
+  /// \return True if supported; false otherwise.
+  virtual bool supports_explicit_measurements() const = 0;
 
-  /// Launch the kernel with given name (to extract its Quake representation).
-  /// The raw function pointer is also provided, as are the runtime arguments,
-  /// as a struct-packed void pointer and its corresponding size.
-  [[nodiscard]] virtual KernelThunkResultType
-  launchKernel(const std::string &name, KernelThunkType kernelFunc, void *args,
-               std::uint64_t, std::uint64_t,
-               const std::vector<void *> &rawArgs) = 0;
+  virtual bool supports_task_distribution() const = 0;
 
-  /// Launch the kernel with given name and argument arrays.
-  // This is intended for any QPUs whereby we need to JIT-compile the kernel
-  // with argument synthesis. The QPU implementation must override this.
-  virtual void launchKernel(const std::string &name,
-                            const std::vector<void *> &rawArgs) {
-    if (!isRemote())
-      throw std::runtime_error("Wrong kernel launch point: Attempt to launch "
-                               "kernel in streamlined for JIT mode on local "
-                               "simulated QPU. This is not supported.");
+  /// \brief Tear down the QPU, releasing resources.
+  virtual void tear_down() = 0;
+
+  /// \brief Set the execution context for this QPU.
+  /// \param ctx Pointer to the execution context.
+  virtual void set_execution_context(ExecutionContext *ctx) = 0;
+  void set_exec_ctx(ExecutionContext *ctx) { set_execution_context(ctx); }
+
+  /// \brief Get the name of the current execution context, if any.
+  /// \return Optional string containing the context name.
+  virtual const std::optional<std::string> get_current_context_name() {
+    return std::nullopt;
   }
 
-  /// Launch serialized code for remote execution. Subtypes that support this
-  /// should override this function.
-  virtual void launchSerializedCodeExecution(
-      const std::string &name,
-      cudaq::SerializedCodeExecutionContext &serializeCodeExecutionObject) {}
+  /// \brief Reset the execution context for this QPU.
+  virtual void reset_execution_context() = 0;
+  void reset_exec_ctx() { reset_execution_context(); }
 
-  /// @brief Notify the QPU that a new random seed value is set.
-  /// By default do nothing, let subclasses override.
-  virtual void onRandomSeedSet(std::size_t seed) {}
+  void resetLogStream() { platformLogStream = nullptr; }
+
+  std::ostream *getLogStream() { return platformLogStream; }
+
+  void setLogStream(std::ostream &logStream) { platformLogStream = &logStream; }
+
+  /// \brief Cast this QPU to a specific capability type.
+  /// \tparam CapabilityType The capability interface type.
+  /// \return Pointer to the capability type if supported, nullptr otherwise.
+  template <typename CapabilityType>
+  CapabilityType *as() {
+    return dynamic_cast<CapabilityType *>(this);
+  }
+
+  template <typename CapabilityType>
+  bool isa() {
+    return as<CapabilityType>() != nullptr;
+  }
 };
+
+/// \class qpu
+/// \brief Concrete QPU implementation using template mixins for capabilities.
+///
+/// This class derives from qpu_handle and any number of capability mixins.
+/// By default, it represents a local simulator QPU.
+template <typename... Mixins>
+class qpu_mixin : public qpu, public Mixins... {
+public:
+  /// \brief Construct a QPU with the given platform metadata.
+  /// \param m Platform metadata reference.
+  qpu_mixin(const platform_metadata &m) : qpu(m) {}
+
+  /// \brief Indicates if execution is remotely hosted.
+  bool is_remote() const override { return false; }
+
+  /// \brief Indicates if this QPU is a local simulator.
+  bool is_simulator() const override { return true; }
+
+  /// \brief Indicates if this QPU is an emulator.
+  bool is_emulator() const override { return false; }
+
+  /// \brief Check if conditional feedback is supported.
+  bool supports_conditional_feedback() const override { return false; }
+
+  /// \brief Check if explicit measurements are supported.
+  bool supports_explicit_measurements() const override { return true; }
+  bool supports_task_distribution() const override { return false; }
+
+  /// \brief Tear down the QPU, releasing resources.
+  void tear_down() override {}
+};
+
 } // namespace cudaq

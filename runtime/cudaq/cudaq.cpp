@@ -21,10 +21,6 @@
 #include <signal.h>
 #include <string>
 #include <vector>
-namespace nvqir {
-void tearDownBeforeMPIFinalize();
-void setRandomSeed(std::size_t);
-} // namespace nvqir
 
 namespace cudaq::mpi {
 cudaq::MPIPlugin *getMpiPlugin(bool unsafe) {
@@ -181,7 +177,7 @@ std::pair<void *, std::size_t> comm_dup() {
 void finalize() {
   // Inform the simulator that we are
   // about to run MPI Finalize
-  nvqir::tearDownBeforeMPIFinalize();
+  get_qpu().tear_down();
   auto *commPlugin = getMpiPlugin();
   if (!commPlugin->is_finalized()) {
     if (rank() == 0)
@@ -202,36 +198,11 @@ bool globalFalse = false;
 
 //===----------------------------------------------------------------------===//
 
-namespace nvqir {
-void setRandomSeed(std::size_t);
-}
-
 namespace cudaq {
 
-void set_target_backend(const char *backend) {
-  auto &platform = cudaq::get_platform();
-  platform.setTargetBackend(std::string(backend));
+void set_target_backend(const char *backend, const char *options) {
+  initialize(backend, options);
 }
-
-// Ignore warnings about deprecations in platform.set_shots and
-// platform.clear_shots because the functions that are using them here
-// (cudaq::set_shots and cudaq::clear_shots are also deprecated and will be
-// removed at the same time.)
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-void set_shots(const std::size_t nShots) {
-  auto &platform = cudaq::get_platform();
-  platform.set_shots(nShots);
-}
-void clear_shots(const std::size_t nShots) {
-  auto &platform = cudaq::get_platform();
-  platform.clear_shots();
-}
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
 
 void set_noise(const cudaq::noise_model &model) {
   auto &platform = cudaq::get_platform();
@@ -240,7 +211,7 @@ void set_noise(const cudaq::noise_model &model) {
 
 void unset_noise() {
   auto &platform = cudaq::get_platform();
-  platform.set_noise(nullptr);
+  platform.reset_noise();
 }
 
 thread_local static std::size_t cudaq_random_seed = 0;
@@ -250,10 +221,7 @@ thread_local static std::size_t cudaq_random_seed = 0;
 /// will not be repeatable for those operations.
 void set_random_seed(std::size_t seed) {
   cudaq_random_seed = seed;
-  nvqir::setRandomSeed(seed);
-  auto &platform = cudaq::get_platform();
-  // Notify the platform that a new random seed value is set.
-  platform.onRandomSeedSet(seed);
+  get_qpu().set_random_seed(seed);
 }
 
 std::size_t get_random_seed() { return cudaq_random_seed; }

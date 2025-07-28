@@ -13,13 +13,13 @@ namespace cudaq {
 
 void RemoteSimulationState::execute() const {
   if (!state) {
-    auto &platform = cudaq::get_platform();
+    auto &platform = get_qpu();
     // Create an execution context, indicate this is for
     // extracting the state representation
     ExecutionContext context("extract-state");
     // Perform the usual pattern set the context,
     // execute and then reset
-    platform.set_exec_ctx(&context);
+    platform.set_execution_context(&context);
     // Redirect remote platform log (if any)
     // Note: due to the lazy-evaluation mechanism, the execution on the remote
     // platform may occur during accessor API calls (e.g., amplitude, overlap).
@@ -27,8 +27,11 @@ void RemoteSimulationState::execute() const {
     // potential logging of the result of the API call.
     std::ostringstream remoteLogCout;
     platform.setLogStream(remoteLogCout);
-    platform.launchKernel(kernelName, args);
-    platform.reset_exec_ctx();
+    auto *as_mlir_launch = platform.as<mlir_launch_trait>();
+    if (!as_mlir_launch)
+      throw std::runtime_error("invalid qpu for remote simulation state execution.");
+    as_mlir_launch->launch_kernel(kernelName, args);
+    platform.reset_execution_context();
     platform.resetLogStream();
     // Cache the info log if any.
     platformExecutionLog = remoteLogCout.str();
@@ -143,7 +146,7 @@ std::vector<std::complex<double>> RemoteSimulationState::getAmplitudes(
     execute();
     return state->getAmplitudes(basisStates);
   }
-  auto &platform = cudaq::get_platform();
+  auto &platform = get_qpu();
   // Create an execution context, indicate this is for
   // extracting the state representation
   ExecutionContext context("extract-state");
@@ -153,9 +156,9 @@ std::vector<std::complex<double>> RemoteSimulationState::getAmplitudes(
   context.amplitudeMaps = std::move(amplitudeMaps);
   // Perform the usual pattern set the context,
   // execute and then reset
-  platform.set_exec_ctx(&context);
-  platform.launchKernel(kernelName, args);
-  platform.reset_exec_ctx();
+  platform.set_execution_context(&context);
+  platform.as<mlir_launch_trait>()->launch_kernel(kernelName, args);
+  platform.reset_execution_context();
   std::vector<std::complex<double>> amplitudes;
   amplitudes.reserve(basisStates.size());
   for (const auto &basisState : basisStates)
@@ -179,15 +182,16 @@ RemoteSimulationState::overlap(const cudaq::SimulationState &other) {
   }
 
   const auto &otherState = dynamic_cast<const RemoteSimulationState &>(other);
-  auto &platform = cudaq::get_platform();
+  auto &platform = get_qpu();
   ExecutionContext context("state-overlap");
   context.overlapComputeStates =
       std::make_pair(static_cast<const cudaq::SimulationState *>(this),
                      static_cast<const cudaq::SimulationState *>(&otherState));
-  platform.set_exec_ctx(&context);
+  platform.set_execution_context(&context);
   [[maybe_unused]] auto dynamicResult =
-      platform.launchKernel(kernelName, nullptr, nullptr, 0, 0, {});
-  platform.reset_exec_ctx();
+      platform.as<mlir_launch_trait>()->launch_kernel(kernelName, nullptr,
+                                                          nullptr, 0, 0, {});
+  platform.reset_execution_context();
   assert(context.overlapResult.has_value());
   return context.overlapResult.value();
 }

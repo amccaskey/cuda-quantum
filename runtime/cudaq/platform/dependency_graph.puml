@@ -1,0 +1,44 @@
+@startuml
+
+namespace cudaq {}
+namespace common {}
+namespace operator{}
+namespace nvqir {}
+namespace mlir_runtime {}
+namespace kernel_builder {}
+
+namespace platform {
+    class platform_config{}
+    class qpu{} 
+    class qpu_mixin<Traits...>
+    qpu <|-- qpu_mixin
+    qpu_mixin <|-- simulator_qpu  
+    note on link
+      Traits: 
+      simulation_trait
+      noise_trait
+      mlir_launch_trait
+    end note
+    qpu_mixin <|-- base_remote_qpu 
+    note on link
+      Traits: 
+      mlir_launch_trait
+    end note
+    base_remote_qpu <|-- remote_rest_qpu 
+    base_remote_qpu <|-- remote_simulator_qpu
+}
+
+cudaq o-- platform 
+note on link 
+  This is actually part of libcudaq.so, 
+  just pulling it out to highlight new architecture
+end note 
+cudaq o-- common 
+cudaq o-- operator 
+kernel_builder o-- cudaq 
+kernel_builder o-- mlir_runtime
+mlir_runtime o-[#red]- cudaq
+nvqir o-- cudaq 
+common o-- operator 
+
+@enduml 

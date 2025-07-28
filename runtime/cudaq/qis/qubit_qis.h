@@ -8,16 +8,20 @@
 
 #pragma once
 
+#include "common/CustomOp.h"
 #include "common/SampleResult.h"
 #include "cudaq/host_config.h"
 #include "cudaq/operators.h"
 #include "cudaq/platform.h"
+#include "cudaq/platform/gates.h"
 #include "cudaq/qis/modifiers.h"
 #include "cudaq/qis/pauli_word.h"
 #include "cudaq/qis/qarray.h"
 #include "cudaq/qis/qkernel.h"
 #include "cudaq/qis/qreg.h"
+#include "cudaq/qis/qudit_info.h"
 #include "cudaq/qis/qvector.h"
+
 #include <algorithm>
 #include <cstring>
 #include <functional>
@@ -28,10 +32,88 @@
 // set for CUDA-Q kernels.
 
 namespace cudaq {
+using measure_result = bool;
+using SpinMeasureResult = std::pair<double, sample_result>;
+
+namespace tmp {
+struct ExecMgr {
+  void apply(const std::string &name, const std::vector<double> &params,
+             const std::vector<QuditInfo> &controls,
+             const std::vector<QuditInfo> &targets, bool isAdjoint = false,
+             const spin_op_term op = cudaq::spin_op::identity()) {
+    auto *sim_qpu = get_qpu().as<simulation_trait>();
+    if (!sim_qpu)
+      throw std::runtime_error("invalid qpu requested, no simulation trait.");
+
+    std::vector<std::size_t> ctrls, tgts;
+    for (auto &c : controls)
+      ctrls.push_back(c.id);
+    for (auto &t : targets)
+      tgts.push_back(t.id);
+
+    if (cudaq::customOpRegistry::getInstance().isOperationRegistered(name)) {
+      const auto &op =
+          cudaq::customOpRegistry::getInstance().getOperation(name);
+      auto data = op.unitary(params);
+      sim_qpu->apply(data, ctrls, tgts, {name, params, isAdjoint});
+      return;
+    }
+
+    auto gateEnum = gates::gateNameFromString(name);
+    auto matrixData = gates::getGateByName<double>(gateEnum, params);
+    sim_qpu->apply(matrixData, ctrls, tgts, {name, params, isAdjoint});
+  }
+  void applyNoise(const kraus_channel &channelName,
+                  const std::vector<QuditInfo> &targets) {
+    auto *noise_qpu = get_qpu().as<noise_trait>();
+    if (!noise_qpu)
+      return;
+    std::vector<std::size_t> tgts;
+    for (auto &t : targets)
+      tgts.push_back(t.id);
+    noise_qpu->apply_noise(channelName, tgts);
+  }
+
+  /// Reset the qubit to the |0> state
+  void reset(const QuditInfo &target) {
+    auto *sim_qpu = get_qpu().as<simulation_trait>();
+    if (!sim_qpu)
+      throw std::runtime_error("invalid qpu requested, no simulation trait.");
+    sim_qpu->reset(target.id);
+  }
+
+  // Measure the qudit and return the observed state \f$(0,1,2,3,...)\f$; e.g.,
+  // for qubits this can return 0 or 1.
+  int measure(const QuditInfo &target, const std::string registerName = "") {
+    auto *sim_qpu = get_qpu().as<simulation_trait>();
+    if (!sim_qpu)
+      throw std::runtime_error("invalid qpu requested, no simulation trait.");
+
+    return sim_qpu->mz(target.id, registerName);
+  }
+  SpinMeasureResult measure(const cudaq::spin_op &op) { return {}; }
+  bool memoryLeaked() { return false; }
+};
+
+static std::unique_ptr<ExecMgr> tmpExecMgrInstance =
+    std::make_unique<ExecMgr>();
+} // namespace tmp
+
+inline tmp::ExecMgr *getExecutionManager() {
+  return tmp::tmpExecMgrInstance.get();
+}
 
 namespace details {
 void warn(const std::string_view msg);
+inline simulation_trait *get_simulation_qpu() {
+  auto *sim = get_qpu().as<simulation_trait>();
+  if (!sim)
+    throw std::runtime_error(
+        "cannot run local, library-mode simulation with a qpu target that does "
+        "not implement the simulation_trait");
+  return sim;
 }
+} // namespace details
 
 // Define the common single qubit operations.
 namespace qubit_op {
@@ -118,20 +200,27 @@ void oneQubitApply(QubitArgs &...args) {
 
 /// This function will apply a multi-controlled operation with the given control
 /// register on the single qubit target.
-template <typename QuantumOp, typename mod = ctrl, typename QubitRange>
+template <typename QuantumOp, typename mod, typename QubitRange>
   requires(std::ranges::range<QubitRange>)
 void oneQubitApplyControlledRange(QubitRange &ctrls, qubit &target) {
   // Get the name of the operation
   auto gateName = QuantumOp::name();
 
   // Map the input control register to a vector of QuditInfo
-  std::vector<QuditInfo> controls;
-  std::transform(ctrls.begin(), ctrls.end(), std::back_inserter(controls),
-                 [](auto &q) { return cudaq::qubitToQuditInfo(q); });
-
+  std::vector<QuditInfo> controls, tgts;
+  if constexpr (std::is_same_v<mod, ctrl>)
+    std::transform(ctrls.begin(), ctrls.end(), std::back_inserter(controls),
+                   [](auto &q) { return cudaq::qubitToQuditInfo(q); });
+  else
+    std::transform(ctrls.begin(), ctrls.end(), std::back_inserter(tgts),
+                   [](auto &q) { return cudaq::qubitToQuditInfo(q); });
+  tgts.push_back(cudaq::qubitToQuditInfo(target));
   // Apply the gate
-  getExecutionManager()->apply(gateName, {}, controls,
-                               {cudaq::qubitToQuditInfo(target)});
+  if (tgts.size() > 1)
+    for (auto &t : tgts)
+      getExecutionManager()->apply(gateName, {}, controls, {t});
+  else
+    getExecutionManager()->apply(gateName, {}, controls, tgts);
 }
 
 #define CUDAQ_QIS_ONE_TARGET_QUBIT_(NAME)                                      \
@@ -144,7 +233,7 @@ void oneQubitApplyControlledRange(QubitRange &ctrls, qubit &target) {
   void NAME(QubitArgs &...args) {                                              \
     oneQubitApply<qubit_op::NAME##Op, mod>(args...);                           \
   }                                                                            \
-  template <typename mod = ctrl, typename QubitRange>                          \
+  template <typename mod = base, typename QubitRange>                          \
     requires(std::ranges::range<QubitRange>)                                   \
   void NAME(QubitRange &ctrls, qubit &target) {                                \
     oneQubitApplyControlledRange<qubit_op::NAME##Op, mod>(ctrls, target);      \
@@ -693,12 +782,12 @@ template <
         std::remove_reference_t<std::remove_cv_t<QubitRange>>, cudaq::qubit>>>
 #endif
 void exp_pauli(double theta, QubitRange &&qubits, const char *pauliWord) {
-  std::vector<QuditInfo> quditInfos;
+  std::vector<std::size_t> quditInfos;
   std::transform(qubits.begin(), qubits.end(), std::back_inserter(quditInfos),
-                 [](auto &q) { return cudaq::qubitToQuditInfo(q); });
+                 [](auto &q) { return cudaq::qubitToQuditInfo(q).id; });
   // FIXME: it would be cleaner if we just kept it as a pauli word here
-  getExecutionManager()->apply("exp_pauli", {theta}, {}, quditInfos, false,
-                               spin_op::from_word(pauliWord));
+  details::get_simulation_qpu()->apply_exp_pauli(theta, {}, quditInfos,
+                                                 spin_op::from_word(pauliWord));
 }
 
 /// @brief Apply a general Pauli rotation, takes a qubit register and the size
@@ -728,8 +817,11 @@ void exp_pauli(double theta, const char *pauliWord, QubitArgs &...qubits) {
 
   // Map the qubits to their unique ids and pack them into a std::array
   std::vector<QuditInfo> quditInfos{qubitToQuditInfo(qubits)...};
-  getExecutionManager()->apply("exp_pauli", {theta}, {}, quditInfos, false,
-                               spin_op::from_word(pauliWord));
+  std::vector<std::size_t> qidxs;
+  for (auto &qq : quditInfos)
+    qidxs.push_back(qq.id);
+  details::get_simulation_qpu()->apply_exp_pauli(theta, {}, qidxs,
+                                                 spin_op::from_word(pauliWord));
 }
 
 /// @brief Apply a general Pauli rotation with control qubits and a variadic set
@@ -746,17 +838,20 @@ template <typename QuantumRegister, typename... QubitArgs,
 #endif
 void exp_pauli(QuantumRegister &ctrls, double theta, const char *pauliWord,
                QubitArgs &...qubits) {
-  std::vector<QuditInfo> controls;
+  std::vector<std::size_t> controls;
   std::transform(ctrls.begin(), ctrls.end(), std::back_inserter(controls),
-                 [](const auto &q) { return qubitToQuditInfo(q); });
+                 [](const auto &q) { return qubitToQuditInfo(q).id; });
   if (sizeof...(QubitArgs) != std::strlen(pauliWord))
     throw std::runtime_error(
         "Invalid exp_pauli call, number of qubits != size of pauliWord.");
 
   // Map the qubits to their unique ids and pack them into a std::array
   std::vector<QuditInfo> quditInfos{qubitToQuditInfo(qubits)...};
-  getExecutionManager()->apply("exp_pauli", {theta}, controls, quditInfos,
-                               false, spin_op::from_word(pauliWord));
+  std::vector<std::size_t> qidxs;
+  for (auto &qq : quditInfos)
+    qidxs.push_back(qq.id);
+  details::get_simulation_qpu()->apply_exp_pauli(theta, controls, qidxs,
+                                                 spin_op::from_word(pauliWord));
 }
 
 /// @brief Measure an individual qubit, return 0,1 as `bool`
@@ -905,10 +1000,13 @@ template <typename QuantumKernel, typename... Args,
               std::is_invocable_r_v<void, QuantumKernel, Args...>>>
 #endif
 void control(QuantumKernel &&kernel, qubit &control, Args &&...args) {
-  std::vector<std::size_t> ctrls{control.id()};
-  getExecutionManager()->startCtrlRegion(ctrls);
-  kernel(std::forward<Args>(args)...);
-  getExecutionManager()->endCtrlRegion(ctrls.size());
+  auto *sim_qpu = get_qpu().as<simulation_trait>();
+  if (!sim_qpu)
+    throw std::runtime_error("invalid qpu requested, no simulation trait.");
+  std::vector<std::size_t> ctrls;
+  ctrls.push_back(control.id());
+  sim_qpu->applyControlRegion(ctrls,
+                              [&]() { kernel(std::forward<Args>(args)...); });
 }
 
 // Control the given cudaq kernel on the given register of control qubits
@@ -926,13 +1024,15 @@ template <typename QuantumKernel, typename QuantumRegister, typename... Args,
 #endif
 void control(QuantumKernel &&kernel, QuantumRegister &&ctrl_qubits,
              Args &&...args) {
+  auto *sim_qpu = get_qpu().as<simulation_trait>();
+  if (!sim_qpu)
+    throw std::runtime_error("invalid qpu requested, no simulation trait.");
   std::vector<std::size_t> ctrls;
   for (std::size_t i = 0; i < ctrl_qubits.size(); i++) {
     ctrls.push_back(ctrl_qubits[i].id());
   }
-  getExecutionManager()->startCtrlRegion(ctrls);
-  kernel(std::forward<Args>(args)...);
-  getExecutionManager()->endCtrlRegion(ctrls.size());
+  sim_qpu->applyControlRegion(ctrls,
+                              [&]() { kernel(std::forward<Args>(args)...); });
 }
 
 // Control the given cudaq kernel on the given list of references to control
@@ -948,13 +1048,15 @@ template <typename QuantumKernel, typename... Args,
 void control(QuantumKernel &&kernel,
              std::vector<std::reference_wrapper<qubit>> &&ctrl_qubits,
              Args &&...args) {
+  auto *sim_qpu = get_qpu().as<simulation_trait>();
+  if (!sim_qpu)
+    throw std::runtime_error("invalid qpu requested, no simulation trait.");
   std::vector<std::size_t> ctrls;
   for (auto &cq : ctrl_qubits) {
     ctrls.push_back(cq.get().id());
   }
-  getExecutionManager()->startCtrlRegion(ctrls);
-  kernel(std::forward<Args>(args)...);
-  getExecutionManager()->endCtrlRegion(ctrls.size());
+  sim_qpu->applyControlRegion(ctrls,
+                              [&]() { kernel(std::forward<Args>(args)...); });
 }
 
 // Apply the adjoint of the given cudaq kernel
@@ -968,9 +1070,10 @@ template <typename QuantumKernel, typename... Args,
 #endif
 void adjoint(QuantumKernel &&kernel, Args &&...args) {
   // static_assert(true, "adj not implemented yet.");
-  getExecutionManager()->startAdjointRegion();
-  kernel(std::forward<Args>(args)...);
-  getExecutionManager()->endAdjointRegion();
+  auto *sim_qpu = get_qpu().as<simulation_trait>();
+  if (!sim_qpu)
+    throw std::runtime_error("invalid qpu requested, no simulation trait.");
+  sim_qpu->applyAdjointRegion([&]() { kernel(std::forward<Args>(args)...); });
 }
 
 /// Instantiate this type to affect C A C^dag, where the user
@@ -1189,7 +1292,7 @@ void applyQuantumOperation(const std::string &gateName,
         "cudaq does not support broadcast for multi-qubit operations.");
 
   // Operation on correct number of targets, no controls, possible broadcast
-  if ((std::is_same_v<mod, base> || std::is_same_v<mod, adj>)&&NumT == 1) {
+  if ((std::is_same_v<mod, base> || std::is_same_v<mod, adj>) && NumT == 1) {
     for (auto &qubit : qubits)
       getExecutionManager()->apply(gateName, parameters, {}, {qubit},
                                    std::is_same_v<mod, adj>);
@@ -1389,6 +1492,9 @@ void apply_noise(Args &&...args) {
 } // namespace cudaq
 
 #define __qop__ __attribute__((annotate("user_custom_quantum_operation")))
+
+#define CONCAT(a, b) CONCAT_INNER(a, b)
+#define CONCAT_INNER(a, b) a##b
 
 /// Register a new custom unitary operation providing a unique name,
 /// the number of target qubits, the number of rotation parameters (can be 0),

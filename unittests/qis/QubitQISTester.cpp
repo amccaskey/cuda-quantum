@@ -552,7 +552,7 @@ CUDAQ_TEST(CustomUnitaryTester, checkParameterized) {
     auto rotation_adjoint_test = []() {
       cudaq::qubit q;
       // mimic Rx gate
-      CustomU3(1.1, -M_PI_2, M_PI_2, q);
+      CustomU3(1.1, M_PI_2, -M_PI_2, q);
       // rx<adj>(angle) = u3<adj>(angle, pi/2, -pi/2)
       CustomU3<cudaq::adj>(1.1, M_PI_2, -M_PI_2, q);
       // mimic Ry gate

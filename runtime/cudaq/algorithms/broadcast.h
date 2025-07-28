@@ -123,7 +123,7 @@ broadcastFunctionOverArguments(std::size_t numQpus, quantum_platform &platform,
           promise.set_value(results);
         });
 
-    platform.enqueueAsyncTask(qpuId, functor);
+    platform.enqueueAsyncTask(qpuId, std::move(functor));
   }
 
   // Get all the async-generated results and return.

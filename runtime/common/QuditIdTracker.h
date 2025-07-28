@@ -46,7 +46,11 @@ public:
   /// If all qudits have been deallocated, reset the
   /// tracker.
   void returnIndex(std::size_t idx) {
-    recycledQudits.push_back(idx);
+    if(idx == currentId) return;
+    if (std::find(recycledQudits.begin(), recycledQudits.end(), idx) ==
+        recycledQudits.end()) {
+      recycledQudits.push_back(idx);
+    }
     std::sort(recycledQudits.begin(), recycledQudits.end(),
               std::greater<std::size_t>());
     if (recycledQudits.size() == currentId) {

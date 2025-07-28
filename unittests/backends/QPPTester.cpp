@@ -12,11 +12,11 @@
 #include <math.h>
 
 #include "CUDAQTestUtils.h"
-#include "QppCircuitSimulator.cpp"
+#include "cudaq/platform/qpus/simulation/qpp/QppCircuitSimulator.cpp"
 
 #define _USE_MATH_DEFINES
 
-using namespace nvqir;
+using namespace cudaq;
 
 void print_state(const qpp::ket &stateVector) {
   std::cout << "state = [";
@@ -46,8 +46,8 @@ std::string getSampledBitString(QppCircuitSimulator<qpp::ket> &qppBackend,
   // Call `sample` and return the bitstring as the first element of the
   // measurement count map.
   cudaq::ExecutionContext ctx("sample", 1);
-  qppBackend.setExecutionContext(&ctx);
-  qppBackend.resetExecutionContext();
+  qppBackend.set_execution_context(&ctx);
+  qppBackend.reset_execution_context();
   auto sampleResults = ctx.result;
   return sampleResults.begin()->first;
 }
@@ -416,6 +416,7 @@ CUDAQ_TEST(QPPTester, checkSingleQGates) {
     qppBackend.deallocate(q0);
     qppBackend.deallocate(q1);
   }
+  
 
   // Checking the single qubit TDG-gate.
   {
@@ -474,7 +475,7 @@ CUDAQ_TEST(QPPTester, checkParameterizedGates) {
     // Note: `RX(pi) = ((0,-i),(-i,0))`
     qppBackend.rx(M_PI, q0);
     // State vector should now be `|psi> = (0 -i)`.
-    want_state = -1. * im<> * getOneState(1);
+    want_state = -1. * std::complex<double>(0, 1.) * getOneState(1);
     got_state = qppBackend.getStateVector();
     want_bitstring = std::string("1");
     got_bitstring = getSampledBitString(qppBackend, {0});
@@ -569,7 +570,8 @@ CUDAQ_TEST(QPPTester, checkParameterizedGates) {
     // Rotate q0 again by RZ(pi).
     // Note: we should end at `(exp(-i*pi/2)  0)`
     qppBackend.rz(M_PI, q0);
-    want_state = std::exp(-0.5 * im<> * M_PI) * getZeroState(num_qubits);
+    want_state = std::exp(-0.5 * std::complex<double>(0, 1.) * M_PI) *
+                 getZeroState(num_qubits);
     got_state = qppBackend.getStateVector();
     want_bitstring = std::string("0");
     got_bitstring = getSampledBitString(qppBackend, {0});
@@ -651,7 +653,7 @@ CUDAQ_TEST(QPPTester, checkParameterizedGates) {
     qppBackend.u1(M_PI, q0);
     // State vector should now be `(0 exp(i*pi))`
     want_state = getOneState(1);
-    want_state(1) = std::exp(im<> * M_PI);
+    want_state(1) = std::exp(std::complex<double>(0, 1.) * M_PI);
     got_state = qppBackend.getStateVector();
     want_bitstring = std::string("1");
     got_bitstring = getSampledBitString(qppBackend, {0});
@@ -765,7 +767,7 @@ CUDAQ_TEST(QPPTester, checkParameterizedGates) {
     qppBackend.r1(M_PI, /* ctrls */ {q0}, q1);
 
     // CS should take `|11>` state vector to (0,0,0,exp(i*theta))
-    want_state = std::exp(im<> * M_PI) * getOneState(2);
+    want_state = std::exp(std::complex<double>(0, 1.) * M_PI) * getOneState(2);
     got_state = qppBackend.getStateVector();
     EXPECT_EQ(want_state, got_state);
     qppBackend.deallocate(q0);
@@ -1052,7 +1054,7 @@ CUDAQ_TEST(QPPTester, checkCtrlGates) {
     // Apply CS between q0 and q1
     qppBackend.s(/* ctrls */ {q0}, /* target */ q1);
     // CS should take `|11>` state vector to (0,0,0,i)
-    want_state = im<> * getOneState(2);
+    want_state = std::complex<double>(0, 1.) * getOneState(2);
     got_state = qppBackend.getStateVector();
     EXPECT_EQ(want_state, got_state);
     qppBackend.deallocate(q0);

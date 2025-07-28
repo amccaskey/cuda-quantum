@@ -8,6 +8,7 @@
 
 #include "Resources.h"
 #include "common/FmtCore.h"
+#include "common/Trace.h"
 #include <algorithm>
 #include <iomanip>
 #include <iostream>

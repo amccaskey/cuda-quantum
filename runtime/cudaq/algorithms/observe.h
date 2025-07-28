@@ -96,8 +96,7 @@ runObservation(KernelFunctor &&k, const cudaq::spin_op &H,
   // Indicate that this is an asynchronous execution
   ctx->asyncExec = futureResult != nullptr;
 
-  platform.set_current_qpu(qpu_id);
-  platform.set_exec_ctx(ctx.get(), qpu_id);
+  platform.get(qpu_id).set_exec_ctx(ctx.get());
 
   k();
 
@@ -108,7 +107,7 @@ runObservation(KernelFunctor &&k, const cudaq::spin_op &H,
     return std::nullopt;
   }
 
-  platform.reset_exec_ctx(qpu_id);
+  platform.get(qpu_id).reset_exec_ctx();
 
   // Extract the results
   sample_result data;
@@ -165,7 +164,7 @@ auto runObservationAsync(KernelFunctor &&wrappedKernel, const spin_op &H,
 
   // If the platform is not remote, then we can handle asynchronous execution
   // via a new worker thread.
-  KernelExecutionTask task(
+  std::function<sample_result()> task(
       [&, H, qpu_id, shots, kernelName,
        kernel = std::forward<KernelFunctor>(wrappedKernel)]() mutable {
         return details::runObservation(kernel, H, platform, shots, kernelName,
@@ -174,8 +173,15 @@ auto runObservationAsync(KernelFunctor &&wrappedKernel, const spin_op &H,
             .raw_data();
       });
 
-  return async_observe_result(
-      details::future(platform.enqueueAsyncTask(qpu_id, task)), &H);
+  std::promise<sample_result> promise;
+  auto f = promise.get_future();
+  platform.get(qpu_id).enqueue_task([p = std::move(promise), t = task]() mutable {
+    auto counts = t();
+    p.set_value(counts);
+  });
+
+  return async_observe_result(details::future(f), &H);
+
 }
 
 /// @brief Distribute the expectation value computations among the

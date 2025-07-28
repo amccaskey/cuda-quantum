@@ -8,13 +8,11 @@
 
 #pragma once
 
-#include "cudaq/qis/execution_manager.h"
 #include <string>
 #include <vector>
+#include "cudaq/qis/qudit_info.h"
 
 namespace cudaq {
-
-struct QuditInfo;
 
 /// @brief A trace is a circuit representation of the executed computation, as
 /// seen by the execution manager. (Here, a circuit is represented as a list
