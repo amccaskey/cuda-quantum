@@ -35,11 +35,6 @@
 
 using namespace mlir;
 
-extern "C" {
-void altLaunchKernel(const char *kernelName, void (*kernelFunc)(void *),
-                     void *kernelArgs, std::uint64_t argsSize);
-}
-
 namespace cudaq::details {
 
 /// @brief Track unique measurement register names.
@@ -1105,9 +1100,9 @@ void invokeCode(ImplicitLocOpBuilder &builder, ExecutionEngine *jit,
   }
 
   // Invoke and free the args memory.
-  auto thunk = reinterpret_cast<void (*)(void *)>(*thunkPtr);
+  auto thunk = reinterpret_cast<cudaq::KernelThunkType>(*thunkPtr);
 
-  altLaunchKernel(properName.data(), thunk, rawArgs, size);
+  altLaunchKernel(properName.data(), thunk, rawArgs, size, 0);
   std::free(rawArgs);
   // TODO: any return values are dropped on the floor here.
 }

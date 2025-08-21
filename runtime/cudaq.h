@@ -217,7 +217,7 @@ KernelArgsCreator getArgsCreator(const std::string &kernelName);
 bool kernelHasConditionalFeedback(const std::string &kernelName);
 
 /// @brief Provide a hook to set the target backend.
-void set_target_backend(const char *backend);
+void set_target_backend(const char *backend, const char * options);
 
 /// @brief Utility function for setting the shots on the platform
 [[deprecated("Specify the number of shots in the using the overloaded sample() "

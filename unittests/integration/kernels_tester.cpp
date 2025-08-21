@@ -273,6 +273,7 @@ CUDAQ_TEST(KernelsTester, msmTester_mz_only) {
     EXPECT_EQ(p, noise_bf_prob);
     col++;
   }
+  cudaq::unset_noise();
 }
 
 CUDAQ_TEST(KernelsTester, msmTester_mz_and_depol1_corr) {
@@ -368,6 +369,7 @@ CUDAQ_TEST(KernelsTester, msmTester_mz_and_depol1_corr) {
   for (std::size_t i = 0; i < ctx_msm.msm_prob_err_id.value().size(); i++)
     EXPECT_EQ(ctx_msm.msm_prob_err_id.value()[i], expected_err_ids[i])
         << "Mismatch at index " << i;
+  cudaq::unset_noise();
 }
 
 /// This helper function is used in many tests below. It creates a simple kernel
@@ -423,8 +425,13 @@ get_msm_test(double noise_probability) {
   simple_test{}(noise_probability);
   platform.reset_exec_ctx();
 
-  return {transpose_msm(ctx_msm.result.sequential_data()),
-          ctx_msm.msm_probabilities.value(), ctx_msm.msm_prob_err_id.value()};
+  std::tuple<std::vector<std::string>, std::vector<double>,
+             std::vector<std::size_t>>
+      ret = {transpose_msm(ctx_msm.result.sequential_data()),
+             ctx_msm.msm_probabilities.value(),
+             ctx_msm.msm_prob_err_id.value()};
+  cudaq::unset_noise();
+  return ret;
 }
 
 CUDAQ_TEST(KernelsTester, msmTester_depol2) {

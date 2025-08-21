@@ -13,7 +13,6 @@
 #include "cudaq/algorithms/broadcast.h"
 #include "cudaq/concepts.h"
 #include "cudaq/host_config.h"
-#include "cudaq/platform/QuantumExecutionQueue.h"
 #include "cudaq/qis/kernel_utils.h"
 #include <cstdint>
 
@@ -96,6 +95,16 @@ void (*get_run_entry_point(qkernel<R(As...)>, const std::string &name))(As...) {
 }
 #endif
 
+inline void set_noise_run(quantum_platform &qpu, const noise_model &noise) {
+  if (auto *has_noise = qpu.get().as<noise_trait>())
+    has_noise->set_noise(noise);
+}
+
+inline void reset_noise_run(quantum_platform &qpu) {
+  if (auto *has_noise = qpu.get().as<noise_trait>())
+    has_noise->reset_noise();
+}
+
 } // namespace details
 
 #if CUDAQ_USE_STD20
@@ -136,9 +145,9 @@ run(std::size_t shots, QuantumKernel &&kernel, ARGS &&...args) {
   // Direct kernel invocation loop for library mode
   results.reserve(shots);
   for (std::size_t i = 0; i < shots; ++i) {
-    platform.set_exec_ctx(ctx.get());
+    platform.get().set_exec_ctx(ctx.get());
     results.emplace_back(kernel(std::forward<ARGS>(args)...));
-    platform.reset_exec_ctx();
+    platform.get().reset_exec_ctx();
   }
 #else
   // Launch the kernel in the appropriate context.
@@ -176,8 +185,8 @@ std::vector<
 run(std::size_t shots, cudaq::noise_model &noise_model, QuantumKernel &&kernel,
     ARGS &&...args) {
   auto &platform = cudaq::get_platform();
-  if (platform.get_remote_capabilities().isRemoteSimulator ||
-      platform.is_remote())
+  if (platform.get().get_remote_capabilities().isRemoteSimulator ||
+      platform.get().is_remote())
     throw std::runtime_error(
         "Noise model is not supported on remote platforms.");
   if (shots == 0)
@@ -187,7 +196,7 @@ run(std::size_t shots, cudaq::noise_model &noise_model, QuantumKernel &&kernel,
   std::vector<ResultTy> results;
 #ifdef CUDAQ_LIBRARY_MODE
   // Direct kernel invocation loop for library mode
-  platform.set_noise(&noise_model);
+  details::set_noise_run(platform, noise_model);
   auto ctx = std::make_unique<cudaq::ExecutionContext>("run", 1);
   results.reserve(shots);
   for (std::size_t i = 0; i < shots; ++i) {
@@ -195,10 +204,10 @@ run(std::size_t shots, cudaq::noise_model &noise_model, QuantumKernel &&kernel,
     results.emplace_back(kernel(std::forward<ARGS>(args)...));
     platform.reset_exec_ctx();
   }
-  platform.reset_noise();
+  details::reset_noise_run(platform);
 #else
   // Launch the kernel in the appropriate context.
-  platform.set_noise(&noise_model);
+  details::set_noise_run(platform, noise_model);
   std::string kernelName{details::getKernelName(kernel)};
   details::RunResultSpan span = details::runTheKernel(
       [&]() mutable {
@@ -207,7 +216,7 @@ run(std::size_t shots, cudaq::noise_model &noise_model, QuantumKernel &&kernel,
         (*runKernel)(std::forward<ARGS>(args)...);
       },
       platform, kernelName, kernelName, shots);
-  platform.reset_noise();
+  details::reset_noise_run(platform);
   details::resultSpanToVectorViaOwnership<ResultTy>(results, span);
 #endif
   return results;
@@ -317,7 +326,7 @@ run_async(std::size_t qpu_id, std::size_t shots, QuantumKernel &&kernel,
 #endif
       });
 #endif
-  platform.enqueueAsyncTask(qpu_id, wrapped);
+  platform.enqueueAsyncTask(qpu_id, std::move(wrapped));
   return fut;
 }
 
@@ -363,10 +372,9 @@ run_async(std::size_t qpu_id, std::size_t shots,
           p.set_value({});
           return;
         }
-        assert(platform.get_current_qpu() == qpu_id);
 #ifdef CUDAQ_LIBRARY_MODE
         // Direct kernel invocation loop for library mode
-        platform.set_noise(&noise_model);
+        details::set_noise_run(platform, noise_model);
         auto ctx = std::make_unique<cudaq::ExecutionContext>("run", 1);
         std::vector<ResultTy> res;
         res.reserve(shots);
@@ -375,10 +383,10 @@ run_async(std::size_t qpu_id, std::size_t shots,
           res.emplace_back(kernel(std::forward<ARGS>(args)...));
           platform.reset_exec_ctx();
         }
-        platform.reset_noise();
+        details::reset_noise_run(platform);
         p.set_value(std::move(res));
 #else
-        platform.set_noise(&noise_model);
+        details::set_noise_run(platform, noise_model);
         const std::string kernelName{details::getKernelName(kernel)};
         details::RunResultSpan span = details::runTheKernel(
             [&]() mutable {
@@ -387,7 +395,7 @@ run_async(std::size_t qpu_id, std::size_t shots,
               (*runKernel)(std::forward<ARGS>(args)...);
             },
             platform, kernelName, kernelName, shots, qpu_id);
-        platform.reset_noise();
+        details::reset_noise_run(platform);
         std::vector<ResultTy> results;
         details::resultSpanToVectorViaOwnership<ResultTy>(results, span);
         p.set_value(std::move(results));
@@ -401,10 +409,9 @@ run_async(std::size_t qpu_id, std::size_t shots,
           p.set_value({});
           return;
         }
-        assert(platform.get_current_qpu() == qpu_id);
 #ifdef CUDAQ_LIBRARY_MODE
         // Direct kernel invocation loop for library mode
-        platform.set_noise(&noise_model);
+        details::set_noise_run(platform, noise_model);
         auto ctx = std::make_unique<cudaq::ExecutionContext>("run", 1);
         std::vector<ResultTy> res;
         res.reserve(shots);
@@ -417,10 +424,10 @@ run_async(std::size_t qpu_id, std::size_t shots,
               std::move(args)));
           platform.reset_exec_ctx();
         }
-        platform.reset_noise();
+        details::reset_noise_run(platform);
         p.set_value(std::move(res));
 #else
-        platform.set_noise(&noise_model);
+        details::set_noise_run(platform, noise_model);
         const std::string kernelName{details::getKernelName(kernel)};
         details::RunResultSpan span = details::runTheKernel(
             [&]() mutable {
@@ -433,14 +440,14 @@ run_async(std::size_t qpu_id, std::size_t shots,
                   std::move(args));
             },
             platform, kernelName, kernelName, shots, qpu_id);
-        platform.reset_noise();
+        details::reset_noise_run(platform);
         std::vector<ResultTy> results;
         details::resultSpanToVectorViaOwnership<ResultTy>(results, span);
         p.set_value(std::move(results));
 #endif
       });
 #endif
-  platform.enqueueAsyncTask(qpu_id, wrapped);
+  platform.enqueueAsyncTask(qpu_id, std::move(wrapped));
   return fut;
 }
 } // namespace cudaq

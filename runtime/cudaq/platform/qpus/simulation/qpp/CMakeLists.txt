@@ -6,4 +6,8 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(qpus)
+target_sources(${LIBRARY_NAME} PRIVATE QppCircuitSimulator.cpp QppDMCircuitSimulator.cpp)
+target_link_libraries(${LIBRARY_NAME} PRIVATE libqpp)
+
+add_target_config(qpp-cpu)
+add_target_config(density-matrix-cpu)

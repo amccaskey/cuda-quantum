@@ -6,4 +6,10 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(qpus)
+add_subdirectory(simulation)
+# add_subdirectory(photonics)
+# add_subdirectory(remote)
+# add_subdirectory(pasqal)
+# add_subdirectory(fermioniq)
+# add_subdirectory(orca)
+# add_subdirectory(quera)

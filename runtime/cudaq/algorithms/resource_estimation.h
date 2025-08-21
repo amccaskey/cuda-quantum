@@ -13,10 +13,13 @@
 #include "cudaq/platform.h"
 
 namespace nvqir {
-void switchToResourceCounterSimulator();
-void stopUsingResourceCounterSimulator();
-void setChoiceFunction(std::function<bool()> choice);
-cudaq::Resources *getResourceCounts();
+void switchToResourceCounterSimulator() {}
+void stopUsingResourceCounterSimulator() {}
+void setChoiceFunction(std::function<bool()> choice) {}
+cudaq::Resources *getResourceCounts() {
+  throw std::runtime_error(
+      "resource estimation not supported with refactor (needs to be reworked)");
+}
 } // namespace nvqir
 
 namespace cudaq {

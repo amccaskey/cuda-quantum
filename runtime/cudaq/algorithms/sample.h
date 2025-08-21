@@ -72,9 +72,9 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
     // Trace the kernel function
     ExecutionContext context("tracer");
     auto &platform = get_platform();
-    platform.set_exec_ctx(&context, qpu_id);
+    platform.get(qpu_id).set_exec_ctx(&context);
     wrappedKernel();
-    platform.reset_exec_ctx(qpu_id);
+    platform.get(qpu_id).reset_exec_ctx();
     // In trace mode, if we have a measure result
     // that is passed to an if statement, then
     // we'll have collected registernames
@@ -92,8 +92,7 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
   ctx->asyncExec = futureResult != nullptr;
 
   // Set the platform and the qpu id.
-  platform.set_exec_ctx(ctx.get(), qpu_id);
-  platform.set_current_qpu(qpu_id);
+  platform.get(qpu_id).set_exec_ctx(ctx.get());
 
   // Loop until all shots are returned.
   cudaq::sample_result counts;
@@ -103,7 +102,7 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
       *futureResult = ctx->futureResult;
       return std::nullopt;
     }
-    platform.reset_exec_ctx(qpu_id);
+    platform.get(qpu_id).reset_exec_ctx();
     if (counts.get_total_shots() == 0)
       counts = std::move(ctx->result); // optimize for first iteration
     else
@@ -123,7 +122,7 @@ runSampling(KernelFunctor &&wrappedKernel, quantum_platform &platform,
     // Reset the context for the next round,
     // don't need to reset on the last exec
     if (counts.get_total_shots() < static_cast<std::size_t>(shots)) {
-      platform.set_exec_ctx(ctx.get(), qpu_id);
+      platform.get(qpu_id).set_exec_ctx(ctx.get());
     }
   }
   return counts;
@@ -156,7 +155,7 @@ auto runSamplingAsync(KernelFunctor &&wrappedKernel, quantum_platform &platform,
   }
 
   // Otherwise we'll create our own future/promise and return it
-  KernelExecutionTask task(
+  std::function<sample_result()> task(
       [qpu_id, explicitMeasurements, shots, kernelName, &platform,
        kernel = std::forward<KernelFunctor>(wrappedKernel)]() mutable {
         return details::runSampling(kernel, platform, kernelName, shots,
@@ -164,8 +163,14 @@ auto runSamplingAsync(KernelFunctor &&wrappedKernel, quantum_platform &platform,
             .value();
       });
 
-  return async_sample_result(
-      details::future(platform.enqueueAsyncTask(qpu_id, task)));
+  std::promise<sample_result> promise;
+  auto f = promise.get_future();
+  platform.get(qpu_id).enqueue_task(
+      [p = std::move(promise), t = task]() mutable {
+        auto counts = t();
+        p.set_value(counts);
+      });
+  return async_sample_result(details::future(f));
 }
 } // namespace details
 
@@ -211,7 +216,7 @@ sample_result sample(QuantumKernel &&kernel, Args &&...args) {
 
   // Run this SHOTS times
   auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(1000);
+  auto shots = 1000;
   auto kernelName = cudaq::getKernelName(kernel);
   return details::runSampling(
              [&]() mutable { kernel(std::forward<Args>(args)...); }, platform,
@@ -331,7 +336,7 @@ async_sample_result sample_async(const std::size_t qpu_id,
 
   // Run this SHOTS times
   auto &platform = cudaq::get_platform();
-  auto shots = platform.get_shots().value_or(1000);
+  auto shots = 1000;
   auto kernelName = cudaq::getKernelName(kernel);
 
 #if CUDAQ_USE_STD20
@@ -517,7 +522,7 @@ std::vector<sample_result> sample(QuantumKernel &&kernel,
   details::BroadcastFunctorType<sample_result, Args...> functor =
       [&](std::size_t qpuId, std::size_t counter, std::size_t N,
           Args &...singleIterParameters) -> sample_result {
-    auto shots = platform.get_shots().value_or(1000);
+    auto shots = 1000;
     auto kernelName = cudaq::getKernelName(kernel);
     auto ret = details::runSampling(
                    [&kernel, &singleIterParameters...]() mutable {
@@ -654,7 +659,7 @@ sample_n(QuantumKernel &&kernel, ArgumentSet<Args...> &&params) {
   details::BroadcastFunctorType<sample_result, Args...> functor =
       [&](std::size_t qpuId, std::size_t counter, std::size_t N,
           Args &...singleIterParameters) -> sample_result {
-    auto shots = platform.get_shots().value_or(1000);
+    auto shots = 1000;
     auto kernelName = cudaq::getKernelName(kernel);
     auto ret = details::runSampling(
                    [&kernel, &singleIterParameters...]() mutable {

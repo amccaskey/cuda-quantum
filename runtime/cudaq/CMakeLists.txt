@@ -17,10 +17,8 @@ add_library(${LIBRARY_NAME}
                 algorithms/draw.cpp
                 algorithms/evolve.cpp
                 algorithms/schedule.cpp
+                platform/platform.cpp 
                 platform/qpu_state.cpp
-                platform/quantum_platform.cpp
-                qis/execution_manager_c_api.cpp
-                qis/execution_manager.cpp
                 qis/remote_state.cpp
                 qis/state.cpp
                 utils/cudaq_utils.cpp
@@ -42,7 +40,7 @@ if (CUDA_FOUND)
 
   target_link_libraries(${LIBRARY_NAME}
     PUBLIC dl cudaq-operator cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only CUDA::cudart_static)
+    PRIVATE fmt::fmt-header-only CUDA::cudart_static CUDAQTargetConfigUtil)
 
   target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
 else()
@@ -54,10 +52,9 @@ else()
 
   target_link_libraries(${LIBRARY_NAME}
     PUBLIC dl cudaq-operator cudaq-common cudaq-nlopt cudaq-ensmallen
-    PRIVATE nvqir fmt::fmt-header-only)
+    PRIVATE nvqir fmt::fmt-header-only CUDAQTargetConfigUtil)
 endif()
 
-add_subdirectory(qis/managers)
 add_subdirectory(algorithms)
 add_subdirectory(platform)
 add_subdirectory(builder)

@@ -15,8 +15,6 @@ set(INTERFACE_POSITION_INDEPENDENT_CODE ON)
 set(NVQIR_RUNTIME_SRC
   QIRTypes.cpp
   NVQIR.cpp
-  resourcecounter/ResourceCounter.cpp
-  ../cudaq/qis/state.cpp
 )
 
 add_library(${LIBRARY_NAME} SHARED ${NVQIR_RUNTIME_SRC})
@@ -37,19 +35,6 @@ install(TARGETS ${LIBRARY_NAME}
         EXPORT nvqir-targets 
         LIBRARY DESTINATION lib
         INCLUDES DESTINATION include/nvqir)
-
-add_subdirectory(qpp)
-add_subdirectory(stim)
-
-if (CUSTATEVEC_ROOT AND CUDA_FOUND) 
-  add_subdirectory(custatevec)
-endif() 
-if (CUTENSORNET_ROOT AND CUDA_FOUND)
-  add_subdirectory(cutensornet)  
-endif()
-if (CUDENSITYMAT_ROOT AND CUDA_FOUND)
-  add_subdirectory(cudensitymat)
-endif()
 
 install(EXPORT nvqir-targets
         FILE NVQIRTargets.cmake
