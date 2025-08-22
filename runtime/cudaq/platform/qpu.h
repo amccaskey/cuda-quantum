@@ -72,6 +72,7 @@ struct platform_metadata {
 
 struct qpu_specs {
   std::string name;
+  // need some more here...
 };
 
 /// \brief Set the current QPU for the calling thread.

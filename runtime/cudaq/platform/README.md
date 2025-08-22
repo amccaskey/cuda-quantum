@@ -12,13 +12,14 @@ Red line dependencies represent non-ideal linkages (would be good to figure out 
 
 ## Remaining Task List:
 
-- [ ] Current QPU Mutability (remote rest is a qpu, but need to delegate to simulator qpu for emulation)
+- [X] Current QPU Mutability (remote rest is a qpu, but need to delegate to simulator qpu for emulation)
+  - [X] I think qpu stack is the way to go here. 
 - [ ] Validate the platform_config and target yaml files
 - [ ] Runtime Tests (tests on the new API)
 - [ ] Need to Port: 
-  - [ ] cuQuantum simulator backends (including internal)
-  - [ ] Dynamics (cudaq::evolve)
-  - [ ] MQPU 
+  - [X] cuQuantum simulator backends (including internal)
+  - [X] Dynamics (cudaq::evolve)
+  - [X] MQPU 
   - [ ] Remote QPUs
     - [ ] Remote REST 
     - [ ] Remote Simulator 

@@ -11,11 +11,10 @@ add_library(cudaq-qpu-simulator SHARED simulator_qpu.cpp)
 
 add_subdirectory(qpp)
 add_subdirectory(stim) 
-# FIXME Add when ready...
-# if (CUDA_FOUND)
-#   add_subdirectory(custatevec) 
-#   add_subdirectory(cudensitymat)
-# endif()
+if (CUDA_FOUND)
+  add_subdirectory(custatevec) 
+  add_subdirectory(cudensitymat)
+endif()
 
 target_include_directories(${LIBRARY_NAME} PRIVATE .
     PUBLIC 

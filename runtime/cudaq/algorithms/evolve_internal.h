@@ -13,7 +13,6 @@
 #include "cudaq/host_config.h"
 #include "cudaq/operators.h"
 #include "cudaq/platform.h"
-#include "cudaq/platform/QuantumExecutionQueue.h"
 #include "cudaq/schedule.h"
 
 namespace cudaq {
@@ -112,7 +111,7 @@ evolve_async(state initial_state, QuantumKernel &&kernel,
           platform.set_noise(nullptr);
       });
 
-  platform.enqueueAsyncTask(qpu_id, wrapped);
+  platform.enqueueAsyncTask(qpu_id, std::move(wrapped));
   return f;
 }
 
@@ -138,7 +137,7 @@ evolve_async(state initial_state, std::vector<QuantumKernel> kernels,
           platform.set_noise(nullptr);
       });
 
-  platform.enqueueAsyncTask(qpu_id, wrapped);
+  platform.enqueueAsyncTask(qpu_id, std::move(wrapped));
   return f;
 }
 
@@ -160,7 +159,7 @@ evolve_async(std::function<evolve_result()> evolveFunctor,
         p.set_value(evolveFunctor());
       });
 
-  platform.enqueueAsyncTask(qpu_id, wrapped);
+  platform.enqueueAsyncTask(qpu_id, std::move(wrapped));
   return f;
 }
 
