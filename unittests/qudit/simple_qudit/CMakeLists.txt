@@ -6,7 +6,7 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-set(LIBRARY_NAME cudaq-em-qudit)
+set(LIBRARY_NAME cudaq-qpu-qudit)
 
 add_library(${LIBRARY_NAME} SHARED SimpleQuditExecutionManager.cpp)
 

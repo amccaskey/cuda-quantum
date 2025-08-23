@@ -212,7 +212,7 @@ public:
   /// \param task The function to execute.
   template <typename TaskTy>
   void enqueue_task(TaskTy &&task) {
-    taskQueue.enqueue_task([&, t = std::move(task), id = qpu_uid]() mutable {
+    taskQueue.enqueue_task([&, t = std::move(task)]() mutable {
       // This is a new thread. Handle any
       // preprocessing that needs to be done like setting the QPU id.
       handle_async_task_launch();

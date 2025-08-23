@@ -6,9 +6,9 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-set(LIBRARY_NAME cudaq-em-photonics)
+set(LIBRARY_NAME cudaq-qpu-photonics)
 
-add_library(${LIBRARY_NAME} SHARED PhotonicsExecutionManager.cpp)
+add_library(${LIBRARY_NAME} SHARED PhotonicsQPU.cpp)
 
 target_include_directories(${LIBRARY_NAME} 
     PUBLIC 
@@ -26,12 +26,12 @@ target_link_libraries(${LIBRARY_NAME}
 )
 
 install(TARGETS ${LIBRARY_NAME}
-  EXPORT cudaq-em-photonics-targets
+  # EXPORT cudaq-qpu-photonics-targets
   DESTINATION lib)
 
-install(EXPORT cudaq-em-photonics-targets
-        FILE CUDAQEmPhotonicsTargets.cmake
-        NAMESPACE cudaq::
-        DESTINATION lib/cmake/cudaq)
+# install(EXPORT cudaq-qpu-photonics-targets
+#         FILE CUDAQEmPhotonicsTargets.cmake
+#         NAMESPACE cudaq::
+#         DESTINATION lib/cmake/cudaq)
 
 add_target_config(orca-photonics)

@@ -695,10 +695,8 @@ if ${ENABLE_MLIR_LIB_LINKING}; then
     LINKLIBS="${LINKLIBS} -lcudaq-mlir-runtime -lcudaq-builder"
 fi
 
-# Set the execution manager and the platform
-#LINKLIBS="${LINKLIBS} -lcudaq-em-${LIBRARY_MODE_EXECUTION_MANAGER}"
-#LINKLIBS="${LINKLIBS} -lcudaq-platform-${PLATFORM_LIBRARY}"
-#LINKLIBS="${LINKLIBS} ${NVQIR_LIBS}"
+# FIXME Revisit if we want nvqir always
+LINKLIBS="${LINKLIBS} -lnvqir"
 LLC=${LLVMBIN}llc${llvm_suffix}
 
 if ${LIBRARY_MODE}; then

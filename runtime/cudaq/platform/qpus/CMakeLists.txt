@@ -7,7 +7,7 @@
 # ============================================================================ #
 
 add_subdirectory(simulation)
-# add_subdirectory(photonics)
+add_subdirectory(photonics)
 # add_subdirectory(remote)
 # add_subdirectory(pasqal)
 # add_subdirectory(fermioniq)

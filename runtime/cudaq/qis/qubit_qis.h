@@ -1493,6 +1493,9 @@ void apply_noise(Args &&...args) {
 
 #define __qop__ __attribute__((annotate("user_custom_quantum_operation")))
 
+#define CONCAT(a, b) CONCAT_INNER(a, b)
+#define CONCAT_INNER(a, b) a##b
+
 /// Register a new custom unitary operation providing a unique name,
 /// the number of target qubits, the number of rotation parameters (can be 0),
 /// and the unitary matrix as a 1D row-major `std::vector<complex>`

@@ -140,6 +140,10 @@ public:
   /// \return The constructed state.
   virtual cudaq::state get_state(const state_data &data) = 0;
 
+  /// \brief Get the internal quantum state from provided state data.
+  virtual std::unique_ptr<cudaq::SimulationState>
+  get_internal_state(const state_data &data) = 0;
+
   /// \brief Get the simulation precision.
   /// \return The current simulation precision.
   virtual simulation_precision get_precision() const = 0;

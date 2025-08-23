@@ -14,8 +14,9 @@
 #include "cudaq/Support/Version.h"
 #include "cudaq/gradients.h"
 #include "cudaq/optimizers.h"
-#include "cudaq/simulators.h"
+#include "cudaq/platform/qpu.h"
 #include "nlohmann/json.hpp"
+
 /*! \file
     \brief Utility to support JSON serialization between the client and server.
 */
@@ -193,16 +194,19 @@ inline void from_json(const json &j, ExecutionContext &context) {
     // represents no state data in the context.
     if (!stateDim.empty()) {
       // Create the simulation specific SimulationState
-      auto *simulator = cudaq::get_simulator();
-      if (simulator->isSinglePrecision()) {
+      auto *simulator = cudaq::get_qpu().as<cudaq::simulation_trait>();
+      if (!simulator)
+        throw std::runtime_error(
+            "invalid qpu, no simulator trait needed for json convert.");
+      if (simulator->get_precision() == simulation_precision::fp32) {
         // If the host (local) simulator is single-precision, convert the type
         // before loading the state vector.
         std::vector<std::complex<float>> converted(stateData.begin(),
                                                    stateData.end());
-        context.simulationState = simulator->createStateFromData(
+        context.simulationState = simulator->get_internal_state(
             std::make_pair(converted.data(), stateDim[0]));
       } else {
-        context.simulationState = simulator->createStateFromData(
+        context.simulationState = simulator->get_internal_state(
             std::make_pair(stateData.data(), stateDim[0]));
       }
     }
@@ -224,8 +228,7 @@ inline void from_json(const json &j, ExecutionContext &context) {
 // Enum data to denote the payload format.
 enum class CodeFormat { MLIR, LLVM };
 
-#define JSON_ENUM(enum_class, val)                                             \
-  { enum_class::val, #val }
+#define JSON_ENUM(enum_class, val) {enum_class::val, #val}
 
 NLOHMANN_JSON_SERIALIZE_ENUM(CodeFormat, {JSON_ENUM(CodeFormat, MLIR),
                                           JSON_ENUM(CodeFormat, LLVM)});

@@ -9,21 +9,23 @@
 #include <gtest/gtest.h>
 
 #include "cudaq.h"
+#include "cudaq/platform.h"
 
 /// This following functions form a primitive default
 /// instruction set for this simple qudit execution manager.
 /// You could imagine these in their own header file, like we do
 /// for qubit_qis.h
 
+using namespace cudaq;
+
 // Plus Gate : U|0> -> |1>, U|1> -> |2>, and U|2> -> |0>
 void plusGate(cudaq::qudit<3> &q) {
-  auto em = cudaq::getExecutionManager();
-  em->apply("plusGate", {}, {}, {{q.n_levels(), q.id()}});
+  get_qpu().as<simulation_trait>()->apply({0, 0, 1, 1, 0, 0, 0, 1, 0},
+                                                  {}, {q.id()});
 }
 
 int mz(cudaq::qudit<3> &q) {
-  auto em = cudaq::getExecutionManager();
-  return em->measure({q.n_levels(), q.id()});
+  return get_qpu().as<simulation_trait>()->mz(q.id());
 }
 
 std::vector<int> mz(cudaq::qvector<3> &q) {

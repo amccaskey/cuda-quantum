@@ -212,7 +212,11 @@ public:
   cudaq::state get_state(const state_data &data) override {
     return state(simulator->createStateFromData(data).release());
   }
-
+  
+  std::unique_ptr<cudaq::SimulationState>
+  get_internal_state(const state_data &data) override {
+    return simulator->createStateFromData(data);
+  }
   /// \brief Get the simulation precision (fp32 or fp64).
   /// \return The simulation precision.
   simulation_precision get_precision() const override {
