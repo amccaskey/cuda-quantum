@@ -581,6 +581,8 @@ endif()
 add_subdirectory(tools)
 add_subdirectory(utils)
 
+add_subdirectory(rt)
+
 if(CUDAQ_BUILD_TESTS)
   enable_testing()
 endif()
