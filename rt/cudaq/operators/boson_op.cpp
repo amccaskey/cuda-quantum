@@ -12,10 +12,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include <Eigen/Sparse>
 #include "cudaq/operators.h"
 #include "cudaq/utils/matrix.h"
 #include "helpers.h"
+#include <Eigen/Sparse>
 
 #include "cudaq/boson_op.h"
 

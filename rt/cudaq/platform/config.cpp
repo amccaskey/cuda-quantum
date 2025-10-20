@@ -5,22 +5,20 @@
  * This source code and the accompanying materials are made available under    *
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
-#pragma once
-#include <algorithm>
-#include <string>
+#include "config.h"
+#include "cudaq/utils/logger.h"
 
-namespace cudaq {
-
-/// @brief Helper function to get boolean environment variable
-inline bool getEnvBool(const char *envName, bool defaultVal = false) {
-  if (auto envVal = std::getenv(envName)) {
-    std::string tmp(envVal);
-    std::transform(tmp.begin(), tmp.end(), tmp.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-    return (tmp == "1" || tmp == "on" || tmp == "true" || tmp == "y" ||
-            tmp == "yes");
+namespace cudaq::config {
+__attribute__((constructor)) void __cudaq__startup__config() {
+  auto *sym = dlsym(RTLD_DEFAULT, "initialize_qpu");
+  if (!sym) {
+    info("no initialize_qpu() function available (dlerror = {})",
+         std::string(dlerror()));
+    return;
   }
-  return defaultVal;
+  
+  info("initialize_qpu() function detected, configuring default qpu.");
+  auto *functor = reinterpret_cast<void (*)(heterogeneous_map &)>(sym);
+  functor(get_qpu_config());
 }
-
-} // namespace cudaq
+} // namespace cudaq::config

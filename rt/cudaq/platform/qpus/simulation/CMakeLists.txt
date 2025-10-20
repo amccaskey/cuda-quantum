@@ -1,0 +1,7 @@
+if (CUDA_FOUND)
+  enable_language(CUDA)
+  find_package(CUDAToolkit REQUIRED)
+  target_compile_definitions(${LIBRARY_NAME} PRIVATE CUDAQ_HAS_CUDA)
+  add_subdirectory(gpu)
+  add_subdirectory(mqpu)
+endif()

@@ -14,10 +14,10 @@
 #include <unordered_map>
 #include <utility>
 
-#include <Eigen/Sparse>
 #include "cudaq/operators.h"
 #include "evaluation.h"
 #include "helpers.h"
+#include <Eigen/Sparse>
 
 namespace cudaq {
 

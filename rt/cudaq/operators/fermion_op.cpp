@@ -12,9 +12,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include <Eigen/Sparse>
 #include "cudaq/operators.h"
 #include "cudaq/utils/matrix.h"
+#include <Eigen/Sparse>
 
 #include "cudaq/fermion_op.h"
 

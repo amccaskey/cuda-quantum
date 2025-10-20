@@ -6,10 +6,10 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#include <Eigen/Sparse>
 #include "cudaq/operators.h"
 #include "evaluation.h"
 #include "helpers.h"
+#include <Eigen/Sparse>
 #include <algorithm>
 #include <iostream>
 #include <set>

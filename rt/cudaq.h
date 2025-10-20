@@ -6,21 +6,9 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 #pragma once
-#include <algorithm>
-#include <string>
 
-namespace cudaq {
+#include "cudaq/launch.h"
+#include "cudaq/platform/qpu.h"
+#include "cudaq/qis/qis.h"
 
-/// @brief Helper function to get boolean environment variable
-inline bool getEnvBool(const char *envName, bool defaultVal = false) {
-  if (auto envVal = std::getenv(envName)) {
-    std::string tmp(envVal);
-    std::transform(tmp.begin(), tmp.end(), tmp.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-    return (tmp == "1" || tmp == "on" || tmp == "true" || tmp == "y" ||
-            tmp == "yes");
-  }
-  return defaultVal;
-}
-
-} // namespace cudaq
+#include "cudaq/platform/qpus/all.h"
