@@ -10,6 +10,7 @@
 
 #include "cudaq/host_config.h"
 #include "cudaq/policies/sample/policy.h"
+#include "cudaq/policies/sample/sample_result.h"
 #include "cudaq/qis/state.h"
 #include "cudaq/qpu.h"
 #include "cudaq/spin_op.h"
@@ -22,7 +23,7 @@
 #include <string>
 #include <vector>
 
-namespace cudaq::simulator::gpu {
+namespace cudaq::simulator::cpu {
 
 // Forward declarations to hide implementation details
 namespace detail {
@@ -30,16 +31,16 @@ template <typename ScalarType>
 class state_vector_impl;
 }
 
-/// @brief GPU-accelerated state vector simulator using NVIDIA cuStateVec
+/// @brief State Vector Simulator using QPP (CPU)
 ///
-/// This simulator leverages the NVIDIA cuStateVec library for high-performance
-/// quantum circuit simulation on GPUs. It follows the experimental trait-based
-/// design pattern, implementing both simulator and local_trait interfaces.
+/// This simulator uses a state vector (ket) representation for pure quantum
+/// states. It's based on the QPP (Quantum++) library and runs on CPU.
+/// For noisy simulation, use density_matrix instead.
 ///
 /// Example usage:
 /// ```cpp
-/// state_vector qpu;
-/// auto results = cudaq::launch(qpu, cudaq::sample_policy{}, my_kernel);
+/// cudaq::simulator::cpu::state_vector qpu;
+/// auto result = cudaq::launch(qpu, cudaq::sample_policy{.shots = 1000}, kernel);
 /// ```
 template <typename ScalarType = double>
 class state_vector : public qpu<state_vector<ScalarType>,
@@ -50,7 +51,7 @@ class state_vector : public qpu<state_vector<ScalarType>,
           traits::local_trait<state_vector<ScalarType>>>;
 
 private:
-  /// @brief Pointer to implementation (PIMPL pattern to hide CUDA headers)
+  /// @brief Pointer to implementation (PIMPL pattern to hide QPP headers)
   std::unique_ptr<detail::state_vector_impl<ScalarType>> impl_;
 
   /// @brief Random number generator for measurements
@@ -60,23 +61,14 @@ private:
   /// @brief Number of currently allocated qubits
   std::size_t num_qubits_ = 0;
 
-  /// @brief Qudit levels tracker (maps qudit index to number of levels)
-  std::vector<std::size_t> qudit_levels_;
-
   /// @brief Track allocated qudit indices
   std::vector<std::size_t> allocated_qudits_;
 
   /// @brief Next available qudit index
   std::size_t next_qudit_idx_ = 0;
 
-  /// @brief Noise model pointer (optional)
-  const cudaq::noise_model *noise_model_ = nullptr;
-
   /// @brief Initialize the implementation
   void ensure_initialized();
-
-  /// @brief Helper to get total state dimension
-  std::size_t get_state_dimension() const;
 
   using BaseType::m_configuration;
 
@@ -91,7 +83,7 @@ public:
   ~state_vector();
 
   /// @brief Get the name of this QPU
-  std::string name() const { return "gpu::state_vector"; }
+  std::string name() const { return "cpu::state_vector"; }
 
   // ============================================================================
   // Simulator Trait Interface
@@ -120,17 +112,6 @@ public:
   std::vector<std::size_t> allocateQudits(std::size_t numQudits,
                                           std::size_t numLevels = 2);
 
-  /// @brief Allocate qudits from raw state data
-  std::vector<std::size_t> allocateQudits(std::size_t numQudits,
-                                          std::size_t numLevels,
-                                          const void *state,
-                                          simulation_precision precision);
-
-  /// @brief Allocate qudits from SimulationState
-  std::vector<std::size_t> allocateQudits(std::size_t numQudits,
-                                          std::size_t numLevels,
-                                          const SimulationState *state);
-
   /// @brief Deallocate a single qudit
   void deallocate(std::size_t idx);
 
@@ -138,8 +119,6 @@ public:
   void deallocate(const std::vector<std::size_t> &idxs);
 
   /// @brief Apply a quantum gate (implementation - called by base trait)
-  /// Note: applyControlRegion and applyAdjointRegion are now handled by the
-  /// base simulator trait, so derived classes only need to implement apply_impl
   void apply_impl(const std::vector<std::complex<double>> &matrixRowMajor,
                   const std::vector<std::size_t> &controls,
                   const std::vector<std::size_t> &targets,
@@ -160,21 +139,20 @@ public:
   void set_random_seed(std::size_t seed);
 
   // ============================================================================
-  // Noise Model Support
+  // Noise Model Support (not supported for state vector)
   // ============================================================================
 
-  /// @brief Set the noise model
-  void set_noise(const cudaq::noise_model *model) { noise_model_ = model; }
+  /// @brief Set the noise model (throws error - use density_matrix for noise)
+  void set_noise(const cudaq::noise_model *model) {
+    if (model) {
+      throw std::runtime_error(
+          "Noise models are not supported for state_vector simulator. "
+          "Use cpu::density_matrix simulator for noisy simulation.");
+    }
+  }
 
   /// @brief Get the current noise model
-  const cudaq::noise_model *get_noise() const { return noise_model_; }
-
-  /// @brief Apply noise channel to qubits (stub for now)
-  void apply_noise(const std::vector<cudaq::kraus_op> &ops,
-                   const std::vector<std::size_t> &qubits) {
-    // TODO: Implement Kraus operator application
-    // For now, this is a no-op
-  }
+  const cudaq::noise_model *get_noise() const { return nullptr; }
 
   // ============================================================================
   // Local Trait Interface
@@ -184,14 +162,23 @@ public:
   template <typename QuantumKernel, typename... Args>
   auto launch(const cudaq::sample_policy &policy, QuantumKernel &&kernel,
               Args &&...args) {
+    // Reset state before execution
     reset_state();
     
     // Set up the kernel API for this thread
     cudaq::set_kernel_api(*this);
+    
+    // Check for noise
+    if (policy.noise) {
+      throw std::runtime_error(
+          "Noise models are not supported for state_vector simulator. "
+          "Use cpu::density_matrix simulator for noisy simulation.");
+    }
 
-    // Execute the kernel (which will call back into our simulator methods)
+    // Execute the kernel once (builds the final state)
     kernel(std::forward<Args>(args)...);
 
+    // Sample from the final state
     auto result = sample_kernel(policy.shots);
 
     // Clean up API
@@ -201,9 +188,11 @@ public:
   }
 
 private:
+  /// @brief Sample from the current state
   sample_result sample_kernel(std::size_t shots);
+  
   /// @brief Reset the simulator state (deallocates qubits and resets impl)
   void reset_state();
 };
 
-} // namespace cudaq::simulator::gpu
+} // namespace cudaq::simulator::cpu

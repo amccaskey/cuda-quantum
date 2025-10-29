@@ -743,6 +743,17 @@ sample_result state_vector<ScalarType>::sample_kernel(std::size_t shots) {
   return impl_->sample_kernel(shots);
 }
 
+template<typename ScalarType>
+void state_vector<ScalarType>::reset_state() {
+  // Clear qubit tracking
+  num_qubits_ = 0;
+  allocated_qudits_.clear();
+  qudit_levels_.clear();
+  next_qudit_idx_ = 0;
+  
+  // Reset the implementation (deallocates and prepares for new execution)
+  impl_ = std::make_unique<detail::state_vector_impl<ScalarType>>();
+}
 // Template method implementations need to be in header or explicitly
 // instantiated Explicit template instantiations
 template class state_vector<float>;

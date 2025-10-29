@@ -8,6 +8,8 @@
 
 #include "cudaq.h"
 #include "cudaq/qpu.h"
+#include "cudaq/qpus/simulator/cpu/all.h"
+#include "cudaq/qpus/simulator/cpu/density_matrix.h"
 #include "mock_qpu/phantom.h"
 
 #include <chrono>
@@ -614,4 +616,194 @@ TEST(RuntimeTester, checkKernelControlAndAdjoint) {
   }
 
   printf("✓ All kernel control and adjoint tests passed!\n");
+}
+
+TEST(RuntimeTester, checkNoisyExecution) {
+  using namespace cudaq;
+  using namespace cudaq::simulator;
+
+  printf("\n=== Testing Noisy Execution ===\n");
+  cpu::density_matrix<> qpu; 
+
+  // Test 1: Bit flip noise on X gate
+  {
+    printf("Test 1: Bit flip noise on X gate\n");
+
+    auto x_gate_test = []() {
+      qubit q;
+      cudaq::x(q); // Apply X gate - should flip to |1⟩
+      // With noise, might flip back to |0⟩
+    };
+
+    // Create noise model with 20% bit flip error on X gates
+    cudaq::noise_model noise;
+    noise.add_all_qubit_channel<cudaq::types::x>(cudaq::bit_flip_channel(0.2));
+    
+    // Run with noise
+    auto noisy_counts = launch(qpu, sample_policy{.shots = 1000, .noise = &noise}, x_gate_test);
+    noisy_counts.dump();
+    
+    // Should have both 0 and 1 outcomes due to noise
+    EXPECT_EQ(2, noisy_counts.size());
+    
+    // The |1⟩ state should be more likely than |0⟩ (80% vs 20%)
+    auto prob_0 = noisy_counts.probability("0");
+    auto prob_1 = noisy_counts.probability("1");
+    printf("  P(0) = %.3f, P(1) = %.3f\n", prob_0, prob_1);
+    EXPECT_GT(prob_1, prob_0); // |1⟩ should be more probable
+    
+    // Run without noise for comparison
+    auto ideal_counts = launch(qpu, sample_policy{.shots = 1000}, x_gate_test);
+    ideal_counts.dump();
+    EXPECT_EQ(1, ideal_counts.size());
+    EXPECT_TRUE(ideal_counts.begin()->first == "1");
+  }
+
+  // Test 2: Depolarization noise on Hadamard
+  {
+    printf("Test 2: Depolarization noise on Hadamard\n");
+    
+    auto hadamard_test = []() {
+      qubit q;
+      cudaq::h(q); // Create superposition
+    };
+
+    // Create noise model with 10% depolarization on H gates
+    cudaq::noise_model noise;
+    noise.add_all_qubit_channel<cudaq::types::h>(cudaq::depolarization_channel(0.1));
+    
+    auto noisy_counts = launch(qpu, sample_policy{.shots = 1000, .noise = &noise}, hadamard_test);
+    noisy_counts.dump();
+    
+    // Should still have both outcomes
+    EXPECT_EQ(2, noisy_counts.size());
+    
+    // With noise, distribution should deviate from ideal 50/50
+    auto prob_0 = noisy_counts.probability("0");
+    auto prob_1 = noisy_counts.probability("1");
+    printf("  P(0) = %.3f, P(1) = %.3f\n", prob_0, prob_1);
+  }
+
+  // Test 3: Amplitude damping (simulates energy relaxation)
+  {
+    printf("Test 3: Amplitude damping noise\n");
+    
+    auto excited_state_test = []() {
+      qubit q;
+      cudaq::x(q); // Prepare |1⟩ (excited state)
+    };
+
+    // Create noise model with 30% amplitude damping
+    // This simulates T1 relaxation
+    cudaq::noise_model noise;
+    noise.add_all_qubit_channel<cudaq::types::x>(cudaq::amplitude_damping_channel(0.3));
+    
+    auto noisy_counts = launch(qpu, sample_policy{.shots = 1000, .noise = &noise}, excited_state_test);
+    noisy_counts.dump();
+    
+    // Should have both |0⟩ and |1⟩ due to damping
+    EXPECT_EQ(2, noisy_counts.size());
+    
+    auto prob_0 = noisy_counts.probability("0");
+    auto prob_1 = noisy_counts.probability("1");
+    printf("  P(0) = %.3f, P(1) = %.3f\n", prob_0, prob_1);
+    
+    // |1⟩ should still be more probable than |0⟩
+    EXPECT_GT(prob_1, prob_0);
+  } 
+
+  printf("✓ All noisy execution tests passed!\n");
+}
+
+TEST(RuntimeTester, checkDensityMatrixSimulator) {
+  using namespace cudaq;
+  using namespace cudaq::simulator;
+
+  printf("\n=== Testing Density Matrix Simulator ===\n");
+
+  // Test 1: Basic density matrix simulation without noise
+  {
+    printf("Test 1: Basic state evolution (no noise)\n");
+    
+    auto bell_state = []() {
+      qubit q, r;
+      cudaq::h(q);
+      cudaq::x<cudaq::ctrl>(q, r);
+    };
+
+    cpu::density_matrix<> dm_qpu;
+    auto counts = launch(dm_qpu, sample_policy{.shots = 1000}, bell_state);
+    counts.dump();
+    
+    // Should have |00⟩ and |11⟩ outcomes
+    EXPECT_EQ(2, counts.size());
+    auto prob_00 = counts.probability("00");
+    auto prob_11 = counts.probability("11");
+    printf("  P(00) = %.3f, P(11) = %.3f\n", prob_00, prob_11);
+    
+    // Should be approximately equal
+    EXPECT_NEAR(prob_00, 0.5, 0.1);
+    EXPECT_NEAR(prob_11, 0.5, 0.1);
+  }
+
+  // Test 2: Density matrix with bit flip noise
+  {
+    printf("Test 2: Density matrix with bit flip noise\n");
+    
+    auto x_gate = []() {
+      qubit q;
+      cudaq::x(q); // Should flip to |1⟩
+    };
+
+    cpu::density_matrix<> dm_qpu;
+    
+    // Create noise model
+    noise_model noise;
+    noise.add_all_qubit_channel<cudaq::types::x>(bit_flip_channel(0.25));
+    
+    auto noisy_counts = launch(dm_qpu, sample_policy{.shots = 1000, .noise = &noise}, x_gate);
+    noisy_counts.dump();
+    
+    // Should have both |0⟩ and |1⟩ due to noise
+    EXPECT_EQ(2, noisy_counts.size());
+    
+    auto prob_0 = noisy_counts.probability("0");
+    auto prob_1 = noisy_counts.probability("1");
+    printf("  P(0) = %.3f, P(1) = %.3f\n", prob_0, prob_1);
+    
+    // |1⟩ should be more probable (75% vs 25%)
+    EXPECT_GT(prob_1, prob_0);
+    EXPECT_NEAR(prob_1, 0.75, 0.1);
+    EXPECT_NEAR(prob_0, 0.25, 0.1);
+  }
+
+
+  // Test 3: Amplitude damping (T1 relaxation)
+  {
+    printf("Test 3: Amplitude damping on excited state\n");
+    
+    auto excited_state = []() {
+      qubit q;
+      cudaq::x(q); // Prepare |1⟩
+    };
+
+    cpu::density_matrix<> dm_qpu;
+    
+    // Add amplitude damping
+    noise_model noise;
+    noise.add_all_qubit_channel<cudaq::types::x>(amplitude_damping_channel(0.4));
+    
+    auto noisy_counts = launch(dm_qpu, sample_policy{.shots = 1000, .noise = &noise}, excited_state);
+    noisy_counts.dump();
+    
+    auto prob_0 = noisy_counts.probability("0");
+    auto prob_1 = noisy_counts.probability("1");
+    printf("  P(0) = %.3f, P(1) = %.3f\n", prob_0, prob_1);
+    
+    // |1⟩ should still be more probable, but |0⟩ should have significant probability
+    EXPECT_GT(prob_1, prob_0);
+    EXPECT_GT(prob_0, 0.2); // At least 20% damped to ground state
+  }
+
+  printf("✓ All density matrix simulator tests passed!\n");
 }

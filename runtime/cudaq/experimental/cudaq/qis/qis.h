@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "cudaq/qis/qudit.h"
 #include "cudaq/qis/noise_model.h"
+#include "cudaq/qis/qudit.h"
 #include "cudaq/traits/simulator.h"
 #include "gates.h"
 
@@ -22,6 +22,21 @@
 // set for CUDA-Q kernels using the type-erased simulator trait.
 
 namespace cudaq {
+
+// AJM FIXME Reconsider, this is for backwards compat
+// Define the common single qubit operations.
+namespace types {
+#define ConcreteQubitOp(NAME)                                                  \
+  struct NAME {                                                                \
+    inline static const std::string name{#NAME};                               \
+  };
+
+ConcreteQubitOp(h) ConcreteQubitOp(x) ConcreteQubitOp(y) ConcreteQubitOp(z)
+    ConcreteQubitOp(s) ConcreteQubitOp(t) ConcreteQubitOp(rx)
+        ConcreteQubitOp(ry) ConcreteQubitOp(rz) ConcreteQubitOp(r1)
+            ConcreteQubitOp(u3)
+
+} // namespace types
 
 // Operation modifiers
 struct base {};
@@ -70,15 +85,15 @@ void apply_gate(QubitArgs &&...args) {
   GateType gate_obj;
   auto gate_matrix = gate_obj.getGate();
   std::string gate_name = gate_obj.name();
-  
+
   // Collect all qubit IDs from arguments (handles both qubits and containers)
   auto qubit_ids = collect_qubit_ids(std::forward<QubitArgs>(args)...);
-  
+
   // Base: broadcast to all qubits
   if constexpr (std::is_same_v<mod, base>) {
     for (auto id : qubit_ids) {
       api->q_applicator(gate_matrix, {}, {id},
-                       traits::operation_metadata{gate_name});
+                        traits::operation_metadata{gate_name});
     }
   }
   // Ctrl: last qubit is target, rest are controls
@@ -86,13 +101,13 @@ void apply_gate(QubitArgs &&...args) {
     std::vector<std::size_t> controls(qubit_ids.begin(), qubit_ids.end() - 1);
     std::vector<std::size_t> targets = {qubit_ids.back()};
     api->q_applicator(gate_matrix, controls, targets,
-                     traits::operation_metadata{gate_name});
+                      traits::operation_metadata{gate_name});
   }
   // Adj: apply adjoint to single qubit
   else if constexpr (std::is_same_v<mod, adj>) {
     for (auto id : qubit_ids) {
       api->q_applicator(gate_matrix, {}, {id},
-                       traits::operation_metadata{gate_name});
+                        traits::operation_metadata{gate_name});
     }
   }
 }
@@ -108,27 +123,27 @@ void apply_parametric_gate(double angle, QubitArgs &&...args) {
   GateType gate_obj;
   auto gate_matrix = gate_obj.getGate({angle});
   std::string gate_name = gate_obj.name();
-  
+
   // Collect all qubit IDs from arguments
   auto qubit_ids = collect_qubit_ids(std::forward<QubitArgs>(args)...);
-  
+
   if constexpr (std::is_same_v<mod, base>) {
     // Broadcast to all qubits
     for (auto id : qubit_ids) {
       api->q_applicator(gate_matrix, {}, {id},
-                       traits::operation_metadata{gate_name});
+                        traits::operation_metadata{gate_name});
     }
   } else if constexpr (std::is_same_v<mod, ctrl>) {
     // Last qubit is target, rest are controls
     std::vector<std::size_t> controls(qubit_ids.begin(), qubit_ids.end() - 1);
     std::vector<std::size_t> targets = {qubit_ids.back()};
     api->q_applicator(gate_matrix, controls, targets,
-                     traits::operation_metadata{gate_name});
+                      traits::operation_metadata{gate_name});
   } else if constexpr (std::is_same_v<mod, adj>) {
     // Apply adjoint
     for (auto id : qubit_ids) {
       api->q_applicator(gate_matrix, {}, {id},
-                       traits::operation_metadata{gate_name});
+                        traits::operation_metadata{gate_name});
     }
   }
 }
@@ -190,22 +205,26 @@ inline void tdg(qubit &q) {
 
 template <typename mod = base, typename... QubitArgs>
 void rx(double angle, QubitArgs &&...qubits) {
-  apply_parametric_gate<gates::rx<>, mod>(angle, std::forward<QubitArgs>(qubits)...);
+  apply_parametric_gate<gates::rx<>, mod>(angle,
+                                          std::forward<QubitArgs>(qubits)...);
 }
 
 template <typename mod = base, typename... QubitArgs>
 void ry(double angle, QubitArgs &&...qubits) {
-  apply_parametric_gate<gates::ry<>, mod>(angle, std::forward<QubitArgs>(qubits)...);
+  apply_parametric_gate<gates::ry<>, mod>(angle,
+                                          std::forward<QubitArgs>(qubits)...);
 }
 
 template <typename mod = base, typename... QubitArgs>
 void rz(double angle, QubitArgs &&...qubits) {
-  apply_parametric_gate<gates::rz<>, mod>(angle, std::forward<QubitArgs>(qubits)...);
+  apply_parametric_gate<gates::rz<>, mod>(angle,
+                                          std::forward<QubitArgs>(qubits)...);
 }
 
 template <typename mod = base, typename... QubitArgs>
 void r1(double angle, QubitArgs &&...qubits) {
-  apply_parametric_gate<gates::r1<>, mod>(angle, std::forward<QubitArgs>(qubits)...);
+  apply_parametric_gate<gates::r1<>, mod>(angle,
+                                          std::forward<QubitArgs>(qubits)...);
 }
 
 // ============================================================================
@@ -258,12 +277,12 @@ inline void cswap(qubit &ctrl, qubit &q1, qubit &q2) {
   auto *api = cudaq::get_kernel_api();
   if (!api)
     throw std::runtime_error("Kernel API not initialized");
-  api->q_applicator(gates::swap<>().getGate(), {ctrl.id()},
-                    {q1.id(), q2.id()}, traits::operation_metadata{"swap"});
+  api->q_applicator(gates::swap<>().getGate(), {ctrl.id()}, {q1.id(), q2.id()},
+                    traits::operation_metadata{"swap"});
 }
 
 // ============================================================================
-// Measurement Operations  
+// Measurement Operations
 // ============================================================================
 // Note: Measurement also supports containers via the same dispatch mechanism
 
@@ -326,9 +345,7 @@ void control(QuantumKernel &&kernel, qubit &ctrl, Args &&...args) {
     throw std::runtime_error("Kernel API not initialized");
 
   std::vector<std::size_t> ctrls{ctrl.id()};
-  api->q_control_region(ctrls, [&]() {
-    kernel(std::forward<Args>(args)...);
-  });
+  api->q_control_region(ctrls, [&]() { kernel(std::forward<Args>(args)...); });
 }
 
 template <typename QuantumKernel, typename QubitRange, typename... Args>
@@ -342,9 +359,7 @@ void control(QuantumKernel &&kernel, QubitRange &ctrl_qubits, Args &&...args) {
     ctrls.push_back(q.id());
   }
 
-  api->q_control_region(ctrls, [&]() {
-    kernel(std::forward<Args>(args)...);
-  });
+  api->q_control_region(ctrls, [&]() { kernel(std::forward<Args>(args)...); });
 }
 
 template <typename QuantumKernel, typename... Args>
@@ -353,9 +368,7 @@ void adjoint(QuantumKernel &&kernel, Args &&...args) {
   if (!api)
     throw std::runtime_error("Kernel API not initialized");
 
-  api->q_adjoint_region([&]() {
-    kernel(std::forward<Args>(args)...);
-  });
+  api->q_adjoint_region([&]() { kernel(std::forward<Args>(args)...); });
 }
 
 // ============================================================================
@@ -382,8 +395,9 @@ void compute_dag_action(ComputeFunction &&c, ActionFunction &&a) {
 
 /// @brief Apply noise channel with runtime parameters
 /// Supports both individual qubits and containers via dispatch mechanism
-template <typename KrausChannel, typename... QubitArgs,
-          typename = std::enable_if_t<std::is_base_of_v<kraus_channel, KrausChannel>>>
+template <
+    typename KrausChannel, typename... QubitArgs,
+    typename = std::enable_if_t<std::is_base_of_v<kraus_channel, KrausChannel>>>
 void apply_noise(const std::vector<double> &params, QubitArgs &&...args) {
   auto *api = cudaq::get_kernel_api();
   if (!api)
@@ -412,8 +426,9 @@ void apply_noise(const std::vector<double> &params, QubitArgs &&...args) {
 
 /// @brief Apply noise channel with compile-time parameters
 /// Extracts parameters from leading double arguments
-template <typename KrausChannel, typename... Args,
-          typename = std::enable_if_t<std::is_base_of_v<kraus_channel, KrausChannel>>>
+template <
+    typename KrausChannel, typename... Args,
+    typename = std::enable_if_t<std::is_base_of_v<kraus_channel, KrausChannel>>>
 void apply_noise(Args &&...args) {
   auto *api = cudaq::get_kernel_api();
   if (!api)
@@ -428,14 +443,16 @@ void apply_noise(Args &&...args) {
   std::vector<std::size_t> qubit_ids;
 
   // Helper to extract parameters and qubits
-  ([&] {
-    using T = std::decay_t<decltype(args)>;
-    if constexpr (std::is_floating_point_v<T>) {
-      params.push_back(static_cast<double>(args));
-    } else {
-      extract_qubit_ids(qubit_ids, std::forward<Args>(args));
-    }
-  }(), ...);
+  (
+      [&] {
+        using T = std::decay_t<decltype(args)>;
+        if constexpr (std::is_floating_point_v<T>) {
+          params.push_back(static_cast<double>(args));
+        } else {
+          extract_qubit_ids(qubit_ids, std::forward<Args>(args));
+        }
+      }(),
+      ...);
 
   // Get the Kraus operators for this channel
   auto channel = noise_model->template get_channel<KrausChannel>(params);
