@@ -173,6 +173,9 @@ function show_help {
 --llvm-version=<vers>
 	Set the LLVM version suffix is <vers>.
 
+--experimental | -experimental
+	Use the experimental CUDA-Q runtime (libcudaq-experimental.so).
+
 --execution-manager=<mgr> | -em=<mgr> | -execution-manager=<mgr>
 	Set the execution manager to <mgr>.
 
@@ -321,7 +324,9 @@ LIBRARY_MODE_EXECUTION_MANAGER="default"
 PLATFORM_LIBRARY="default"
 PLATFORM_TRANSPORT_LAYER="qir:0.1"
 LINKDIRS="-L${install_dir}/lib -L${install_dir}/lib/plugins @CUDAQ_CXX_NVQPP_LINK_STR@"
-LINKLIBS="-lcudaq -lcudaq-common -lcudaq-ensmallen -lcudaq-nlopt -lcudaq-operator"
+# Base CUDA-Q library - will be updated if using experimental runtime
+CUDAQ_BASE_LIB="-lcudaq"
+LINKLIBS="${CUDAQ_BASE_LIB} -lcudaq-common -lcudaq-ensmallen -lcudaq-nlopt -lcudaq-operator"
 
 # Add any plugin libraries to the link stage
 CUDAQ_PLUGIN_DIR=${install_dir}/lib/plugins
@@ -372,6 +377,7 @@ NVQIR_LIBS="-lnvqir -lnvqir-"
 CPPSTD=-std=c++20
 CUDAQ_OPT_EXTRA_PASSES=
 SET_TARGET_BACKEND=true
+USE_EXPERIMENTAL=false
 
 # Provide a default backend, user can override
 TARGET_CONFIG="qpp-cpu"
@@ -460,6 +466,9 @@ while [ $# -ne 0 ]; do
 		;;
 	--llvm-version=*)
 		llvm_suffix="${arg#*=}"
+		;;
+	--experimental | -experimental)
+		USE_EXPERIMENTAL=true
 		;;
 	--execution-manager | -em | -execution-manager)
 		LIBRARY_MODE_EXECUTION_MANAGER="$2"
@@ -620,6 +629,27 @@ while [ $# -ne 0 ]; do
 	esac
 	shift
 done
+
+# Update library linking and include paths if using experimental runtime
+if ${USE_EXPERIMENTAL}; then
+	# Update the include path for experimental runtime
+	if [ -f "${install_dir}/include/cudaq/experimental/cudaq.h" ]; then
+		CUDAQ_INCLUDE_PATH="${install_dir}/include/cudaq/experimental"
+	elif [ "@CMAKE_BINARY_DIR@" -ef "${install_dir}" ]; then
+		CUDAQ_INCLUDE_PATH="@CMAKE_SOURCE_DIR@/runtime/cudaq/experimental"
+	else
+		error_exit "Experimental runtime not found in installation."
+	fi
+	
+	# Update compiler and include flags with new path
+	COMPILER_FLAGS="-I ${CUDAQ_INCLUDE_PATH} ${CUDAQ_CLANG_EXTRA_ARGS}"
+	# INCLUDES is used by cudaq-quake, COMPILER_FLAGS is used by direct C++ compilation
+	INCLUDES="-I ${CUDAQ_INCLUDE_PATH} ${INCLUDES}"
+	
+	# Update library linking
+	CUDAQ_BASE_LIB="-lcudaq-experimental"
+	LINKLIBS="${CUDAQ_BASE_LIB} -lcudaq-operator"
+fi
 
 if ${SHOW_HELP}; then
 	show_help
