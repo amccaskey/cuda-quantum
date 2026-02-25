@@ -9,3 +9,9 @@
 include(HandleLLVMOptions)
 add_subdirectory(Optimizer)
 add_subdirectory(Support)
+
+# Install Frontend headers that are transitively included by Optimizer headers
+# (e.g. InlinerInterface.h includes cudaq/Frontend/nvqpp/AttributeNames.h).
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Frontend/
+        DESTINATION include/cudaq/Frontend
+        FILES_MATCHING PATTERN "*.h")
