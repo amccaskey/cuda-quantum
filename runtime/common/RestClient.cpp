@@ -7,6 +7,9 @@
  ******************************************************************************/
 
 #include "RestClient.h"
+
+#ifdef CUDAQ_RESTCLIENT_AVAILABLE
+
 #include "FmtCore.h"
 #include "cudaq/runtime/logger/logger.h"
 #include "cudaq/utils/cudaq_utils.h"
@@ -205,3 +208,67 @@ void RestClient::download(const std::string_view remoteUrl,
   }
 }
 } // namespace cudaq
+
+#else // !CUDAQ_RESTCLIENT_AVAILABLE
+
+// Provide a complete type so unique_ptr<cpr::SslOptions> can be destroyed.
+namespace cpr {
+struct SslOptions {};
+} // namespace cpr
+
+namespace {
+[[noreturn]] void throwRestNotAvailable() {
+  throw std::runtime_error(
+      "REST client is not available. Please build CUDA-Q with OpenSSL support "
+      "(install libssl-dev and reconfigure with CUDAQ_ENABLE_REST=ON).");
+}
+} // namespace
+
+namespace cudaq {
+
+RestClient::RestClient() = default;
+RestClient::~RestClient() = default;
+
+nlohmann::json
+RestClient::post(const std::string_view, const std::string_view,
+                 nlohmann::json &, std::map<std::string, std::string> &, bool,
+                 bool, const std::map<std::string, std::string> &,
+                 std::map<std::string, std::string> *) {
+  throwRestNotAvailable();
+}
+
+void RestClient::put(const std::string_view, const std::string_view,
+                     nlohmann::json &, std::map<std::string, std::string> &,
+                     bool, bool,
+                     const std::map<std::string, std::string> &) {
+  throwRestNotAvailable();
+}
+
+std::string
+RestClient::getRawText(const std::string_view, const std::string_view,
+                       std::map<std::string, std::string> &, bool,
+                       const std::map<std::string, std::string> &) {
+  throwRestNotAvailable();
+}
+
+nlohmann::json
+RestClient::get(const std::string_view, const std::string_view,
+                std::map<std::string, std::string> &, bool,
+                const std::map<std::string, std::string> &) {
+  throwRestNotAvailable();
+}
+
+void RestClient::del(const std::string_view, const std::string_view,
+                     std::map<std::string, std::string> &, bool, bool,
+                     const std::map<std::string, std::string> &) {
+  throwRestNotAvailable();
+}
+
+void RestClient::download(const std::string_view, const std::string &, bool,
+                          bool,
+                          const std::map<std::string, std::string> &) {
+  throwRestNotAvailable();
+}
+} // namespace cudaq
+
+#endif // CUDAQ_RESTCLIENT_AVAILABLE
