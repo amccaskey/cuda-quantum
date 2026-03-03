@@ -121,6 +121,10 @@ cudaq::details::getTagNameOfFunctionDecl(const clang::FunctionDecl *func,
     // cudaq::get_class_kernel_name<C>();
     auto name = trimmedMangledTypeName(
         mangler->getASTContext().getCanonicalTagType(cxxCls), mangler);
+    // For named static methods, include the method name to disambiguate
+    // multiple kernel methods within the same class.
+    if (cxxMethod->isStatic() && cxxMethod->getIdentifier())
+      name += '_' + cxxMethod->getNameAsString();
     LLVM_DEBUG(llvm::dbgs() << "member name is: " << name << '\n');
     return name;
   }
@@ -198,18 +202,18 @@ public:
           "CUDA-Q kernel class with data members is not yet supported");
       de.Report(x->getBeginLoc(), id);
     }
-    unsigned quantumCount = 0;
-    for (auto *method : x->methods()) {
-      if (cudaq::ASTBridgeAction::ASTBridgeConsumer::isQuantum(method)) {
-        if (quantumCount++) {
-          auto id = de.getCustomDiagID(clang::DiagnosticsEngine::Error,
-                                       "CUDA-Q kernel class with multiple "
-                                       "quantum methods not yet supported");
-          de.Report(method->getBeginLoc(), id);
-          break;
-        }
-      }
-    }
+    // unsigned quantumCount = 0;
+    // for (auto *method : x->methods()) {
+    //   if (cudaq::ASTBridgeAction::ASTBridgeConsumer::isQuantum(method)) {
+    //     if (quantumCount++) {
+    //       auto id = de.getCustomDiagID(clang::DiagnosticsEngine::Error,
+    //                                    "CUDA-Q kernel class with multiple "
+    //                                    "quantum methods not yet supported");
+    //       de.Report(method->getBeginLoc(), id);
+    //       break;
+    //     }
+    //   }
+    // }
     checkedClass = nullptr;
   }
 

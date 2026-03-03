@@ -439,6 +439,13 @@ bool QuakeBridgeVisitor::VisitBuiltinType(clang::BuiltinType *t) {
   return pushType(builtinTypeToType(t));
 }
 
+bool QuakeBridgeVisitor::VisitEnumType(clang::EnumType *t) {
+  auto *enumDecl = t->getDecl();
+  auto underlyingTy = enumDecl->getIntegerType();
+  auto width = astContext->getTypeSize(underlyingTy);
+  return pushType(builder.getIntegerType(width));
+}
+
 bool QuakeBridgeVisitor::VisitPointerType(clang::PointerType *t) {
   if (t->getPointeeType()->isUndeducedAutoType())
     return pushType(cc::PointerType::get(builder.getContext()));

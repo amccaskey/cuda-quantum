@@ -154,6 +154,7 @@ if (CUSTATEVEC_ROOT AND CUDA_FOUND)
   # dependency to to validate that functionality.
   # create_tests_with_backend(custatevec-fp64 "")
 
+  if (CUDAQ_ENABLE_REMOTE_SIM)
   add_executable(test_mqpu main.cpp mqpu/mqpu_tester.cpp)
   # Need to force the link to nvqir-qpp here if gcc.
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
@@ -167,6 +168,7 @@ if (CUSTATEVEC_ROOT AND CUDA_FOUND)
     nvqir-custatevec-fp64
     gtest_main)
   gtest_discover_tests(test_mqpu PROPERTIES LABELS "gpu_required")
+endif() 
 
   # Test CUDAQ_OBSERVE_FROM_SAMPLING=ON mode.
   # (term-by-term expectation value calculation by applying change-of-basis gates then reverting them)

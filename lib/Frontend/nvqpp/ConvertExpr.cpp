@@ -1525,12 +1525,12 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
 
   auto funcArity = func->getNumParams();
   SmallVector<Value> args = lastValues(funcArity);
-  if (isa<clang::CXXMethodDecl>(func)) {
+  if (!func->isStatic() && isa<clang::CXXMethodDecl>(func)) {
     [[maybe_unused]] auto thisPtrValue = popValue();
   }
   auto calleeOp = popValue();
 
-  if (isInNamespace(func, "cudaq")) {
+  if (isInNamespace(func, "cudaq") && !isKernelEntryPoint(func)) {
     // Check and see if this quantum operation is adjoint
     bool isAdjoint = false;
     bool isControl = false;

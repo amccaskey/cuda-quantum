@@ -444,6 +444,7 @@ public:
 
   bool VisitFunctionProtoType(clang::FunctionProtoType *t);
   bool VisitBuiltinType(clang::BuiltinType *t);
+  bool VisitEnumType(clang::EnumType *t);
   bool VisitPointerType(clang::PointerType *t);
   bool VisitLValueReferenceType(clang::LValueReferenceType *t);
   bool VisitRValueReferenceType(clang::RValueReferenceType *t);
