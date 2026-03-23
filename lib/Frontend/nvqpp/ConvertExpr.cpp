@@ -2288,9 +2288,10 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
       return pushValue(devCall.getResult(0));
     }
 
-    // Finally, flag the call as an error except anything in cudaq::solvers or
-    // cudaq::qec.
-    if (!isInNamespace(func, "solvers") && !isInNamespace(func, "qec")) {
+    // Finally, flag the call as an error except anything in cudaq::solvers,
+    // cudaq::qec, or cudaq::qlx.
+    if (!isInNamespace(func, "solvers") && !isInNamespace(func, "qec") &&
+        !isInNamespace(func, "qlx")) {
       TODO_loc(loc, "unknown function, " + funcName + ", in cudaq namespace");
     }
   } // end in cudaq namespace
