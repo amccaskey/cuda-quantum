@@ -83,8 +83,8 @@ void bindOperatorHandlers(py::module_ &mod) {
             auto cmat = self.to_matrix(dims, pm);
             return details::cmat_to_numpy(cmat);
           },
-          py::arg("dimensions").none() = py::none(),
-          py::arg("parameters").none() = py::none(),
+          py::arg("dimensions") = py::none(),
+          py::arg("parameters") = py::none(),
           "Returns the matrix representation of the operator.")
       .def(
           "to_matrix",
@@ -95,9 +95,9 @@ void bindOperatorHandlers(py::module_ &mod) {
                                        details::kwargs_to_param_map(kwargs));
             return details::cmat_to_numpy(cmat);
           },
-          py::arg("dimensions").none() = py::none(),
+          py::arg("dimensions") = py::none(),
+          py::arg("kwarg") = py::none(),
           "Returns the matrix representation of the operator.")
-
       // tools for custom operators
       .def_static(
           "_define",
@@ -143,8 +143,8 @@ void bindOperatorHandlers(py::module_ &mod) {
             auto cmat = self.to_matrix(dims, pm);
             return details::cmat_to_numpy(cmat);
           },
-          py::arg("dimensions").none() = py::none(),
-          py::arg("parameters").none() = py::none(),
+          py::arg("dimensions") = py::none(),
+          py::arg("parameters") = py::none(),
           "Returns the matrix representation of the operator.")
       .def(
           "to_matrix",
@@ -156,6 +156,7 @@ void bindOperatorHandlers(py::module_ &mod) {
             return details::cmat_to_numpy(cmat);
           },
           py::arg("dimensions").none() = py::none(),
+          py::arg("kwarg") = py::none(),
           "Returns the matrix representation of the operator.");
 
   py::class_<fermion_handler>(mod, "FermionOperatorElement")
@@ -192,7 +193,8 @@ void bindOperatorHandlers(py::module_ &mod) {
                                        details::kwargs_to_param_map(kwargs));
             return details::cmat_to_numpy(cmat);
           },
-          py::arg("dimensions").none() = py::none(),
+          py::arg("dimensions") = py::none(),
+          py::arg("kwarg") = py::none(),
           "Returns the matrix representation of the operator.");
 
   py::class_<spin_handler>(mod, "SpinOperatorElement")
@@ -231,7 +233,8 @@ void bindOperatorHandlers(py::module_ &mod) {
                                        details::kwargs_to_param_map(kwargs));
             return details::cmat_to_numpy(cmat);
           },
-          py::arg("dimensions").none() = py::none(),
+          py::arg("dimensions") = py::none(),
+          py::arg("kwarg") = py::none(),
           "Returns the matrix representation of the operator.");
 }
 
