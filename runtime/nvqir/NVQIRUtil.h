@@ -8,8 +8,18 @@
 
 #pragma once
 #include "QIRTypes.h"
+#include <cstdint>
+#include <vector>
 
 namespace nvqir {
+
+/// @brief Look up the chronological measurement id assigned to a Result*
+/// when it was produced. Returns -1 if no id has been recorded.
+std::int64_t getMeasurementUniqueId(Result *r);
+
+/// @brief Extract Result* pointers from a QIR Array of Result*.
+std::vector<Result *> arrayToVectorResultPtr(Array *arr);
+
 // Singleton struct to track allocated arrays
 // This facilitates cleaning up arrays at program end to avoid memory leaks.
 struct ArrayTracker {

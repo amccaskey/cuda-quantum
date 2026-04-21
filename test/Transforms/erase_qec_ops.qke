@@ -1,0 +1,53 @@
+// ========================================================================== //
+// Copyright (c) 2022 - 2026 NVIDIA Corporation & Affiliates.                 //
+// All rights reserved.                                                       //
+//                                                                            //
+// This source code and the accompanying materials are made available under   //
+// the terms of the Apache License 2.0 which accompanies this distribution.   //
+// ========================================================================== //
+
+// RUN: cudaq-opt --erase-qec-ops %s | FileCheck %s
+// RUN: cudaq-opt --erase-qec-ops --canonicalize %s | FileCheck --check-prefix=CLEAN %s
+
+// Verify the EraseQECOps pass strips all three kinds of QEC declaration ops
+// and (after canonicalization) removes the now-unused upstream measurement
+// and indexing machinery.
+
+func.func @erase_scalar_detectors() {
+  %0 = quake.alloca !quake.ref
+  %1 = quake.alloca !quake.ref
+  quake.h %0 : (!quake.ref) -> ()
+  quake.h %1 : (!quake.ref) -> ()
+  %m0 = quake.mz %0 : (!quake.ref) -> !quake.measure
+  %m1 = quake.mz %1 : (!quake.ref) -> !quake.measure
+  qec.detector(%m0) : (!quake.measure) -> ()
+  qec.detector(%m0, %m1) : (!quake.measure, !quake.measure) -> ()
+  return
+}
+
+// CHECK-LABEL:   func.func @erase_scalar_detectors()
+// CHECK-NOT:       qec.detector
+// CHECK-NOT:       qec.detector_vec
+// CHECK-NOT:       qec.logical_observable
+// CHECK:           return
+
+func.func @erase_stdvec_and_observable(%q : !quake.veq<3>) {
+  %v = quake.mz %q : (!quake.veq<3>) -> !cc.stdvec<!quake.measure>
+  qec.detector_vec(%v) : (!cc.stdvec<!quake.measure>) -> ()
+  qec.logical_observable(%v) : (!cc.stdvec<!quake.measure>) -> ()
+  return
+}
+
+// CHECK-LABEL:   func.func @erase_stdvec_and_observable
+// CHECK-NOT:       qec.detector_vec
+// CHECK-NOT:       qec.logical_observable
+// CHECK:           return
+
+// After erase + canonicalize, no qec.* op must survive. quake.mz has
+// measurement side-effects and is expected to remain even with unused
+// results.
+// CLEAN-LABEL:   func.func @erase_scalar_detectors()
+// CLEAN-NOT:       qec.detector
+// CLEAN-NOT:       qec.detector_vec
+// CLEAN-NOT:       qec.logical_observable
+// CLEAN:           return

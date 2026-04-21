@@ -6,29 +6,17 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-type-limits")
+add_cudaq_dialect_library(QECDialect
+  QECDialect.cpp
+  QECOps.cpp
 
-add_llvm_executable(cudaq-opt cudaq-opt.cpp)
+  DEPENDS
+  QECDialectIncGen
+  QECOpsIncGen
+  QECTypesIncGen
 
-llvm_update_compile_flags(cudaq-opt)
-target_link_libraries(cudaq-opt
-  PUBLIC
-  MLIRLLVMDialect
-  MLIROptLib
-  MLIRIR
-  MLIRFuncDialect
-  MLIRFuncInlinerExtension
-  MLIRArithDialect
-
+  LINK_LIBS
   CCDialect
   QuakeDialect
-  QECDialect
-  OptCodeGen
-  OptTransforms
-  CUDAQSupport
+  MLIRIR
 )
-
-export_executable_symbols_for_plugins(cudaq-opt)
-mlir_check_all_link_libraries(cudaq-opt)
-
-install(TARGETS cudaq-opt DESTINATION bin)

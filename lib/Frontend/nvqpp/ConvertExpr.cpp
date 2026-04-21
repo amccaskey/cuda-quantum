@@ -11,6 +11,7 @@
 #include "cudaq/Optimizer/Builder/Factory.h"
 #include "cudaq/Optimizer/Builder/Intrinsics.h"
 #include "cudaq/Optimizer/Dialect/CC/CCOps.h"
+#include "cudaq/Optimizer/Dialect/QEC/QECOps.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -666,6 +667,21 @@ bool QuakeBridgeVisitor::VisitCastExpr(clang::CastExpr *x) {
     auto sub = popValue();
     // castToTy is the converion function signature.
     castToTy = popType();
+    // measure_result -> bool: emit quake.discriminate to read the classical
+    // bit from the opaque measurement handle. Mirrors the deferred-
+    // discrimination design: the measurement value stays opaque until a
+    // classical value is actually demanded.
+    if (isa<quake::MeasureType>(sub.getType()) &&
+        isa<IntegerType>(castToTy)) {
+      Value bit = quake::DiscriminateOp::create(
+                      builder, loc, builder.getI1Type(), sub)
+                      .getResult();
+      if (castToTy == builder.getI1Type())
+        return pushValue(bit);
+      auto locSub = toLocation(x->getSubExpr());
+      return pushValue(integerCoercion(locSub, x->getSubExpr()->getType(),
+                                       castToTy, bit));
+    }
     if (isa<IntegerType>(castToTy) && isa<IntegerType>(sub.getType())) {
       auto locSub = toLocation(x->getSubExpr());
       bool result = intToIntCast(locSub, sub);
@@ -1019,9 +1035,11 @@ bool QuakeBridgeVisitor::VisitMaterializeTemporaryExpr(
 
   // The following cases are λ expressions, quantum data, or a std::vector view.
   // In those cases, there is nothing to materialize, so we can just pass the
-  // Value on the top of the stack.
+  // Value on the top of the stack. `!quake.measure` is an opaque handle that
+  // flows only as an SSA value — it has no meaningful memory representation,
+  // so we skip materialization for it as well.
   if (isa<cc::CallableType, quake::VeqType, quake::RefType, cc::SpanLikeType,
-          quake::StateType>(ty))
+          quake::StateType, quake::MeasureType>(ty))
     return true;
 
   // If not one of the above special cases, then materialize the value to a
@@ -1436,6 +1454,102 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
     TODO_loc(loc, "unhandled std::vector<bool> member function, " + funcName);
   }
 
+  // Intercept `cudaq::measure_result` member operators. In MLIR mode the
+  // class itself maps to `!quake.measure`, so an lvalue of type
+  // `measure_result` is a `!cc.ptr<!quake.measure>`. We need to handle the
+  // conversion operators (operator bool/int/double), assignment (store),
+  // and equality (compare after discrimination). The bodies of these
+  // methods access the raw `value` field, which does not survive the
+  // opaque `!quake.measure` typing — hence the explicit intercepts.
+  if (isInClassInNamespace(func, "measure_result", "cudaq")) {
+    auto loadIfPtr = [&](Value v) {
+      if (auto ptrTy = dyn_cast<cc::PointerType>(v.getType()))
+        if (isa<quake::MeasureType>(ptrTy.getElementType()))
+          return cc::LoadOp::create(builder, loc, v).getResult();
+      return v;
+    };
+    // Stack layout at this point (following the std::complex pattern
+    // earlier in the function): for a CXXMemberCallExpr, the `this` value
+    // is on top of the value stack, and the callee function type is on
+    // top of the type stack. The callee itself is folded into the member
+    // expression (no separate value push).
+    //
+    // Conversion operators: `operator bool()`, `operator int()`,
+    // `operator double()`. These present as CXXConversionDecl. Emit
+    // `quake.discriminate` and coerce as needed.
+    if (isa<clang::CXXConversionDecl>(func)) {
+      auto self = popValue();
+      self = loadIfPtr(self);
+      Value bit = quake::DiscriminateOp::create(
+                      builder, loc, builder.getI1Type(), self)
+                      .getResult();
+      auto retTy = func->getReturnType();
+      if (retTy->isBooleanType())
+        return pushValue(bit);
+      if (retTy->isIntegerType())
+        return pushValue(cudaq::cc::CastOp::create(
+            builder, loc, builder.getIntegerType(astContext->getTypeSize(retTy)),
+            bit, cudaq::cc::CastOpMode::Unsigned));
+      if (retTy->isFloatingType()) {
+        Value zext = cudaq::cc::CastOp::create(
+            builder, loc, builder.getI64Type(), bit,
+            cudaq::cc::CastOpMode::Unsigned);
+        return pushValue(cudaq::cc::CastOp::create(
+            builder, loc, builder.getF64Type(), zext,
+            cudaq::cc::CastOpMode::Unsigned));
+      }
+      TODO_loc(loc, "unhandled measure_result conversion target type");
+    }
+    // operator= and operator== are CXXOperatorCallExprs (not member
+    // calls): their stack layout is [lhs, rhs, callee-address].
+    if (func->isOverloadedOperator()) {
+      auto overloaded = func->getOverloadedOperator();
+      if (isAssignmentOperator(overloaded)) {
+        auto rhs = popValue();
+        auto lhs = popValue();
+        popValue(); // the operator function address
+        rhs = loadIfPtr(rhs);
+        // Two cases:
+        //  - Memory-backed lhs (cc.ptr<!quake.measure> or cc.ptr<struct>):
+        //    default-constructed local that went through the generic
+        //    alloca path. Store the new value.
+        //  - SSA-backed lhs (!quake.measure or stdvec of): the local was
+        //    bound directly in the symbol table. Rebind by shadowing the
+        //    previous insertion with the new value. The LHS VarDecl is
+        //    recovered from the CXXOperatorCallExpr's first argument.
+        if (isa<cc::PointerType>(lhs.getType())) {
+          cc::StoreOp::create(builder, loc, rhs, lhs);
+          return pushValue(lhs);
+        }
+        if (auto *opCall = dyn_cast<clang::CXXOperatorCallExpr>(x))
+          if (auto *dre = dyn_cast<clang::DeclRefExpr>(
+                  opCall->getArg(0)->IgnoreParenImpCasts()))
+            if (auto *vd = dyn_cast<clang::VarDecl>(dre->getDecl())) {
+              symbolTable.insert(vd->getName(), rhs);
+              return pushValue(rhs);
+            }
+        TODO_loc(loc, "measure_result assignment with unknown LHS shape");
+      }
+      if (isCompareEqualOperator(overloaded)) {
+        auto rhs = popValue();
+        auto lhs = popValue();
+        popValue(); // the operator function address
+        lhs = loadIfPtr(lhs);
+        rhs = loadIfPtr(rhs);
+        Value lhsBit = quake::DiscriminateOp::create(
+                           builder, loc, builder.getI1Type(), lhs)
+                           .getResult();
+        Value rhsBit = quake::DiscriminateOp::create(
+                           builder, loc, builder.getI1Type(), rhs)
+                           .getResult();
+        return pushValue(arith::CmpIOp::create(
+            builder, loc, arith::CmpIPredicate::eq, lhsBit, rhsBit));
+      }
+    }
+    // Fall through to the generic TODO if an unhandled member of
+    // measure_result is invoked.
+  }
+
   if (isInClassInNamespace(func, "qreg", "cudaq") ||
       isInClassInNamespace(func, "qvector", "cudaq") ||
       isInClassInNamespace(func, "qarray", "cudaq") ||
@@ -1652,25 +1766,52 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
     }
 
     if (funcName == "mx" || funcName == "my" || funcName == "mz") {
-      // Measurements always return a bool or a std::vector<bool>.
+      // Measurements return !quake.measure (scalar) or !cc.stdvec<!quake.measure>
+      // (vector). Discrimination is deferred until a classical value is
+      // demanded (see CK_UserDefinedConversion and to_bool_vector handling).
       bool useStdvec =
           (args.size() > 1) ||
           (args.size() == 1 && isa<quake::VeqType>(args[0].getType()));
-      auto measure = [&]() -> Value {
-        Type measTy = quake::MeasureType::get(builder.getContext());
-        if (useStdvec)
-          measTy = cc::StdvecType::get(measTy);
-        if (funcName == "mx")
-          return quake::MxOp::create(builder,loc, measTy, args).getMeasOut();
-        if (funcName == "my")
-          return quake::MyOp::create(builder,loc, measTy, args).getMeasOut();
-        return quake::MzOp::create(builder,loc, measTy, args).getMeasOut();
-      }();
-      Type resTy = builder.getI1Type();
+      Type measTy = quake::MeasureType::get(builder.getContext());
       if (useStdvec)
-        resTy = cc::StdvecType::get(resTy);
-      return pushValue(
-          quake::DiscriminateOp::create(builder,loc, resTy, measure));
+        measTy = cc::StdvecType::get(measTy);
+      Value measure;
+      if (funcName == "mx")
+        measure = quake::MxOp::create(builder, loc, measTy, args).getMeasOut();
+      else if (funcName == "my")
+        measure = quake::MyOp::create(builder, loc, measTy, args).getMeasOut();
+      else
+        measure = quake::MzOp::create(builder, loc, measTy, args).getMeasOut();
+      return pushValue(measure);
+    }
+
+    // QEC declarations. `cudaq::detector` has two overloads: variadic
+    // over measure_result and a single vector. `cudaq::logical_observable`
+    // takes a single vector. The variadic overload takes `const
+    // measure_result&` arguments, so the bridge may pass us pointers to
+    // `!quake.measure` which must be loaded to values before building the op.
+    auto loadIfPtrToMeasure = [&](Value v) -> Value {
+      if (auto ptrTy = dyn_cast<cudaq::cc::PointerType>(v.getType()))
+        if (isa<quake::MeasureType>(ptrTy.getElementType()))
+          return cudaq::cc::LoadOp::create(builder, loc, v);
+      return v;
+    };
+    if (funcName == "detector") {
+      if (args.size() == 1 && isa<cc::StdvecType>(args[0].getType())) {
+        cudaq::qec::DetectorVecOp::create(builder, loc, TypeRange{}, args[0]);
+      } else {
+        SmallVector<Value> measArgs;
+        measArgs.reserve(args.size());
+        for (auto v : args)
+          measArgs.push_back(loadIfPtrToMeasure(v));
+        cudaq::qec::DetectorOp::create(builder, loc, TypeRange{}, measArgs);
+      }
+      return true;
+    }
+    if (funcName == "logical_observable") {
+      cudaq::qec::LogicalObservableOp::create(builder, loc, TypeRange{},
+                                              args[0]);
+      return true;
     }
 
     // Handle the quantum gate set.

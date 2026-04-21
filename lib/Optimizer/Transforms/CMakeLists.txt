@@ -31,6 +31,7 @@ add_cudaq_library(OptTransforms
   DistributedDeviceCall.cpp
   EraseNoise.cpp
   EraseNopCalls.cpp
+  EraseQECOps.cpp
   EraseVectorCopyCtor.cpp
   ExpandControlVeqs.cpp
   ExpandMeasurements.cpp
@@ -78,12 +79,14 @@ add_cudaq_library(OptTransforms
     OptTransformsPassIncGen
     CCDialect
     QuakeDialect
+    QECDialect
     
   LINK_LIBS PUBLIC
     CCDialect
     MLIRIR
     OptimBuilder
     QuakeDialect
+    QECDialect
 )
 
 target_include_directories(OptTransforms SYSTEM

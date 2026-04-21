@@ -39,6 +39,7 @@ set(CUDAQ_RUNTIME_TEST_SOURCES
   integration/measure_reset_tester.cpp
   integration/mps_to_host_tester.cpp
   qir/NVQIRTester.cpp
+  qis/MeasureResultTester.cpp
   qis/QubitQISTester.cpp
   integration/kernels_tester.cpp
   common/MeasureCountsTester.cpp

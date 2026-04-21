@@ -1,4 +1,4 @@
-/*******************************************************************************
+/****************************************************************-*- C++ -*-****
  * Copyright (c) 2022 - 2026 NVIDIA Corporation & Affiliates.                  *
  * All rights reserved.                                                        *
  *                                                                             *
@@ -6,13 +6,9 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#include "cudaq/platform.h"
-#include "execution_manager.h"
+#pragma once
 
-bool cudaq::__nvqpp__MeasureResultBoolConversion(std::int64_t result) {
-  auto &platform = get_platform();
-  auto *ctx = getExecutionContext();
-  if (ctx && ctx->name == "tracer")
-    ctx->registerNames.push_back("");
-  return result == 1;
-}
+#include "mlir/IR/Types.h"
+
+#define GET_TYPEDEF_CLASSES
+#include "cudaq/Optimizer/Dialect/QEC/QECTypes.h.inc"

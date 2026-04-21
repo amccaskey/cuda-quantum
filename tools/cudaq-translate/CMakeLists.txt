@@ -33,6 +33,7 @@ target_link_libraries(cudaq-translate
   OptCodeGen
   OptTransforms
   QuakeDialect
+  QECDialect
 )
 
 mlir_check_all_link_libraries(cudaq-translate)

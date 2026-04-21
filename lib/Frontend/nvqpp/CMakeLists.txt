@@ -20,6 +20,7 @@ add_mlir_library(${LIBRARY_NAME}
   LINK_LIBS PUBLIC
     CCDialect
     QuakeDialect
+    QECDialect
     OptimBuilder
 
     MLIRIR
