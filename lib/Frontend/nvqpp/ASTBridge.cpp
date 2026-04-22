@@ -657,6 +657,22 @@ void ASTBridgeAction::ASTBridgeConsumer::HandleTranslationUnit(
       if (clang::isa<clang::CXXConstructorDecl>(rfp))
         continue;
 
+      // Skip member functions of intercepted cudaq classes whose bodies
+      // cannot be lowered meaningfully (the class types are opaque in IR,
+      // so accessing members in the body would be ill-formed). All calls
+      // to these methods are intercepted directly in ConvertExpr.cpp.
+      if (auto *method = dyn_cast<clang::CXXMethodDecl>(rfp)) {
+        if (auto *record = method->getParent()) {
+          if (cudaq::isInNamespace(record, "cudaq")) {
+            if (auto *ident = record->getIdentifier()) {
+              auto name = ident->getName();
+              if (name == "measure_result")
+                continue;
+            }
+          }
+        }
+      }
+
       if (auto *rf = dyn_cast<clang::FunctionDecl>(rfp)) {
         if (rf->getBody()) {
           SymbolTableScope var_scope(symbol_table);

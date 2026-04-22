@@ -169,6 +169,9 @@ bool QuakeBridgeVisitor::interceptRecordDecl(clang::RecordDecl *x) {
       auto fnTy = cast<FunctionType>(popType());
       return pushType(cc::IndirectCallableType::get(fnTy));
     }
+    // `cudaq::measure_result` is the opaque measurement handle.
+    if (name == "measure_result")
+      return pushType(quake::MeasureType::get(ctx));
     if (!isInNamespace(x, "solvers") && !isInNamespace(x, "qec")) {
       auto loc = toLocation(x);
       TODO_loc(loc, "unhandled type, " + name + ", in cudaq namespace");
@@ -726,6 +729,26 @@ bool QuakeBridgeVisitor::VisitVarDecl(clang::VarDecl *x) {
     symbolTable.insert(name, peekValue());
     return true;
   }
+
+  // `!quake.measure` is an opaque handle type. For a local with an
+  // initializer (e.g. `auto m = mz(q)`), keep the SSA value in the symbol
+  // table directly — no pointless cc.alloca / cc.store / cc.load cycle.
+  // For a default-constructed local (no initializer) we fall through to
+  // the generic alloca path: such locals tend to be reassigned later (see
+  // the cross-round memory experiment) and memory is the easiest way to
+  // thread the handle across loop iterations.
+  if (isa<quake::MeasureType>(type) && x->hasInit() && !valueStack.empty()) {
+    auto init = popValue();
+    symbolTable.insert(name, init);
+    return pushValue(init);
+  }
+  if (auto stdvecTy = dyn_cast<cc::StdvecType>(type))
+    if (isa<quake::MeasureType>(stdvecTy.getElementType()) && x->hasInit() &&
+        !valueStack.empty()) {
+      auto init = popValue();
+      symbolTable.insert(name, init);
+      return pushValue(init);
+    }
 
   if (cudaq::cc::isDevicePtr(type)) {
     symbolTable.insert(name, peekValue());

@@ -52,6 +52,19 @@ inline static constexpr std::string_view GetCircuitSimulatorSymbol =
 static thread_local std::map<Qubit *, Result *> measQB2Res;
 static thread_local std::map<Result *, Qubit *> measRes2QB;
 static thread_local std::map<Result *, Result> measRes2Val;
+// Map each Result* to its chronological measurement index (assigned by the
+// simulator). Used by QEC backends (e.g. Stim) to translate detector
+// declarations into Stim `rec[-N]` offsets.
+static thread_local std::map<Result *, std::int64_t> measRes2UniqueId;
+
+namespace nvqir {
+std::int64_t getMeasurementUniqueId(Result *r) {
+  auto it = measRes2UniqueId.find(r);
+  if (it != measRes2UniqueId.end())
+    return it->second;
+  return -1;
+}
+} // namespace nvqir
 
 /// @brief Provide a holder for externally created
 /// CircuitSimulator pointers (like from Python) that
@@ -186,6 +199,21 @@ std::vector<std::size_t> arrayToVectorSizeT(Array *arr) {
       ret.push_back(reinterpret_cast<intptr_t>(idxVal));
     else
       ret.push_back(idxVal->idx);
+  }
+  return ret;
+}
+
+/// @brief Utility function mapping a QIR Array of Result* pointers to a
+/// std::vector<Result*>.
+std::vector<Result *> arrayToVectorResultPtr(Array *arr) {
+  assert(arr && "array must not be null");
+  std::vector<Result *> ret;
+  const auto arrSize = arr->size();
+  ret.reserve(arrSize);
+  for (std::size_t i = 0; i < arrSize; ++i) {
+    auto slot = (*arr)[i];
+    Result *r = *reinterpret_cast<Result **>(slot);
+    ret.push_back(r);
   }
   return ret;
 }
@@ -703,8 +731,11 @@ void __quantum__qis__reset__body(Qubit *q) { __quantum__qis__reset(q); }
 Result *__quantum__qis__mz(Qubit *q) {
   auto qI = qubitToSizeT(q);
   ScopedTraceWithContext("NVQIR::mz", qI);
-  auto b = nvqir::getCircuitSimulatorInternal()->mz(qI, "");
-  return b ? ResultOne : ResultZero;
+  auto *sim = nvqir::getCircuitSimulatorInternal();
+  auto b = sim->mz(qI, "");
+  Result *r = b ? ResultOne : ResultZero;
+  measRes2UniqueId[r] = sim->lastMeasurementUniqueId();
+  return r;
 }
 
 Result *__quantum__qis__mz__body(Qubit *q, Result *r) {
@@ -712,8 +743,10 @@ Result *__quantum__qis__mz__body(Qubit *q, Result *r) {
   measRes2QB[r] = q;
   auto qI = qubitToSizeT(q);
   ScopedTraceWithContext("NVQIR::mz", qI);
-  auto b = nvqir::getCircuitSimulatorInternal()->mz(qI, "");
+  auto *sim = nvqir::getCircuitSimulatorInternal();
+  auto b = sim->mz(qI, "");
   measRes2Val[r] = b;
+  measRes2UniqueId[r] = sim->lastMeasurementUniqueId();
   return b ? ResultOne : ResultZero;
 }
 
@@ -768,6 +801,22 @@ void __quantum__qis__exp_pauli__ctl(double theta, Array *ctrls, Array *qubits,
 void __quantum__qis__exp_pauli__body(double theta, Array *qubits,
                                      char *pauliWord) {
   return __quantum__qis__exp_pauli(theta, qubits, pauliWord);
+}
+
+void __quantum__qis__detector(Array *results) {
+  ScopedTraceWithContext("NVQIR::detector");
+  nvqir::getCircuitSimulatorInternal()->detector(static_cast<void *>(results));
+}
+
+void __quantum__qis__detector_vec(Array *results) {
+  ScopedTraceWithContext("NVQIR::detector_vec");
+  nvqir::getCircuitSimulatorInternal()->detector(static_cast<void *>(results));
+}
+
+void __quantum__qis__logical_observable(Array *results) {
+  ScopedTraceWithContext("NVQIR::logical_observable");
+  nvqir::getCircuitSimulatorInternal()->logical_observable(
+      static_cast<void *>(results));
 }
 
 void __quantum__rt__result_record_output(Result *r, int8_t *name) {

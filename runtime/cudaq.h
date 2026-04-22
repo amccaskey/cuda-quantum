@@ -11,6 +11,7 @@
 #include "common/DeviceCodeRegistry.h"
 #include "common/NoiseModel.h"
 #include "cudaq/host_config.h"
+#include "cudaq/qis/detectors.h"
 #include "cudaq/qis/qubit_qis.h"
 #include <string>
 #include <tuple>

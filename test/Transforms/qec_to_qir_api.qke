@@ -1,0 +1,47 @@
+// ========================================================================== //
+// Copyright (c) 2022 - 2026 NVIDIA Corporation & Affiliates.                 //
+// All rights reserved.                                                       //
+//                                                                            //
+// This source code and the accompanying materials are made available under   //
+// the terms of the Apache License 2.0 which accompanies this distribution.   //
+// ========================================================================== //
+
+// RUN: cudaq-opt --convert-to-qir-api=api=full --symbol-dce %s | FileCheck %s
+
+// Verify that qec.detector lowers to a __quantum__qis__detector(Array*) call
+// with Result* pointers packed via __quantum__rt__array_create_1d and
+// __quantum__rt__array_get_element_ptr_1d (plus the pointer-type bitcast
+// because the helper returns a Qubit** in the prelude).
+
+func.func @__nvqpp__mlirgen__detector_pair() attributes {"cudaq-entrypoint", "cudaq-kernel"} {
+  %0 = quake.alloca !quake.ref
+  %1 = quake.alloca !quake.ref
+  quake.h %0 : (!quake.ref) -> ()
+  quake.h %1 : (!quake.ref) -> ()
+  %m0 = quake.mz %0 name "m0" : (!quake.ref) -> !quake.measure
+  %m1 = quake.mz %1 name "m1" : (!quake.ref) -> !quake.measure
+  qec.detector(%m0) : (!quake.measure) -> ()
+  qec.detector(%m0, %m1) : (!quake.measure, !quake.measure) -> ()
+  return
+}
+
+// CHECK-LABEL:   func.func @__nvqpp__mlirgen__detector_pair
+// CHECK:           call @__quantum__qis__mz
+// CHECK:           call @__quantum__qis__mz
+
+// Single-operand detector: allocate an Array of size 1 and pack the Result*.
+// CHECK:           call @__quantum__rt__array_create_1d(%{{.*}}, %{{[^,]*}})
+// CHECK:           call @__quantum__rt__array_get_element_ptr_1d
+// CHECK:           call @__quantum__qis__detector(%{{.*}}) : (!cc.ptr<!llvm.struct<"Array", opaque>>) -> ()
+
+// Two-operand detector: allocate an Array of size 2 and pack both Result*.
+// CHECK:           call @__quantum__rt__array_create_1d
+// CHECK:           call @__quantum__rt__array_get_element_ptr_1d
+// CHECK:           call @__quantum__rt__array_get_element_ptr_1d
+// CHECK:           call @__quantum__qis__detector(%{{.*}}) : (!cc.ptr<!llvm.struct<"Array", opaque>>) -> ()
+// CHECK:           return
+
+// The prelude must declare the detector and array helpers.
+// CHECK-DAG:     func.func private @__quantum__qis__detector(
+// CHECK-DAG:     func.func private @__quantum__rt__array_create_1d
+// CHECK-DAG:     func.func private @__quantum__rt__array_get_element_ptr_1d

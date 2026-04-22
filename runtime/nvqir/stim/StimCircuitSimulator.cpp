@@ -8,6 +8,7 @@
 
 #include "common/FmtCore.h"
 #include "nvqir/CircuitSimulator.h"
+#include "nvqir/NVQIRUtil.h"
 #include "stim.h"
 #include <cmath>
 #include <numeric>
@@ -62,6 +63,15 @@ protected:
   /// @brief Whether or not the execution context name is "msm" (value is cached
   /// for speed)
   bool is_msm_mode = false;
+
+  /// @brief Persistent Stim circuit accumulating gate, measurement,
+  /// DETECTOR, and OBSERVABLE_INCLUDE instructions. Used to support
+  /// Detector Error Model (DEM) extraction.
+  stim::Circuit detectorCircuit;
+
+  /// @brief Counter for OBSERVABLE_INCLUDE instructions, one observable
+  /// per `cudaq::logical_observable` call.
+  std::size_t numObservables = 0;
 
   std::optional<StimNoiseType>
   isValidStimNoiseChannel(const kraus_channel &channel) const {
@@ -283,6 +293,9 @@ protected:
     tempCircuit.safe_append_u(gate_name, targets);
     tableau->safe_do_circuit(tempCircuit);
     sampleSim->safe_do_circuit(tempCircuit);
+    // Mirror gate stream into the detector circuit so DEM extraction has
+    // the full history of gates and measurements.
+    detectorCircuit.safe_append_u(gate_name, targets);
   }
 
   /// @brief Apply the noise channel on \p qubits
@@ -507,6 +520,63 @@ protected:
     return 0;
   }
 
+  /// @brief Return the chronological id of the most recent measurement.
+  /// In Stim that is `num_measurements - 1` after `measureQubit` has run.
+  std::int64_t lastMeasurementUniqueId() const override {
+    if (num_measurements == 0)
+      return -1;
+    return static_cast<std::int64_t>(num_measurements - 1);
+  }
+
+  /// @brief Translate a vector of Result* (each carrying a unique
+  /// chronological id) into Stim `rec[-N]` GateTargets, where the offset
+  /// is `num_measurements - unique_id`.
+  std::vector<stim::GateTarget>
+  resultPtrsToRecTargets(const std::vector<Result *> &results) const {
+    std::vector<stim::GateTarget> targets;
+    targets.reserve(results.size());
+    for (auto *r : results) {
+      std::int64_t uid = nvqir::getMeasurementUniqueId(r);
+      if (uid < 0) {
+        CUDAQ_INFO("Stim::detector: Result* has no recorded unique id; "
+                   "skipping target");
+        continue;
+      }
+      int64_t recOffset = static_cast<int64_t>(num_measurements) - uid;
+      targets.push_back(stim::GateTarget::rec(-recOffset));
+    }
+    return targets;
+  }
+
+  /// @brief Append a `DETECTOR` instruction over the given measurement
+  /// handles. Called from `__quantum__qis__detector`.
+  void detector(void *resultArray) override {
+    auto *arr = static_cast<Array *>(resultArray);
+    if (!arr)
+      return;
+    auto results = nvqir::arrayToVectorResultPtr(arr);
+    auto targets = resultPtrsToRecTargets(results);
+    if (targets.empty())
+      return;
+    detectorCircuit.safe_append(stim::CircuitInstruction(
+        stim::GateType::DETECTOR, {}, targets, {}));
+  }
+
+  /// @brief Append an `OBSERVABLE_INCLUDE` instruction with an
+  /// auto-incremented observable index.
+  void logical_observable(void *resultArray) override {
+    auto *arr = static_cast<Array *>(resultArray);
+    if (!arr)
+      return;
+    auto results = nvqir::arrayToVectorResultPtr(arr);
+    auto targets = resultPtrsToRecTargets(results);
+    if (targets.empty())
+      return;
+    std::vector<double> args = {static_cast<double>(numObservables++)};
+    detectorCircuit.safe_append(stim::CircuitInstruction(
+        stim::GateType::OBSERVABLE_INCLUDE, args, targets, {}));
+  }
+
   /// @brief Measure the qubit and return the result.
   bool measureQubit(const std::size_t index) override {
     // Perform measurement
@@ -547,6 +617,15 @@ public:
   }
 
   bool canHandleObserve() override { return false; }
+
+  /// @brief Return the persistent Stim circuit (gates + measurements +
+  /// DETECTOR + OBSERVABLE_INCLUDE) as a Stim circuit text. Used to
+  /// inspect the basis for DEM extraction.
+  std::string getDetectorCircuitText() const {
+    std::stringstream ss;
+    ss << detectorCircuit;
+    return ss.str();
+  }
 
   /// @brief Reset the qubit
   /// @param index 0-based index of qubit to reset

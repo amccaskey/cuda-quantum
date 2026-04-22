@@ -448,6 +448,17 @@ def EraseNopCalls : Pass<"erase-nop-calls"> {
   }];
 }
 
+def EraseQECOps : Pass<"erase-qec-ops"> {
+  let summary = "Erase qec.detector / qec.logical_observable declarations.";
+  let description = [{
+    Hardware backends that do not support QEC declarations should run this
+    pass before QIR lowering to strip `qec.detector`, `qec.detector_vec`,
+    and `qec.logical_observable` ops from the IR. Because these ops have no
+    results and no observable side effects for non-QEC backends, erasing
+    them is always safe.
+  }];
+}
+
 def EraseVectorCopyCtor : Pass<"erase-vector-copy-ctor"> {
   let summary = "Erase unneeded vector copy ctor idiom after inlining.";
   let description = [{

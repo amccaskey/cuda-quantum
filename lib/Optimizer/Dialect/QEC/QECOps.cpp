@@ -6,13 +6,12 @@
  * the terms of the Apache License 2.0 which accompanies this distribution.    *
  ******************************************************************************/
 
-#include "cudaq/platform.h"
-#include "execution_manager.h"
+#include "cudaq/Optimizer/Dialect/QEC/QECOps.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
 
-bool cudaq::__nvqpp__MeasureResultBoolConversion(std::int64_t result) {
-  auto &platform = get_platform();
-  auto *ctx = getExecutionContext();
-  if (ctx && ctx->name == "tracer")
-    ctx->registerNames.push_back("");
-  return result == 1;
-}
+using namespace mlir;
+
+#define GET_OP_CLASSES
+#include "cudaq/Optimizer/Dialect/QEC/QECOps.cpp.inc"

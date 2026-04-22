@@ -407,6 +407,21 @@ public:
   /// retaining the current number of qubits.
   virtual void setToZeroState() = 0;
 
+  /// @brief Return the unique chronological id of the most recent
+  /// measurement (or -1 if not tracked). Backends that build a Detector
+  /// Error Model (e.g. Stim) override this.
+  virtual std::int64_t lastMeasurementUniqueId() const { return -1; }
+
+  /// @brief Declare a detector parity constraint over a set of measurement
+  /// handles (passed as a QIR `Array*` of `Result*`). Default
+  /// implementation is a no-op so non-QEC backends silently ignore
+  /// detector declarations.
+  virtual void detector(void *resultArray) {}
+
+  /// @brief Declare a logical observable over a set of measurement
+  /// handles. Default implementation is a no-op.
+  virtual void logical_observable(void *resultArray) {}
+
   /// @brief Reset the qubit to the |0> state
   virtual void resetQubit(const std::size_t qubitIdx) = 0;
 

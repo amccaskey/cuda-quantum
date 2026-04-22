@@ -1,0 +1,39 @@
+// ========================================================================== //
+// Copyright (c) 2022 - 2026 NVIDIA Corporation & Affiliates.                 //
+// All rights reserved.                                                       //
+//                                                                            //
+// This source code and the accompanying materials are made available under   //
+// the terms of the Apache License 2.0 which accompanies this distribution.   //
+// ========================================================================== //
+
+// RUN: cudaq-opt %s | cudaq-opt | FileCheck %s
+
+// All three qec ops round-trip through parse+print unchanged. This is the
+// minimum bar for a well-formed dialect definition.
+
+func.func @scalar_detector(%m0 : !quake.measure, %m1 : !quake.measure) {
+  qec.detector(%m0) : (!quake.measure) -> ()
+  qec.detector(%m0, %m1) : (!quake.measure, !quake.measure) -> ()
+  return
+}
+
+// CHECK-LABEL:   func.func @scalar_detector
+// CHECK:           qec.detector(%{{.*}}) : (!quake.measure) -> ()
+// CHECK:           qec.detector(%{{.*}}, %{{.*}}) : (!quake.measure, !quake.measure) -> ()
+// CHECK:           return
+
+func.func @vector_detector(%v : !cc.stdvec<!quake.measure>) {
+  qec.detector_vec(%v) : (!cc.stdvec<!quake.measure>) -> ()
+  return
+}
+
+// CHECK-LABEL:   func.func @vector_detector
+// CHECK:           qec.detector_vec(%{{.*}}) : (!cc.stdvec<!quake.measure>) -> ()
+
+func.func @logical_observable_op(%v : !cc.stdvec<!quake.measure>) {
+  qec.logical_observable(%v) : (!cc.stdvec<!quake.measure>) -> ()
+  return
+}
+
+// CHECK-LABEL:   func.func @logical_observable_op
+// CHECK:           qec.logical_observable(%{{.*}}) : (!cc.stdvec<!quake.measure>) -> ()

@@ -31,6 +31,7 @@ target_link_libraries(cudaq-quake
 
   CCDialect
   QuakeDialect
+  QECDialect
   cudaq-mlirgen
 )
 
