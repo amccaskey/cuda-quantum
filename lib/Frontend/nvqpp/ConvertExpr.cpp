@@ -1762,25 +1762,26 @@ bool QuakeBridgeVisitor::VisitCallExpr(clang::CallExpr *x) {
     if (funcName == "mx" || funcName == "my" || funcName == "mz") {
       // Measurements return !quake.measure (scalar) or !cc.stdvec<!quake.measure>
       // (vector). Discrimination is deferred until a classical value is
-      // demanded (see CK_UserDefinedConversion and to_bool_vector handling).
+      // actually demanded — `if (mz(q))`, `return mz(q)` from a bool
+      // kernel, explicit bool casts, comparisons — all of which are
+      // handled downstream (see CK_UserDefinedConversion and the
+      // measure_result class intercepts). Wrapping the measurement with
+      // a DiscriminateOp here would force all handles to `i1` and break
+      // `cudaq::detector(...)` which needs the opaque `!quake.measure`.
       bool useStdvec =
           (args.size() > 1) ||
           (args.size() == 1 && isa<quake::VeqType>(args[0].getType()));
-      auto measure = [&]() -> Value {
-        Type measTy = quake::MeasureType::get(builder.getContext());
-        if (useStdvec)
-          measTy = cc::StdvecType::get(measTy);
-        if (funcName == "mx")
-          return builder.create<quake::MxOp>(loc, measTy, args).getMeasOut();
-        if (funcName == "my")
-          return builder.create<quake::MyOp>(loc, measTy, args).getMeasOut();
-        return builder.create<quake::MzOp>(loc, measTy, args).getMeasOut();
-      }();
-      Type resTy = builder.getI1Type();
+      Type measTy = quake::MeasureType::get(builder.getContext());
       if (useStdvec)
-        resTy = cc::StdvecType::get(resTy);
-      return pushValue(
-          builder.create<quake::DiscriminateOp>(loc, resTy, measure));
+        measTy = cc::StdvecType::get(measTy);
+      Value measure;
+      if (funcName == "mx")
+        measure = builder.create<quake::MxOp>(loc, measTy, args).getMeasOut();
+      else if (funcName == "my")
+        measure = builder.create<quake::MyOp>(loc, measTy, args).getMeasOut();
+      else
+        measure = builder.create<quake::MzOp>(loc, measTy, args).getMeasOut();
+      return pushValue(measure);
     }
 
     // QEC declarations. `cudaq::detector` has two overloads: variadic
