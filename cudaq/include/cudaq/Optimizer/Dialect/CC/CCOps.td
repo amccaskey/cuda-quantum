@@ -443,7 +443,8 @@ def cc_IfOp : CCOp<"if",
 
 def cc_ConditionOp : CCOp<"condition",
         [Pure, Terminator, ParentOneOf<["LoopOp"]>,
-         DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface>]> {
+         DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface,
+           ["getMutableSuccessorOperands"]>]> {
   let summary = "Conditional branch in a where region's basic block.";
   let description = [{
     A ConditionOp is used as the terminator of the basic block in the where

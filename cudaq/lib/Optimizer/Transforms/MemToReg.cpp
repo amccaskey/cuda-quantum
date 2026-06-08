@@ -1130,7 +1130,7 @@ public:
                       dataFlow.getLiveInArgs().end());
       Operation *np = Operation::create(
           parent->getLoc(), parent->getName(), resultTypes, operands,
-          parent->getAttrs(), OpaqueProperties{nullptr},
+          parent->getAttrs(), PropertyRef{},
           parent->getSuccessors(), parent->getNumRegions());
       builder.insert(np);
       for (unsigned i = 0; i < parent->getNumRegions(); ++i)

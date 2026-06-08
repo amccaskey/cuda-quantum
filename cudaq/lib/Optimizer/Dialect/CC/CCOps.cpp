@@ -1758,9 +1758,9 @@ void cudaq::cc::LoopOp::getSuccessorRegions(
     // loop op, successor is either the WHILE region, or the DO region if loop
     // is post conditional.
     if (isPostConditional())
-      regions.emplace_back(&getBodyRegion(), getDoEntryArguments());
+      regions.emplace_back(&getBodyRegion());
     else
-      regions.emplace_back(&getWhileRegion(), getWhileArguments());
+      regions.emplace_back(&getWhileRegion());
     return;
   }
 
@@ -1770,29 +1770,29 @@ void cudaq::cc::LoopOp::getSuccessorRegions(
   assert(region && "must have a region");
   if (region == &getWhileRegion()) {
     // WHILE region, successors are the owning loop op and the DO region.
-    regions.emplace_back(&getBodyRegion(), getDoEntryArguments());
+    regions.emplace_back(&getBodyRegion());
     if (hasPythonElse())
-      regions.emplace_back(&getElseRegion(), getElseEntryArguments());
+      regions.emplace_back(&getElseRegion());
     else
-      regions.emplace_back(getOperation(), getResults());
+      regions.emplace_back(RegionSuccessor::parent());
   } else if (region == &getBodyRegion()) {
     // DO region, successor is STEP region (2) if present, or WHILE region (0)
     // if STEP is absent.
     if (hasStep())
-      regions.emplace_back(&getStepRegion(), getStepArguments());
+      regions.emplace_back(&getStepRegion());
     else
-      regions.emplace_back(&getWhileRegion(), getWhileArguments());
+      regions.emplace_back(&getWhileRegion());
     // If the body contains a break, then the loop op is also a successor.
     if (hasBreakInBody())
-      regions.emplace_back(getOperation(), getResults());
+      regions.emplace_back(RegionSuccessor::parent());
   } else if (region == &getStepRegion()) {
     // STEP region, if present, WHILE region is always successor.
     if (hasStep())
-      regions.emplace_back(&getWhileRegion(), getWhileArguments());
+      regions.emplace_back(&getWhileRegion());
   } else if (region == &getElseRegion()) {
     // ELSE region, successors are the owning loop op.
     if (hasPythonElse())
-      regions.emplace_back(getOperation(), getResults());
+      regions.emplace_back(RegionSuccessor::parent());
   } else {
     emitOpError("unhandled region");
   }
@@ -2013,7 +2013,7 @@ void cudaq::cc::ScopeOp::getSuccessorRegions(
     regions.emplace_back(&getRegion());
     return;
   }
-  regions.emplace_back(getOperation(), getResults());
+  regions.emplace_back(RegionSuccessor::parent());
 }
 
 // If quantumAllocs, then just look for any allocate memory effect. Otherwise,
@@ -2273,7 +2273,7 @@ void cudaq::cc::IfOp::getSuccessorRegions(
     if (!getElseRegion().empty())
       regions.emplace_back(&getElseRegion());
   } else {
-    regions.emplace_back(getOperation(), getResults());
+    regions.emplace_back(RegionSuccessor::parent());
   }
 }
 
@@ -2291,7 +2291,7 @@ void cudaq::cc::IfOp::getEntrySuccessorRegions(
     regions.emplace_back(&getElseRegion());
     return;
   }
-  regions.emplace_back(getOperation(), getResults());
+  regions.emplace_back(RegionSuccessor::parent());
 }
 
 template <typename A>

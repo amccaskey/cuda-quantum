@@ -802,7 +802,7 @@ protected:
 
     associated = Operation::create(
         oldOp->getLoc(), oldOp->getName(), oldOp->getResultTypes(), operands,
-        oldOp->getAttrs(), OpaqueProperties{nullptr});
+        oldOp->getAttrs(), PropertyRef{});
     associated->removeAttr("dnodeid");
     builder.insert(associated);
   }
