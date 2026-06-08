@@ -6,7 +6,17 @@
 # the terms of the Apache License 2.0 which accompanies this distribution.     #
 # ============================================================================ #
 
-add_subdirectory(CC)
-add_subdirectory(QEC)
-add_subdirectory(QIR)
-add_subdirectory(Quake)
+add_cudaq_dialect_library(QIRDialect
+  QIRDialect.cpp
+
+  DEPENDS
+  QIRDialectIncGen
+  QIROpsIncGen
+  QIRTypesIncGen
+  QIRAttrsIncGen
+
+  LINK_LIBS
+  MLIRIR
+  MLIRSupport
+  MLIRSideEffectInterfaces
+)

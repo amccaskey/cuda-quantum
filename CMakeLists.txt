@@ -226,9 +226,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 if(NOT LLVM_VERSION_MAJOR)
   set(LLVM_VERSION_MAJOR 22)
 endif()
-if(NOT LLVM_VERSION_MINOR)
+# Use DEFINED (not NOT LLVM_VERSION_MINOR) so that -DLLVM_VERSION_MINOR=0 is respected.
+if(NOT DEFINED LLVM_VERSION_MINOR)
   set(LLVM_VERSION_MINOR 1)
 endif()
+
+# Declare early so it can guard the submodule check below.
+option(CUDAQ_ENABLE_QIR_ONLY
+  "Build only the cudaq::qir dialect and QIR-to-LLVM lowering; skip all other cuda-quantum targets."
+  OFF)
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -245,8 +251,10 @@ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
   endif()
 endif()
 
-if(NOT EXISTS "${PROJECT_SOURCE_DIR}/tpls/fmt/CMakeLists.txt")
+if(NOT CUDAQ_ENABLE_QIR_ONLY)
+  if(NOT EXISTS "${PROJECT_SOURCE_DIR}/tpls/fmt/CMakeLists.txt")
     message(FATAL_ERROR "The submodules were not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
+  endif()
 endif()
 
 # Options
@@ -270,7 +278,8 @@ set(CUDAQ_ENABLE_PROJECTS "" CACHE STRING
 # Back-compat: if CUDAQ_ENABLE_PROJECTS wasn't given, derive it from the
 # legacy per-project flags so existing build scripts keep working, and warn
 # the user that those flags are deprecated.
-if(NOT CUDAQ_ENABLE_PROJECTS)
+# (Skip when QIR-only: no CUDA-Q sub-projects are needed.)
+if(NOT CUDAQ_ENABLE_PROJECTS AND NOT CUDAQ_ENABLE_QIR_ONLY)
   set(CUDAQ_ENABLE_PROJECTS "cudaq")
   if(NOT CUDAQ_DISABLE_RUNTIME)
     list(APPEND CUDAQ_ENABLE_PROJECTS "runtime")
@@ -702,7 +711,9 @@ if (NOT CUDAQ_SKIP_MPI AND "runtime" IN_LIST CUDAQ_ENABLE_PROJECTS)
 endif()
 
 # Third-party libraries (tpls)
+# (skipped when CUDAQ_ENABLE_QIR_ONLY=ON — those submodules are not required)
 # ==============================================================================
+if(NOT CUDAQ_ENABLE_QIR_ONLY)
 set(FMT_INSTALL ON)
 cmake_policy(PUSH)
 # CMP0146: The FindCUDA module is removed.
@@ -725,6 +736,7 @@ set(SPDLOG_BUILD_PIC ON)
 set(SPDLOG_SYSTEM_INCLUDES ON)
 add_subdirectory(tpls/spdlog)
 target_compile_options(spdlog PRIVATE -Wno-covered-switch-default)
+endif() # NOT CUDAQ_ENABLE_QIR_ONLY
 
 if (OPENSSL_FOUND AND CUDAQ_ENABLE_REST)
   # Look for CURL
@@ -865,6 +877,55 @@ if("cudaq" IN_LIST CUDAQ_ENABLE_PROJECTS)
 endif()
 if("runtime" IN_LIST CUDAQ_ENABLE_PROJECTS)
   add_subdirectory(runtime)
+endif()
+
+# ---------------------------------------------------------------------------
+# CUDAQ_ENABLE_QIR_ONLY: build only the cudaq::qir dialect + QIRToLLVM pass,
+# nothing else from the cudaq/ sub-tree.  Useful for external projects (e.g.
+# cudaq-qlx) that want to consume a lean QIR MLIR library without pulling in
+# the full CUDA-Q compiler toolchain.
+# (option declared early near the top so it can guard the submodule check)
+# ---------------------------------------------------------------------------
+if(CUDAQ_ENABLE_QIR_ONLY AND NOT "cudaq" IN_LIST CUDAQ_ENABLE_PROJECTS)
+  # The prerequisites below are normally set up by add_subdirectory(cudaq),
+  # but we need them for the standalone QIR-only build too.
+  if(NOT TARGET cudaq-headers)
+    add_custom_target(cudaq-headers)
+  endif()
+
+  add_subdirectory(cudaq/include/cudaq/Optimizer/Dialect/QIR)
+  add_subdirectory(cudaq/lib/Optimizer/Dialect/QIR)
+
+  # QIRToLLVM pass depends on OptCodeGenPassIncGen (generated from Passes.td).
+  # For QIR-only we generate only the QIR-specific pass inc files inline.
+  # mlir_tablegen() outputs relative to CMAKE_CURRENT_BINARY_DIR (build root here).
+  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/cudaq/include/cudaq/Optimizer/CodeGen)
+  set(LLVM_TARGET_DEFINITIONS
+    ${CMAKE_SOURCE_DIR}/cudaq/include/cudaq/Optimizer/CodeGen/Passes.td)
+  mlir_tablegen(cudaq/include/cudaq/Optimizer/CodeGen/Passes.h.inc
+    -gen-pass-decls -name OptCodeGen)
+  add_public_tablegen_target(OptCodeGenPassIncGen)
+
+  add_subdirectory(cudaq/lib/Optimizer/CodeGen
+    ${CMAKE_BINARY_DIR}/cudaq/lib/Optimizer/CodeGen/QIROnly)
+endif()
+
+# Install / export for the QIR sub-component (active whenever QIRDialect and
+# QIRToLLVM have been built, regardless of full vs. QIR-only mode).
+get_property(_cudaq_all_libs GLOBAL PROPERTY CUDAQ_ALL_LIBS)
+if(QIRDialect IN_LIST _cudaq_all_libs OR CUDAQ_ENABLE_QIR_ONLY)
+  include(CMakePackageConfigHelpers)
+  configure_package_config_file(
+    ${CMAKE_SOURCE_DIR}/cmake/CudaqQIRConfig.cmake.in
+    ${CMAKE_BINARY_DIR}/cmake/CudaqQIRConfig.cmake
+    INSTALL_DESTINATION lib/cmake/CudaqQIR)
+  install(FILES ${CMAKE_BINARY_DIR}/cmake/CudaqQIRConfig.cmake
+    DESTINATION lib/cmake/CudaqQIR)
+  install(EXPORT CUDAQTargets
+    FILE CudaqQIRTargets.cmake
+    NAMESPACE CudaqQIR::
+    DESTINATION lib/cmake/CudaqQIR
+    COMPONENT CudaqQIR)
 endif()
 add_subdirectory(utils)
 

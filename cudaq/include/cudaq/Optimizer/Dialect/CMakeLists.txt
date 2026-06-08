@@ -8,4 +8,5 @@
 
 add_subdirectory(CC)
 add_subdirectory(QEC)
+add_subdirectory(QIR)
 add_subdirectory(Quake)

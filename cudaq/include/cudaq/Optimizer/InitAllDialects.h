@@ -10,6 +10,7 @@
 
 #include "cudaq/Optimizer/Dialect/CC/CCDialect.h"
 #include "cudaq/Optimizer/Dialect/QEC/QECDialect.h"
+#include "cudaq/Optimizer/Dialect/QIR/QIROps.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
@@ -17,6 +18,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 namespace cudaq {
 
@@ -31,10 +33,12 @@ inline void registerAllDialects(mlir::DialectRegistry &registry) {
     mlir::func::FuncDialect,
     mlir::LLVM::LLVMDialect,
     mlir::math::MathDialect,
+    mlir::scf::SCFDialect,
 
     // CUDA-Q dialects
     cudaq::cc::CCDialect,
     cudaq::qec::QECDialect,
+    cudaq::qir::QIRDialect,
     cudaq::quake::QuakeDialect
   >();
   // clang-format on

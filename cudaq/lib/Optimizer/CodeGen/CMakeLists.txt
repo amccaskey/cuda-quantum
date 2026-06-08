@@ -10,6 +10,33 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-braced-scalar-init")
 endif()
 
+add_cudaq_library(QIRToLLVM
+  QIRToLLVM.cpp
+  PARTIAL_SOURCES_INTENDED
+
+  DEPENDS
+  QIRDialectIncGen
+  QIROpsIncGen
+  QIRTypesIncGen
+  QIRAttrsIncGen
+  OptCodeGenPassIncGen
+
+  LINK_LIBS PUBLIC
+  QIRDialect
+  MLIRIR
+  MLIRLLVMDialect
+  MLIRSCFDialect
+  MLIRControlFlowDialect
+  MLIRFuncDialect
+  MLIRArithDialect
+  MLIRArithToLLVM
+  MLIRControlFlowToLLVM
+  MLIRFuncToLLVM
+  MLIRSCFToControlFlow
+  MLIRTransforms
+)
+
+if(NOT CUDAQ_ENABLE_QIR_ONLY)
 add_cudaq_library(OptCodeGen
   CCToLLVM.cpp
   CodeGenDialect.cpp
@@ -42,13 +69,16 @@ add_cudaq_library(OptCodeGen
     OptCodeGenPassIncGen
     OptTransformsPassIncGen
     QECDialect
+    QIRDialect
     QuakeDialect
     cudaq-qir-verifier
-    
+
   LINK_LIBS PUBLIC
     CCDialect
     OptimBuilder
     QECDialect
+    QIRDialect
+    QIRToLLVM
     QuakeDialect
 
     MLIRArithTransforms
@@ -70,3 +100,4 @@ add_cudaq_library(OptCodeGen
     # Translation
     MLIRTargetLLVMIRExport
 )
+endif() # NOT CUDAQ_ENABLE_QIR_ONLY

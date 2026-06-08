@@ -282,4 +282,73 @@ def ReturnToOutputLog : Pass<"return-to-output-log", "mlir::ModuleOp"> {
   ];
 }
 
+def ConvertQIRToLLVM : Pass<"convert-qir-to-llvm", "mlir::ModuleOp"> {
+  let summary = "Lower the cudaq::qir dialect to LLVM-IR with QIR runtime calls.";
+  let description = [{
+    Converts every `qir.*` op to `llvm.call @__quantum__qis__*` /
+    `@__quantum__rt__*` calls matching the QIR runtime ABI.
+
+    This pass is the final step in the cudaq::qir lowering pipeline and is
+    independent of the Quake and CC dialects.  It can be used standalone (with
+    `-DCUDAQ_ENABLE_QIR_ONLY=ON`) or as the final stage of a Quake→qir→LLVM
+    pipeline.
+
+    Control-flow dialects (`scf`, `cf`, `func`) are lowered to LLVM IR via
+    the standard MLIR conversion helpers that are loaded as part of this pass.
+
+    Profile annotation:
+      * Full profile: dynamic `alloc_qubit` / `release_qubit` calls.
+      * Base profile:  `static_qubit(i)` maps to a compile-time qubit index.
+      * Adaptive profile: `read_result` enabled for mid-circuit feed-forward.
+  }];
+
+  let options = [
+    Option<"opaquePointers", "opaque-ptrs", "bool", "true",
+           "Use LLVM opaque pointers (true) or legacy typed qubit/result structs (false).">
+  ];
+
+  let dependentDialects = [
+    "cudaq::qir::QIRDialect",
+    "mlir::LLVM::LLVMDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::func::FuncDialect",
+    "mlir::cf::ControlFlowDialect",
+    "mlir::scf::SCFDialect"
+  ];
+}
+
+def QIRAnnotateStaticResources :
+    Pass<"qir-annotate-static-resources", "mlir::func::FuncOp"> {
+  let summary = "Infer required_qubits / required_results attributes (Base/Adaptive).";
+  let description = [{
+    Walks the function body counting `qir.static_qubit` and `qir.static_result`
+    ops and attaches `#qir.required_qubits<N>` and `#qir.required_results<M>`
+    to the enclosing function.  Must be run before `convert-qir-to-llvm` when
+    targeting Base or Adaptive profile so the QIR verifier can check resource
+    bounds.
+  }];
+  let dependentDialects = ["cudaq::qir::QIRDialect"];
+}
+
+def QIRDelayMeasurements :
+    Pass<"qir-delay-measurements", "mlir::func::FuncOp"> {
+  let summary = "Move qir.measure ops as late as possible (Base profile).";
+  let description = [{
+    Sinks every `qir.measure` and `qir.measure_named` op as close to the end of
+    the function as data-flow allows.  This is required for the QIR Base Profile,
+    which mandates that all measurements occur after all gate operations.
+  }];
+  let dependentDialects = ["cudaq::qir::QIRDialect"];
+}
+
+def QIRVerifyProfile : Pass<"qir-verify-profile"> {
+  let summary = "Verify QIR ops conform to the annotated profile.";
+  let description = [{
+    Checks that every function annotated with `#qir.profile<base>` or
+    `#qir.profile<adaptive>` contains only ops that are legal in that profile,
+    reporting diagnostics for violations.
+  }];
+  let dependentDialects = ["cudaq::qir::QIRDialect"];
+}
+
 #endif // CUDAQ_OPT_OPTIMIZER_CODEGEN_PASSES
