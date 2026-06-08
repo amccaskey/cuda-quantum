@@ -8,9 +8,9 @@
 
 @PACKAGE_INIT@
 
-# Provide the include and lib directories.
-set_and_check(CUDAQIR_INCLUDE_DIR "@CMAKE_INSTALL_PREFIX@/include")
-set_and_check(CUDAQIR_LIB_DIR     "@CMAKE_INSTALL_PREFIX@/lib")
+# Provide the include and lib directories (relocatable via PACKAGE_PREFIX_DIR).
+set_and_check(CUDAQIR_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/include")
+set_and_check(CUDAQIR_LIB_DIR     "${PACKAGE_PREFIX_DIR}/lib")
 
 # Pull in the exported CMake targets (QIRDialect, QIRToLLVM).
 include("${CMAKE_CURRENT_LIST_DIR}/CudaqQIRTargets.cmake")
@@ -22,5 +22,13 @@ endif()
 if(NOT TARGET CudaqQIR::QIRToLLVM AND TARGET QIRToLLVM)
   add_library(CudaqQIR::QIRToLLVM ALIAS QIRToLLVM)
 endif()
+
+# Propagate include directories so consumers don't need to add them manually.
+foreach(_tgt CudaqQIR::QIRDialect CudaqQIR::QIRToLLVM)
+  if(TARGET ${_tgt})
+    set_property(TARGET ${_tgt} APPEND PROPERTY
+      INTERFACE_INCLUDE_DIRECTORIES "${CUDAQIR_INCLUDE_DIR}")
+  endif()
+endforeach()
 
 check_required_components(CudaqQIR)
