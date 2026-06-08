@@ -23,3 +23,11 @@ install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/
           PATTERN "*.h.inc"
           PATTERN "*.cpp.inc"
           PATTERN "CMakeFiles" EXCLUDE)
+
+# Install source headers alongside the generated .inc files.
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+        DESTINATION include/cudaq/Optimizer/Dialect/QIR
+        FILES_MATCHING
+          PATTERN "*.h"
+          PATTERN "*.td"
+          PATTERN "CMakeFiles" EXCLUDE)

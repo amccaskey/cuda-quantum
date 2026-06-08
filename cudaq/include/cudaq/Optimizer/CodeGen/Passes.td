@@ -317,6 +317,30 @@ def ConvertQIRToLLVM : Pass<"convert-qir-to-llvm", "mlir::ModuleOp"> {
   ];
 }
 
+def QuakeToQIRDialect : Pass<"quake-to-qir-dialect", "mlir::ModuleOp"> {
+  let summary = "Lower Quake ops to cudaq::qir dialect ops (Full QIR profile).";
+  let description = [{
+    Converts quake::* gate, allocation, and measurement ops to cudaq::qir::*
+    ops using dynamic qubit allocation (Full QIR profile).
+
+    Handles: alloca (!quake.ref / !quake.veq<N>), dealloc, extract_ref,
+    1-qubit gates h/x/y/z/s/t (with adjoint support), rotations rx/ry/rz/r1,
+    2-qubit CNOT/CZ/CCX/SWAP, and mz measurements.
+
+    After this pass, run --convert-qir-to-llvm to produce LLVM IR with the
+    standard __quantum__* runtime calls.
+
+    Limitations: no base/adaptive static addressing, no array-controlled gates,
+    no custom_unitary / exp_pauli, no value-semantics array controls.
+  }];
+  let dependentDialects = [
+    "cudaq::qir::QIRDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::func::FuncDialect",
+    "mlir::LLVM::LLVMDialect"
+  ];
+}
+
 def QIRAnnotateStaticResources :
     Pass<"qir-annotate-static-resources", "mlir::func::FuncOp"> {
   let summary = "Infer required_qubits / required_results attributes (Base/Adaptive).";

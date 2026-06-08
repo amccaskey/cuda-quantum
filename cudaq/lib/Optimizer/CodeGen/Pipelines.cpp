@@ -43,7 +43,12 @@ static void addQIRConversionPipeline(PassManager &pm, StringRef convertTo) {
   } else {
     emitError(UnknownLoc::get(pm.getContext()),
               "convert to QIR must be given a valid specification to use.");
+    return;
   }
+  // Lower any remaining cudaq::qir dialect ops to LLVM. This is a no-op on the
+  // ConvertToQIRAPI path (which already lowers directly to LLVM) but activates
+  // when a prior pass (e.g. --quake-to-qir-dialect) emitted cudaq::qir ops.
+  pm.addPass(cudaq::opt::createConvertQIRToLLVM());
 }
 
 template <bool isJIT>

@@ -40,6 +40,7 @@ if(NOT CUDAQ_ENABLE_QIR_ONLY)
 add_cudaq_library(OptCodeGen
   CCToLLVM.cpp
   CodeGenDialect.cpp
+  ConvertQuakeToQIRDialect.cpp
   CodeGenOps.cpp
   CodeGenTypes.cpp
   ConvertCCToLLVM.cpp

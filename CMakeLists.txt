@@ -910,10 +910,10 @@ if(CUDAQ_ENABLE_QIR_ONLY AND NOT "cudaq" IN_LIST CUDAQ_ENABLE_PROJECTS)
     ${CMAKE_BINARY_DIR}/cudaq/lib/Optimizer/CodeGen/QIROnly)
 endif()
 
-# Install / export for the QIR sub-component (active whenever QIRDialect and
-# QIRToLLVM have been built, regardless of full vs. QIR-only mode).
-get_property(_cudaq_all_libs GLOBAL PROPERTY CUDAQ_ALL_LIBS)
-if(QIRDialect IN_LIST _cudaq_all_libs OR CUDAQ_ENABLE_QIR_ONLY)
+# Install / export for the QIR sub-component (QIR-only mode only).
+# In the full build the QIR libraries are exported as part of the normal
+# CUDAQTargets install; an external consumer uses find_package(CUDAQ) instead.
+if(CUDAQ_ENABLE_QIR_ONLY)
   include(CMakePackageConfigHelpers)
   configure_package_config_file(
     ${CMAKE_SOURCE_DIR}/cmake/CudaqQIRConfig.cmake.in

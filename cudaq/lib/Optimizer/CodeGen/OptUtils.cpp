@@ -41,10 +41,10 @@ static std::optional<OptimizationLevel> mapToLevel(unsigned optLevel,
       return OptimizationLevel::O2;
 
     case 1:
-      return OptimizationLevel::Os;
+      return OptimizationLevel::O2; // Os removed in LLVM 23; fall back to O2
 
     case 2:
-      return OptimizationLevel::Oz;
+      return OptimizationLevel::O2; // Oz removed in LLVM 23; fall back to O2
     }
     break;
   case 3:
