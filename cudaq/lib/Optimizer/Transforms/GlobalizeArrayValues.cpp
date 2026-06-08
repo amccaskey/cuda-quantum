@@ -10,6 +10,7 @@
 #include "cudaq/Optimizer/Builder/Intrinsics.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Support/Complex.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -65,9 +66,12 @@ convertArrayAttrToGlobalConstant(MLIRContext *ctx, Location loc,
   cudaq::IRBuilder irBuilder(ctx);
   auto tensorTy = RankedTensorType::get(arrAttr.size(), eleTy);
   if (isa<ComplexType>(eleTy)) {
-    auto blockValues =
+    auto stdBlockValues =
         conversion<std::complex<APFloat>, ArrayAttr>(arrAttr, eleTy);
-    auto dense = DenseElementsAttr::get(tensorTy, blockValues);
+    SmallVector<mlir::Complex<APFloat>> blockValues(stdBlockValues.begin(),
+                                                    stdBlockValues.end());
+    auto dense = DenseElementsAttr::get(
+        tensorTy, ArrayRef<mlir::Complex<APFloat>>(blockValues));
     irBuilder.genVectorOfConstants(loc, module, globalName, dense, eleTy);
   } else if (isa<FloatType>(eleTy)) {
     auto blockValues = conversion<APFloat, FloatAttr>(arrAttr, eleTy);

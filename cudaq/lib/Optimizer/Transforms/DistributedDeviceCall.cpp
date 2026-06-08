@@ -15,7 +15,7 @@
 #include "cudaq/Optimizer/Dialect/CC/CCOps.h"
 #include "cudaq/Optimizer/Dialect/Quake/QuakeOps.h"
 #include "cudaq/Optimizer/Transforms/Passes.h"
-#include "llvm/Support/Hash.h"
+#include "llvm/Transforms/Utils/KCFIHash.h"
 #include "llvm/Support/MD5.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
