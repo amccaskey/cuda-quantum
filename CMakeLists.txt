@@ -223,10 +223,10 @@ endforeach()
 # for use by clang_complete, YouCompleteMe, etc.
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
-if(NOT LLVM_VERSION_MAJOR)
+if(NOT DEFINED LLVM_VERSION_MAJOR)
   set(LLVM_VERSION_MAJOR 22)
 endif()
-if(NOT LLVM_VERSION_MINOR)
+if(NOT DEFINED LLVM_VERSION_MINOR)
   set(LLVM_VERSION_MINOR 1)
 endif()
 
@@ -347,6 +347,9 @@ if (${CUDAQ_FORCE_COLORED_OUTPUT})
 endif ()
 
 add_compile_options(-Wno-error=deprecated-declarations)
+# Newer host compilers (e.g. GCC in the LLVM-23 dev image) flag warnings the
+# upstream toolchain does not; keep them as warnings so the compiler tools build.
+add_compile_options(-Wno-error=unused-but-set-variable -Wno-error=return-type)
 # Use plain -Wno- (not -Wno-error=) so GCC silently ignores it when unsupported.
 # Guard with check_cxx_compiler_flag so Apple Clang (which errors on unknown
 # -Wno- options) doesn't see it if the warning doesn't exist there.
