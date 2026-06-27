@@ -7,11 +7,12 @@
  ******************************************************************************/
 
 #include "RestClient.h"
+#include "nlohmann/json.hpp"
+#include <stdexcept>
 
 #ifdef CUDAQ_RESTCLIENT_AVAILABLE
 
 #include "FmtCore.h"
-#include "nlohmann/json.hpp"
 #include "cudaq/runtime/logger/logger.h"
 #include "cudaq/utils/cudaq_utils.h"
 #include <cpr/cpr.h>
@@ -211,7 +212,7 @@ struct SslOptions {};
 
 namespace cudaq {
 
-static void throwNoRest [[noreturn]] () {
+[[noreturn]] static void throwNoRest() {
   throw std::runtime_error(
       "REST client is not available. Build with CUDAQ_ENABLE_REST=ON and "
       "OpenSSL to enable REST support.");

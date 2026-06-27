@@ -43,7 +43,8 @@ def cc_ScopeOp : CCOp<"scope",
         [AutomaticAllocationScope, RecursiveMemoryEffects, NoRegionArguments,
          DeclareOpInterfaceMethods<RegionBranchOpInterface,
                                    ["getNumRegionInvocations",
-                                    "getRegionInvocationBounds"]>]> {
+                                    "getRegionInvocationBounds",
+                                    "getSuccessorInputs"]>]> {
   let summary = "A compound statement in which allocations are scoped.";
   let description = [{
     A ScopeOp is used to delineate the scope of local allocations, such as
@@ -114,7 +115,10 @@ def cc_ScopeOp : CCOp<"scope",
 def cc_LoopOp : CCOp<"loop",
         [AutomaticAllocationScope, RecursiveMemoryEffects,
          DeclareOpInterfaceMethods<LoopLikeOpInterface>,
-         DeclareOpInterfaceMethods<RegionBranchOpInterface>]> {
+         DeclareOpInterfaceMethods<RegionBranchOpInterface,
+                                   ["getEntrySuccessorOperands",
+                                    "getSuccessorRegions",
+                                    "getSuccessorInputs"]>]> {
   let summary = "generalized loop construct";
   let description = [{
     A LoopOp is a generalized C-like or Python loop structure. It can be used to
@@ -342,7 +346,6 @@ def cc_LoopOp : CCOp<"loop",
     }
 
     mlir::OperandRange getEntrySuccessorOperands(mlir::RegionBranchPoint point);
-    mlir::OperandRange getEntrySuccessorOperands(mlir::RegionSuccessor point);
 
     bool hasBreakInBody();
   }];
@@ -355,7 +358,8 @@ def cc_LoopOp : CCOp<"loop",
 def cc_IfOp : CCOp<"if",
     [DeclareOpInterfaceMethods<RegionBranchOpInterface,
       ["getNumRegionInvocations", "getRegionInvocationBounds",
-       "getEntrySuccessorRegions"]>,
+       "getEntrySuccessorOperands", "getEntrySuccessorRegions",
+       "getSuccessorInputs"]>,
      RecursiveMemoryEffects, LinearTypeArgsTrait]> {
   let summary = "if-then-else operation";
   let description = [{

@@ -9,7 +9,9 @@
 #pragma once
 #include "nlohmann/json_fwd.hpp"
 #include <map>
+#include <memory>
 #include <string>
+#include <string_view>
 
 // Forward declarations to avoid including CPR header files
 namespace cpr {

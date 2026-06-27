@@ -22,6 +22,7 @@ set(COMMON_RUNTIME_SRC
   Future.cpp
   NoiseModel.cpp
   RecordLogParser.cpp
+  RestClient.cpp
   Resources.cpp
   RuntimeTarget.cpp
   SampleResult.cpp
@@ -70,11 +71,11 @@ if (CMAKE_COMPILER_IS_GNUCXX
   target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:--param=evrp-mode=legacy>)
 endif()
 
-# We can only build the RestClient support if we have OpenSSL
-if(OPENSSL_FOUND)
+# We can only build the full RestClient support if REST is enabled and we have
+# OpenSSL. RestClient.cpp is always compiled so no-REST builds get its stubs.
+if(OPENSSL_FOUND AND CUDAQ_ENABLE_REST)
   message(STATUS "OpenSSL Found, building REST Client.")
 
-  target_sources(${LIBRARY_NAME} PRIVATE RestClient.cpp)
   # --start-group is a GNU ld flag for circular dependencies; Apple's ld doesn't support it
   if(APPLE)
     target_link_libraries(${LIBRARY_NAME} PRIVATE cpr::cpr ZLIB::ZLIB)

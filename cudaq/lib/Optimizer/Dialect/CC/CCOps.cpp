@@ -1798,6 +1798,17 @@ void cudaq::cc::LoopOp::getSuccessorRegions(
   }
 }
 
+void cudaq::cc::LoopOp::getSuccessorRegions(
+    Region &region, SmallVectorImpl<RegionSuccessor> &regions) {
+  for (Block &block : region) {
+    if (block.empty())
+      continue;
+    if (auto terminator =
+            dyn_cast<RegionBranchTerminatorOpInterface>(block.back()))
+      getSuccessorRegions(RegionBranchPoint(terminator), regions);
+  }
+}
+
 OperandRange
 cudaq::cc::LoopOp::getEntrySuccessorOperands(RegionSuccessor successor) {
   // If the successor is the 'while' region (Region #0), pass the initial args.
@@ -1812,6 +1823,12 @@ cudaq::cc::LoopOp::getEntrySuccessorOperands(RegionSuccessor successor) {
 
   // Otherwise, no operands are passed from the parent.
   return {nullptr, 0};
+}
+
+ValueRange cudaq::cc::LoopOp::getSuccessorInputs(RegionSuccessor successor) {
+  if (successor.isParent())
+    return getResults();
+  return successor.getSuccessor()->front().getArguments();
 }
 
 SmallVector<Region *> cudaq::cc::LoopOp::getLoopRegions() {
@@ -2014,6 +2031,12 @@ void cudaq::cc::ScopeOp::getSuccessorRegions(
     return;
   }
   regions.emplace_back(RegionSuccessor::parent());
+}
+
+ValueRange cudaq::cc::ScopeOp::getSuccessorInputs(RegionSuccessor successor) {
+  if (successor.isParent())
+    return getResults();
+  return {};
 }
 
 // If quantumAllocs, then just look for any allocate memory effect. Otherwise,
@@ -2277,6 +2300,14 @@ void cudaq::cc::IfOp::getSuccessorRegions(
   }
 }
 
+OperandRange
+cudaq::cc::IfOp::getEntrySuccessorOperands(RegionSuccessor successor) {
+  auto *region = successor.getSuccessor();
+  if (region == &getThenRegion() || region == &getElseRegion())
+    return getLinearArgs();
+  return {nullptr, 0};
+}
+
 void cudaq::cc::IfOp::getEntrySuccessorRegions(
     ArrayRef<Attribute> operands, SmallVectorImpl<RegionSuccessor> &regions) {
   FoldAdaptor adaptor(operands);
@@ -2292,6 +2323,12 @@ void cudaq::cc::IfOp::getEntrySuccessorRegions(
     return;
   }
   regions.emplace_back(RegionSuccessor::parent());
+}
+
+ValueRange cudaq::cc::IfOp::getSuccessorInputs(RegionSuccessor successor) {
+  if (successor.isParent())
+    return getResults();
+  return successor.getSuccessor()->front().getArguments();
 }
 
 template <typename A>
