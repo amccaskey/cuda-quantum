@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from inspect import signature
+from random import Random
 import json
 import math
 import re
@@ -471,7 +472,34 @@ def _reorder_support(support, order):
     return tuple(support)
 
 
-def _exact_edge_color(checks, order):
+def _greedy_edge_color(checks, order):
+    """Partition ``(check, data)`` incidences with historical first fit."""
+
+    max_degree = max((len(support) for support in checks), default=0)
+    layers: list[list[tuple[int, int]]] = []
+    layer_checks: list[set[int]] = []
+    layer_data: list[set[int]] = []
+    for rank in range(max_degree):
+        for check, support in enumerate(checks):
+            ranked = _reorder_support(support, order)
+            if rank >= len(ranked):
+                continue
+            data = ranked[rank]
+            for index in range(len(layers)):
+                if (check not in layer_checks[index] and
+                        data not in layer_data[index]):
+                    layers[index].append((check, data))
+                    layer_checks[index].add(check)
+                    layer_data[index].add(data)
+                    break
+            else:
+                layers.append([(check, data)])
+                layer_checks.append({check})
+                layer_data.append({data})
+    return tuple(tuple(layer) for layer in layers)
+
+
+def _exact_edge_color(checks, order, rng):
     """Optimally color a bipartite check/data incidence graph.
 
     Edges are inserted neighbor-rank by neighbor-rank. When an edge's
@@ -509,17 +537,21 @@ def _exact_edge_color(checks, order):
 
     for edge, (check, data) in enumerate(incidences):
         edge_colors.append(-1)
-        common = next((color for color in range(delta)
+        common = tuple(color for color in range(delta)
                        if color not in check_colors[check] and
-                       color not in data_colors[data]), None)
-        if common is not None:
-            assign(edge, common)
+                       color not in data_colors[data])
+        if common:
+            assign(edge, common[0] if rng is None else rng.choice(common))
             continue
 
-        check_free = next(
+        check_free_colors = tuple(
             color for color in range(delta) if color not in check_colors[check])
-        data_free = next(
+        data_free_colors = tuple(
             color for color in range(delta) if color not in data_colors[data])
+        check_free = (check_free_colors[0]
+                      if rng is None else rng.choice(check_free_colors))
+        data_free = (data_free_colors[0]
+                     if rng is None else rng.choice(data_free_colors))
         path = []
         left_side = True
         vertex = check
@@ -556,7 +588,12 @@ class CSSCode(StabilizerCode):
 
     __slots__ = ()
 
-    def colored_schedule(self, *, x_order=None, z_order=None):
+    def colored_schedule(self,
+                         *,
+                         x_order=None,
+                         z_order=None,
+                         algorithm="greedy",
+                         rng_seed=None):
         """A per-time-step layering of this code's syndrome-extraction CX gates.
 
         Returns plain data -- ``(x_layers, z_layers)``, where each basis's
@@ -565,9 +602,10 @@ class CSSCode(StabilizerCode):
         of the layers is the schedule: the same stabilizers laid out two ways
         can have two circuit distances (a mid-round ancilla fault spreads to the
         data qubits it has yet to touch). ``x_order`` / ``z_order`` permute each
-        bulk check's neighbor ranking before deterministic exact bipartite
-        edge-coloring. Each basis uses the minimum possible number of layers:
-        the maximum degree among its check and data vertices.
+        bulk check's neighbor ranking before coloring. ``algorithm="greedy"``
+        preserves historical first fit; ``algorithm="exact"`` returns a
+        minimum-depth bipartite edge coloring. ``rng_seed`` selects
+        reproducible random tie breaks for the exact algorithm.
 
         Pass the result straight to
         ``cudaq.logical.extract_syndrome(..., cx_schedule=...)``; it is not a
@@ -575,8 +613,23 @@ class CSSCode(StabilizerCode):
         the schedule input that lays the gadget's CXs into ``fabric.tick``
         moments.
         """
-        return (_exact_edge_color(self.hx,
-                                  x_order), _exact_edge_color(self.hz, z_order))
+        if algorithm == "greedy":
+            if rng_seed is not None:
+                raise ValueError(
+                    "colored_schedule rng_seed requires algorithm='exact'")
+            return (_greedy_edge_color(self.hx, x_order),
+                    _greedy_edge_color(self.hz, z_order))
+        if algorithm == "exact":
+            if rng_seed is None:
+                x_rng = z_rng = None
+            else:
+                seed_rng = Random(rng_seed)
+                x_rng = Random(seed_rng.getrandbits(128))
+                z_rng = Random(seed_rng.getrandbits(128))
+            return (_exact_edge_color(self.hx, x_order, x_rng),
+                    _exact_edge_color(self.hz, z_order, z_rng))
+        raise ValueError(
+            "colored_schedule algorithm must be 'greedy' or 'exact'")
 
     @classmethod
     def from_geometry(cls, geometry, *, d=None, name: str | None = None):

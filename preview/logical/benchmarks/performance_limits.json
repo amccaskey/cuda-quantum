@@ -1,0 +1,10 @@
+{
+  "schema": "cudaq.logical.performance-limits/v1",
+  "reference": "2026-09-17 source-built reference run on the perflab class of runner; limits include build and host headroom",
+  "cases": {
+    "folding-16": {"wall_seconds": 5, "peak_rss_mib": 512},
+    "rsa2048-factory": {"wall_seconds": 90, "peak_rss_mib": 1024},
+    "fermi-p3-l4": {"wall_seconds": 900, "peak_rss_mib": 20480}
+  },
+  "baseline_max_ratio": {"wall_seconds": 1.5, "peak_rss_mib": 1.25}
+}

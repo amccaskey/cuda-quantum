@@ -95,7 +95,7 @@ def _dependencies():
     except ImportError as error:
         raise ImportError(
             "Pinnacle arbitrary-angle RUS synthesis requires PyGridSynth; "
-            "install `cudaq-logical[synthesis]`") from error
+            "install `cudaq-logical[rus]`") from error
     return (
         mpmath,
         diophantine_dyadic,

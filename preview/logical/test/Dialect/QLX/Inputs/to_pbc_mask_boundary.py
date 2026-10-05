@@ -9,7 +9,6 @@
 
 import sys
 
-import _cudaq_logical_devpath  # noqa: F401
 from cudaq.mlir._mlir_libs import _qlxRuntime as runtime
 
 
@@ -24,9 +23,11 @@ def _module(support: int, *, rotation: bool) -> str:
     current = []
     for index in range(support):
         name = f"%q{index}"
-        lines.append(f'    {name} = qlx.prepare "zero" '
-                     f'{{allocation = 0 : i64, value_index = {index} : i64}} '
-                     ': !qlx.logical_qubit')
+        lines.append(
+            f'    {name} = qlx.prepare "zero" '
+            f'{{allocation = 0 : i64, value_index = {index} : i64}} '
+            ': !qlx.logical_qubit'
+        )
         current.append(name)
 
     # Z on the target conjugates through each preceding CX(target) to a Z
@@ -35,25 +36,29 @@ def _module(support: int, *, rotation: bool) -> str:
     target = support - 1
     for control in range(target):
         result = f"%cx{control}"
-        lines.append(f"    {result}:2 = qlx.apply #qlx.action<cx>"
-                     f"({current[control]}, {current[target]}) "
-                     ": (!qlx.logical_qubit, !qlx.logical_qubit) -> "
-                     "(!qlx.logical_qubit, !qlx.logical_qubit)")
+        lines.append(
+            f"    {result}:2 = qlx.apply #qlx.action<cx>"
+            f"({current[control]}, {current[target]}) "
+            ": (!qlx.logical_qubit, !qlx.logical_qubit) -> "
+            "(!qlx.logical_qubit, !qlx.logical_qubit)"
+        )
         current[control] = f"{result}#0"
         current[target] = f"{result}#1"
 
     if rotation:
-        lines.append(f"    %t = qlx.apply #qlx.action<t>({current[target]}) "
-                     ": (!qlx.logical_qubit) -> !qlx.logical_qubit")
+        lines.append(
+            f"    %t = qlx.apply #qlx.action<t>({current[target]}) "
+            ": (!qlx.logical_qubit) -> !qlx.logical_qubit"
+        )
         current[target] = "%t"
 
-    lines.extend((
+    lines.append(
         f"    %m = qlx.measure <Z> {current[target]} "
-        ": !qlx.logical_qubit -> i1",
-        "    qlx.return %m : i1",
-        "  }",
-        "}",
-    ))
+        ": !qlx.logical_qubit -> i1"
+    )
+    for owner in current[:target]:
+        lines.append(f"    qlx.discard {owner} : !qlx.logical_qubit")
+    lines.extend(("    qlx.return %m : i1", "  }", "}"))
     return "\n".join(lines) + "\n"
 
 
@@ -63,7 +68,8 @@ def main(mode: str) -> None:
         maximum_mask = "z_mask = 9223372036854775807 : i64"
         if lowered.count(maximum_mask) < 2:
             raise AssertionError(
-                "63-bit rotation and measurement masks were not preserved")
+                "63-bit rotation and measurement masks were not preserved"
+            )
         print("63-bit rotation and measurement masks are representable")
     elif mode == "rotation-overflow":
         runtime.to_pbc(_module(64, rotation=True))
