@@ -52,6 +52,7 @@ Releases = "https://nvidia.github.io/cuda-quantum/latest/releases.html"
 cu12 = ["cuda-quantum-cu12"]
 cu13 = ["cuda-quantum-cu13"]
 dev = ["pytest>=7.0"]
+rus = ["pygridsynth>=2.0,<3"]
 
 [build-system]
 requires = [

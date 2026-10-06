@@ -99,6 +99,42 @@ def _validate_rsa_factory(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _validate_fermi_p3(record: dict[str, Any]) -> dict[str, Any]:
+    if record.get("schema") != "qlx.pinnacle-fermi-hubbard-p3/v2":
+        raise RuntimeError("Fermi--Hubbard receipt has an unexpected schema")
+    if record.get("problem", {}).get("lattice_size") != 4:
+        raise RuntimeError("Fermi--Hubbard receipt does not describe L=4")
+    studies = record.get("studies", [])
+    if len(studies) != 1 or studies[0].get("factory_mode") != "factory_model":
+        raise RuntimeError("Fermi--Hubbard receipt lacks the factory-model route")
+    study = studies[0]
+    if (study.get("architecture") != "pinnacle_gb510"
+            or study.get("p_phys") != 0.001
+            or study.get("termination_semantics") != "full_workload"):
+        raise RuntimeError("Fermi--Hubbard receipt changed the benchmark route")
+    if (study.get("schedule_entries") != 1237808 or
+            study.get("physical_qubits") != 10890):
+        raise RuntimeError(
+            "Fermi--Hubbard receipt does not cover the reviewed P3 workload")
+    if (_digest(study.get("p3_sha256"), "Fermi p3_sha256") !=
+            "sha256:bd85f4e5604f09782ccb3cd3cf90184a8eb91029c02a8a17f19d55fc76c5a4a3" or
+            _digest(study.get("schedule_sha256"), "Fermi schedule_sha256") !=
+            "sha256:d8bf473139d4a0fe85dd11387108364cd40b4d1b23c7a3bc4782410cc9c14842"):
+        raise RuntimeError(
+            "Fermi--Hubbard receipt differs from the reviewed P3 artifact")
+    return {
+        "schedule_entries": int(
+            _positive_number(study.get("schedule_entries"), "schedule_entries")
+        ),
+        "physical_qubits": int(
+            _positive_number(study.get("physical_qubits"), "physical_qubits")
+        ),
+        "expected_makespan_ns": _positive_number(
+            study.get("expected_makespan_ns"), "expected_makespan_ns"
+        ),
+    }
+
+
 CASES = {
     "folding-16": Case(
         name="folding-16",
@@ -132,6 +168,25 @@ CASES = {
             "--force",
         ],
         validate=_validate_rsa_factory,
+    ),
+    "fermi-p3-l4": Case(
+        name="fermi-p3-l4",
+        receipt_name="fermi-p3-l4.json",
+        command=lambda worktree, receipt, python: [
+            str(python),
+            str(worktree / "preview" / "logical" / "benchmarks" /
+                "paper_evaluations" / "fermi_hubbard_p3.py"),
+            "--lattice-size",
+            "4",
+            "--p-phys",
+            "0.001",
+            "--factory-mode",
+            "factory_model",
+            "--json",
+            str(receipt),
+            "--force",
+        ],
+        validate=_validate_fermi_p3,
     ),
 }
 
